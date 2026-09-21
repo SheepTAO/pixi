@@ -47,7 +47,7 @@ jobs:
       - run: npm ci
 
       - name: Publish Extension (Code Marketplace)
-        run: npx vsce publish --pat ${{ secrets.MARKETPLACE_TOKEN }}
+        run: npx vsce publish --skip-duplicate --pat ${{ secrets.MARKETPLACE_TOKEN }}
 
   publish-openvsx:
     name: 'Publish (OpenVSX)'
@@ -96,8 +96,6 @@ jobs:
         run: npx vsce package --no-git-tag-version
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@c95fe1489396fe8a9ec87454c6603b781431c0ca # v2.2.1
-        with:
-          files: '*.vsix'
+        run: gh release create ${{ github.ref_name }} *.vsix --generate-notes
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
