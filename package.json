@@ -4,7 +4,7 @@
     "description": "Pixi Python environment manager for Visual Studio Code",
     "icon": "assets/icon.png",
     "license": "MIT",
-    "version": "0.2.2",
+    "version": "0.2.3",
     "homepage": "https://github.com/SheepTAO/pixi-python",
     "repository": {
         "type": "git",
@@ -68,6 +68,15 @@
                     ],
                     "description": "Glob patterns to exclude when searching for Pixi projects in the workspace.",
                     "scope": "resource"
+                },
+                "pixi-python.environmentRules": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "default": [],
+                    "description": "Rules to map glob patterns to Pixi environment names (format: 'pattern=env' or 'pattern:env', e.g. 'tests/**=dev', 'train/**=train'). Click 'Add Item' to add rules.",
+                    "scope": "resource"
                 }
             }
         },
@@ -96,6 +105,7 @@
     "devDependencies": {
         "@types/fs-extra": "^11.0.4",
         "@types/node": "24.x",
+        "@types/picomatch": "^4.0.3",
         "@types/vscode": "^1.118.0",
         "@types/which": "^3.0.4",
         "@typescript-eslint/eslint-plugin": "^8.59.1",
@@ -114,6 +124,7 @@
         "@vscode/python-environments": "^1.0.0",
         "fast-glob": "^3.3.3",
         "fs-extra": "^11.3.4",
+        "picomatch": "^4.0.7",
         "semver": "^7.7.4",
         "which": "^6.0.1"
     }

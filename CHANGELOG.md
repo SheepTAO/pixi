@@ -5,6 +5,12 @@ All notable changes to the "pixi-python" extension will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3]
+
+- Add `pixi-python.environmentRules` setting with interactive "Add Item" list editor in VS Code Settings UI
+- Support dynamic per-file environment switching across multiple environments (format: `tests/**=dev`, with backward-compatible object support)
+- Implement lightweight exact environment rule matching using `picomatch` for fast, sub-millisecond glob resolution
+
 ## [0.2.2]
 
 - Fix package inspection showing "No packages found" by returning package list from `PixiPackageManager.refresh` to satisfy VS Code tree view rendering
