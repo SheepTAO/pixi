@@ -1,15 +1,18 @@
 # Changelog
 
-All notable changes to the "pixi-code" extension will be documented in this file.
+All notable changes to the "pixi-python" extension will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.2.1]
 
-- Fix environment discovery failure when project contains unsupported environments
-- Support relative paths and `${workspaceFolder}` in `pixi-code.pixiExecutable` setting
-- Add error handling to package manager refresh
+- Rebrand to `pixi-python` (Pixi Python) under publisher `sheeptao`
+- Fix environment discovery failure when project contains unsupported environments (fixes #39)
+- Fix package list inspection failing with decorated environment name (fixes #47, #50)
+- Add configurable directory ignore patterns (`pixi-python.searchIgnorePatterns`) to `fast-glob` search to optimize startup performance
+- Support relative paths and `${workspaceFolder}` in `pixi-python.pixiExecutable` setting
+- Add error boundary to `PixiPackageManager.refresh`
 
 ## [0.2.0]
 

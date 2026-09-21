@@ -1,17 +1,17 @@
 {
-    "name": "pixi-code",
-    "displayName": "Pixi Code",
-    "description": "Pixi support for the Python Environments extension",
+    "name": "pixi-python",
+    "displayName": "Pixi Python",
+    "description": "Pixi Python environment manager for Visual Studio Code",
     "icon": "assets/icon.png",
     "license": "MIT",
     "version": "0.2.1",
-    "homepage": "https://github.com/renan-r-santos/pixi-code",
+    "homepage": "https://github.com/SheepTAO/pixi-python",
     "repository": {
         "type": "git",
-        "url": "https://github.com/renan-r-santos/pixi-code"
+        "url": "https://github.com/SheepTAO/pixi-python.git"
     },
     "bugs": {
-        "url": "https://github.com/renan-r-santos/pixi-code/issues"
+        "url": "https://github.com/SheepTAO/pixi-python/issues"
     },
     "keywords": [
         "pixi",
@@ -31,7 +31,7 @@
         "workspaceContains:**/pixi.toml",
         "workspaceContains:**/pyproject.toml"
     ],
-    "publisher": "renan-r-santos",
+    "publisher": "sheeptao",
     "extensionDependencies": [
         "ms-python.vscode-python-envs"
     ],
@@ -46,13 +46,28 @@
             ]
         },
         "configuration": {
-            "title": "Pixi",
+            "title": "Pixi Python",
             "properties": {
-                "pixi-code.pixiExecutable": {
+                "pixi-python.pixiExecutable": {
                     "type": "string",
                     "default": "",
-                    "description": "Path to the Pixi executable. Leave empty to use auto-discovery.",
+                    "description": "Path to the Pixi executable (supports relative paths and ${workspaceFolder}). Leave empty to use auto-discovery.",
                     "scope": "machine-overridable"
+                },
+                "pixi-python.searchIgnorePatterns": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "default": [
+                        "**/node_modules/**",
+                        "**/.git/**",
+                        "**/dist/**",
+                        "**/build/**",
+                        "**/.venv/**"
+                    ],
+                    "description": "Glob patterns to exclude when searching for Pixi projects in the workspace.",
+                    "scope": "resource"
                 }
             }
         },

@@ -1,6 +1,6 @@
-# Contributing to Pixi Code
+# Contributing to Pixi Python
 
-Thank you for your interest in contributing to Pixi Code! This document provides guidelines for contributing to this VS
+Thank you for your interest in contributing to Pixi Python! This document provides guidelines for contributing to this VS
 Code extension that integrates Pixi environments with the Python Environments extension.
 
 ## Development setup
@@ -13,8 +13,8 @@ Code extension that integrates Pixi environments with the Python Environments ex
 2. **Clone and setup**
 
     ```bash
-    git clone https://github.com/renan-r-santos/pixi-code.git
-    cd pixi-code
+    git clone https://github.com/SheepTAO/pixi-python.git
+    cd pixi-python
     npm install
     ```
 

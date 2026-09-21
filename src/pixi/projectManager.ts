@@ -72,15 +72,16 @@ export class PixiPackageManager implements PackageManager, Disposable {
                 }
 
                 const projectPath = path.dirname(environment.pixiInfo.project_info.manifest_path);
+                const envName = environment.pixiEnvName || environment.name;
                 try {
-                    const pixiPackages = await listPixiPackages(environment.name, projectPath);
+                    const pixiPackages = await listPixiPackages(envName, projectPath);
                     const before = environment.packages;
                     const after = pixiPkgsToPackages(pixiPackages, environment.envId.id);
 
                     environment.packages = after;
                     this.triggerOnDidChangePackages(environment, before, after);
                 } catch (error) {
-                    traceVerbose(`Failed to refresh packages for environment '${environment.name}': ${error}`);
+                    traceVerbose(`Failed to refresh packages for environment '${envName}': ${error}`);
                 }
             },
         );

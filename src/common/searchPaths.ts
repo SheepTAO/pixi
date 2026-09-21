@@ -74,6 +74,21 @@ function resolveWorkspacePaths(searchPaths: string[]): string[] {
     return resolved;
 }
 
+const DEFAULT_SEARCH_IGNORE_PATTERNS = ['**/node_modules/**', '**/.git/**', '**/dist/**', '**/build/**', '**/.venv/**'];
+
+function getSearchIgnorePatterns(): string[] {
+    try {
+        const config = workspace.getConfiguration('pixi-python');
+        const userPatterns = config.get<string[]>('searchIgnorePatterns');
+        if (userPatterns && userPatterns.length > 0) {
+            return userPatterns;
+        }
+    } catch (error) {
+        traceError('Error reading pixi-python.searchIgnorePatterns:', error);
+    }
+    return DEFAULT_SEARCH_IGNORE_PATTERNS;
+}
+
 async function findPixiDirectories(patterns: string[]): Promise<string[]> {
     const pixiPatterns: string[] = [];
 
@@ -99,6 +114,8 @@ async function findPixiDirectories(patterns: string[]): Promise<string[]> {
 
     traceVerbose('Searching for .pixi directories with patterns:', pixiPatterns);
 
+    const ignorePatterns = getSearchIgnorePatterns();
+
     try {
         const results = await fg(pixiPatterns, {
             onlyDirectories: true,
@@ -106,6 +123,7 @@ async function findPixiDirectories(patterns: string[]): Promise<string[]> {
             dot: true,
             followSymbolicLinks: false,
             deep: 10,
+            ignore: ignorePatterns,
             suppressErrors: true,
         });
 
