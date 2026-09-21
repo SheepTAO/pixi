@@ -67,7 +67,16 @@ jobs:
       - run: npm ci
 
       - name: Publish Extension (OpenVSX, release)
-        run: npx ovsx publish --pat ${{ secrets.OPENVSX_TOKEN }}
+        run: |
+          if output=$(npx ovsx publish --pat ${{ secrets.OPENVSX_TOKEN }} 2>&1); then
+            echo "$output"
+          elif echo "$output" | grep -qi "already published"; then
+            echo "$output"
+            echo "::notice::Version is already published on OpenVSX, skipping."
+          else
+            echo "$output"
+            exit 1
+          fi
         timeout-minutes: 2
 
   github-release:
