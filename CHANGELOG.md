@@ -5,6 +5,14 @@ All notable changes to the "pixi-python" extension will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2]
+
+- Fix package inspection showing "No packages found" in the Environment Managers tree view
+- Add environment package caching and dynamic on-demand retrieval in `PixiPackageManager`
+- Remove `is_explicit` filter to display all installed packages, including Pixi feature dependencies
+- Enrich package tooltips with package type (`conda` / `pypi`) and version
+- Make `PixiPackageManager.refresh` resilient to stripped VS Code environment objects
+
 ## [0.2.1]
 
 - Rebrand to `pixi-python` (Pixi Python) under publisher `sheeptao`

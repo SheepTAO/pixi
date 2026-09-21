@@ -12,6 +12,7 @@ import {
     ResolveEnvironmentContext,
     SetEnvironmentScope,
 } from '@vscode/python-environments';
+import * as path from 'path';
 import { EventEmitter, LogOutputChannel, MarkdownString, ProgressLocation, ThemeIcon, Uri, window } from 'vscode';
 
 import { createDeferred, Deferred } from '../common/deferred';
@@ -164,6 +165,17 @@ export class PixiEnvManager implements EnvironmentManager {
         traceVerbose('Called clearCache');
 
         await clearExtensionCache();
+    }
+
+    getPixiEnvironment(envId: string): PixiEnvironment | undefined {
+        const normalized = path.normalize(envId);
+        for (const envs of this.projectToEnvs.values()) {
+            const found = envs.find((e) => path.normalize(e.envId.id) === normalized);
+            if (found) {
+                return found;
+            }
+        }
+        return undefined;
     }
 
     private buildEnvLookup(): Map<string, PixiEnvironment> {

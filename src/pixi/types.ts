@@ -15,6 +15,7 @@ export interface PixiPackage {
     name: string;
     version: string;
     is_explicit: boolean;
+    kind?: string;
 }
 
 export interface PixiEnvironment extends PythonEnvironment {

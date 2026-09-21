@@ -21,16 +21,19 @@ import {
 } from 'vscode';
 
 import { traceVerbose } from '../common/logging';
+import { PixiEnvManager } from './envManager';
 import { PixiEnvironment } from './types';
 import { listPixiPackages, pixiPkgsToPackages } from './utils';
 
 export class PixiPackageManager implements PackageManager, Disposable {
     private readonly _onDidChangePackages = new EventEmitter<DidChangePackagesEventArgs>();
     onDidChangePackages: Event<DidChangePackagesEventArgs> = this._onDidChangePackages.event;
+    private packagesCache = new Map<string, Package[]>();
 
     constructor(
         public readonly api: PythonEnvironmentApi,
         public readonly log: LogOutputChannel,
+        private readonly envManager?: PixiEnvManager,
     ) {
         this.name = 'pixi';
         this.displayName = 'Pixi';
@@ -49,6 +52,10 @@ export class PixiPackageManager implements PackageManager, Disposable {
         this._onDidChangePackages.dispose();
     }
 
+    async clearCache(): Promise<void> {
+        this.packagesCache.clear();
+    }
+
     async manage(environment: PythonEnvironment, options: PackageManagementOptions): Promise<void> {
         traceVerbose(
             `Called manage with environment: ${JSON.stringify(environment)}, options: ${JSON.stringify(options)}`,
@@ -57,8 +64,65 @@ export class PixiPackageManager implements PackageManager, Disposable {
         window.showErrorMessage('The Pixi extension does not support managing packages. Please use the CLI directly.');
     }
 
-    async refresh(environment: PixiEnvironment): Promise<void> {
-        traceVerbose(`Called refresh for environment: ${JSON.stringify(environment)}`);
+    private resolveEnvDetails(environment: PythonEnvironment): { envName: string; projectPath: string } | undefined {
+        const envId = environment.envId.id;
+        const pixiEnv = this.envManager?.getPixiEnvironment(envId);
+
+        let envName = pixiEnv?.pixiEnvName;
+        let projectPath = pixiEnv?.pixiInfo?.project_info?.manifest_path
+            ? path.dirname(pixiEnv.pixiInfo.project_info.manifest_path)
+            : undefined;
+
+        if (!envName || !projectPath) {
+            const normalized = path.normalize(envId);
+            const parsedEnvName = path.basename(normalized);
+            const envsDir = path.dirname(normalized);
+            const dotPixiDir = path.dirname(envsDir);
+
+            if (!envName) {
+                envName = parsedEnvName;
+            }
+
+            if (!projectPath && path.basename(envsDir) === 'envs' && path.basename(dotPixiDir) === '.pixi') {
+                projectPath = path.dirname(dotPixiDir);
+            }
+        }
+
+        if (envName && projectPath) {
+            return { envName, projectPath };
+        }
+
+        return undefined;
+    }
+
+    private async fetchAndCachePackages(
+        environment: PythonEnvironment,
+        pixiEnv?: PixiEnvironment,
+    ): Promise<Package[] | undefined> {
+        const envId = environment.envId.id;
+        const details = this.resolveEnvDetails(environment);
+        if (!details) {
+            traceVerbose(`Unable to resolve Pixi environment details for: ${envId}`);
+            return undefined;
+        }
+
+        try {
+            const pixiPackages = await listPixiPackages(details.envName, details.projectPath);
+            const packages = pixiPkgsToPackages(pixiPackages, envId);
+            this.packagesCache.set(envId, packages);
+            if (pixiEnv) {
+                pixiEnv.packages = packages;
+            }
+            return packages;
+        } catch (error) {
+            traceVerbose(`Failed to fetch packages for environment '${details.envName}': ${error}`);
+            return undefined;
+        }
+    }
+
+    async refresh(environment: PythonEnvironment): Promise<void> {
+        const envId = environment.envId.id;
+        traceVerbose(`Called refresh for environment: ${envId}`);
 
         await window.withProgress(
             {
@@ -66,34 +130,37 @@ export class PixiPackageManager implements PackageManager, Disposable {
                 title: 'Refreshing Pixi packages',
             },
             async () => {
-                if (!environment.pixiInfo.project_info) {
-                    traceVerbose('No project info found in pixiInfo; skipping package refresh.');
-                    return;
-                }
+                const pixiEnv = this.envManager?.getPixiEnvironment(envId);
+                const before = this.packagesCache.get(envId) || pixiEnv?.packages || [];
+                const after = (await this.fetchAndCachePackages(environment, pixiEnv)) || [];
 
-                const projectPath = path.dirname(environment.pixiInfo.project_info.manifest_path);
-                const envName = environment.pixiEnvName || environment.name;
-                try {
-                    const pixiPackages = await listPixiPackages(envName, projectPath);
-                    const before = environment.packages;
-                    const after = pixiPkgsToPackages(pixiPackages, environment.envId.id);
-
-                    environment.packages = after;
-                    this.triggerOnDidChangePackages(environment, before, after);
-                } catch (error) {
-                    traceVerbose(`Failed to refresh packages for environment '${envName}': ${error}`);
-                }
+                this.triggerOnDidChangePackages(environment, before, after);
             },
         );
     }
 
-    async getPackages(environment: PixiEnvironment): Promise<Package[] | undefined> {
-        traceVerbose(`Called getPackages for environment: ${JSON.stringify(environment)}`);
+    async getPackages(environment: PythonEnvironment): Promise<Package[] | undefined> {
+        const envId = environment.envId.id;
+        traceVerbose(`Called getPackages for environment: ${envId}`);
 
-        return environment.packages;
+        // 1. Check internal cache
+        const cached = this.packagesCache.get(envId);
+        if (cached && cached.length > 0) {
+            return cached;
+        }
+
+        // 2. Check PixiEnvManager cache
+        const pixiEnv = this.envManager?.getPixiEnvironment(envId);
+        if (pixiEnv?.packages && pixiEnv.packages.length > 0) {
+            this.packagesCache.set(envId, pixiEnv.packages);
+            return pixiEnv.packages;
+        }
+
+        // 3. Fallback: on-demand fetch
+        return this.fetchAndCachePackages(environment, pixiEnv);
     }
 
-    private triggerOnDidChangePackages(environment: PixiEnvironment, before: Package[], after: Package[]): void {
+    private triggerOnDidChangePackages(environment: PythonEnvironment, before: Package[], after: Package[]): void {
         const changes: { kind: PackageChangeKind; pkg: Package }[] = [];
 
         // Find removed packages

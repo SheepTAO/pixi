@@ -197,19 +197,21 @@ export async function refreshPixi(projectPath: string): Promise<PixiEnvironment[
 }
 
 export function pixiPkgsToPackages(pixiPackages: PixiPackage[], environmentId: string): Package[] {
-    return pixiPackages
-        .filter((pkg) => pkg.is_explicit)
-        .map((pkg) => ({
+    return pixiPackages.map((pkg) => {
+        const tooltip = pkg.kind ? `${pkg.name} ${pkg.version} (${pkg.kind})` : `${pkg.name} ${pkg.version}`;
+        return {
             name: pkg.name,
             displayName: pkg.name,
             description: pkg.version,
             version: pkg.version,
+            tooltip,
             pkgId: {
                 id: pkg.name,
                 managerId: PIXI_MANAGER_ID,
                 environmentId,
             },
-        }));
+        };
+    });
 }
 
 type PixiPersistentState = {
