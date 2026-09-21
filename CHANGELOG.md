@@ -7,8 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.2.2]
 
-- Fix package inspection showing "No packages found" in the Environment Managers tree view
+- Fix package inspection showing "No packages found" by returning package list from `PixiPackageManager.refresh` to satisfy VS Code tree view rendering
 - Add environment package caching and dynamic on-demand retrieval in `PixiPackageManager`
+- Differentiate direct vs transitive dependencies using native `isTransitive` mapping (`!is_explicit`), enabling VS Code's native dependency grouping and icons
 - Remove `is_explicit` filter to display all installed packages, including Pixi feature dependencies
 - Enrich package tooltips with package type (`conda` / `pypi`) and version
 - Make `PixiPackageManager.refresh` resilient to stripped VS Code environment objects

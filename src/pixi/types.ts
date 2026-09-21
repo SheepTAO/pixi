@@ -15,7 +15,8 @@ export interface PixiPackage {
     name: string;
     version: string;
     is_explicit: boolean;
-    kind?: string;
+    kind?: 'conda' | 'pypi' | string;
+    build?: string;
 }
 
 export interface PixiEnvironment extends PythonEnvironment {

@@ -20,7 +20,7 @@ import {
     window,
 } from 'vscode';
 
-import { traceVerbose } from '../common/logging';
+import { traceError, traceInfo, traceVerbose } from '../common/logging';
 import { PixiEnvManager } from './envManager';
 import { PixiEnvironment } from './types';
 import { listPixiPackages, pixiPkgsToPackages } from './utils';
@@ -102,7 +102,7 @@ export class PixiPackageManager implements PackageManager, Disposable {
         const envId = environment.envId.id;
         const details = this.resolveEnvDetails(environment);
         if (!details) {
-            traceVerbose(`Unable to resolve Pixi environment details for: ${envId}`);
+            traceError(`Unable to resolve Pixi environment details for: ${envId}`);
             return undefined;
         }
 
@@ -113,18 +113,19 @@ export class PixiPackageManager implements PackageManager, Disposable {
             if (pixiEnv) {
                 pixiEnv.packages = packages;
             }
+            traceInfo(`Loaded ${packages.length} packages for environment '${details.envName}'`);
             return packages;
         } catch (error) {
-            traceVerbose(`Failed to fetch packages for environment '${details.envName}': ${error}`);
+            traceError(`Failed to fetch packages for environment '${details.envName}': ${error}`);
             return undefined;
         }
     }
 
     async refresh(environment: PythonEnvironment): Promise<void> {
         const envId = environment.envId.id;
-        traceVerbose(`Called refresh for environment: ${envId}`);
+        traceInfo(`Called refresh for environment: ${envId}`);
 
-        await window.withProgress(
+        return (await window.withProgress(
             {
                 location: ProgressLocation.Window,
                 title: 'Refreshing Pixi packages',
@@ -135,8 +136,9 @@ export class PixiPackageManager implements PackageManager, Disposable {
                 const after = (await this.fetchAndCachePackages(environment, pixiEnv)) || [];
 
                 this.triggerOnDidChangePackages(environment, before, after);
+                return after;
             },
-        );
+        )) as unknown as void;
     }
 
     async getPackages(environment: PythonEnvironment): Promise<Package[] | undefined> {

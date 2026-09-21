@@ -205,12 +205,13 @@ export function pixiPkgsToPackages(pixiPackages: PixiPackage[], environmentId: s
             description: pkg.version,
             version: pkg.version,
             tooltip,
+            isTransitive: !pkg.is_explicit,
             pkgId: {
                 id: pkg.name,
                 managerId: PIXI_MANAGER_ID,
                 environmentId,
             },
-        };
+        } as Package;
     });
 }
 
