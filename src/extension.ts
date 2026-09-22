@@ -3,10 +3,10 @@ import { commands, ExtensionContext, window, workspace } from 'vscode';
 
 import { registerLogger, traceError } from './common/logging';
 import { setPersistentState } from './common/persistentState';
+import { getPixi, runPixi } from './pixi/cli';
 import { PixiEnvManager } from './pixi/envManager';
-import { PixiPackageManager } from './pixi/projectManager';
+import { PixiPackageManager } from './pixi/packageManager';
 import { PixiTaskProvider } from './pixi/taskProvider';
-import { getPixi, runPixi } from './pixi/utils';
 import { getEnvExtApi } from './pythonEnvsApi';
 
 const MINIMUM_PIXI_VERSION = '0.53.0';

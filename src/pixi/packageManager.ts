@@ -21,9 +21,36 @@ import {
 } from 'vscode';
 
 import { traceError, traceInfo, traceVerbose } from '../common/logging';
+import { PIXI_MANAGER_ID } from '../common/utils';
+import { runPixi } from './cli';
 import { PixiEnvManager } from './envManager';
-import { PixiEnvironment } from './types';
-import { listPixiPackages, pixiPkgsToPackages } from './utils';
+import { PixiEnvironment, PixiPackage } from './types';
+
+export async function listPixiPackages(envName: string, projectPath: string): Promise<PixiPackage[]> {
+    const stdout = await runPixi(['list', '--no-install', '--frozen', '--json', '--environment', envName], {
+        cwd: projectPath,
+    });
+    return JSON.parse(stdout);
+}
+
+export function pixiPkgsToPackages(pixiPackages: PixiPackage[], environmentId: string): Package[] {
+    return pixiPackages.map((pkg) => {
+        const tooltip = pkg.kind ? `${pkg.name} ${pkg.version} (${pkg.kind})` : `${pkg.name} ${pkg.version}`;
+        return {
+            name: pkg.name,
+            displayName: pkg.name,
+            description: pkg.version,
+            version: pkg.version,
+            tooltip,
+            isTransitive: !pkg.is_explicit,
+            pkgId: {
+                id: pkg.name,
+                managerId: PIXI_MANAGER_ID,
+                environmentId,
+            },
+        } as Package;
+    });
+}
 
 export class PixiPackageManager implements PackageManager, Disposable {
     private readonly _onDidChangePackages = new EventEmitter<DidChangePackagesEventArgs>();

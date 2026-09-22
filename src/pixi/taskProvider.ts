@@ -17,8 +17,8 @@ import {
 } from 'vscode';
 
 import { traceError, traceVerbose } from '../common/logging';
+import { getPixi, runPixi } from './cli';
 import { PixiEnvManager } from './envManager';
-import { getPixi, runPixi } from './utils';
 
 export interface PixiTaskDefinition extends TaskDefinition {
     type: 'pixi';
