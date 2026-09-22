@@ -2,7 +2,7 @@ import { Package } from '@vscode/python-environments';
 import * as ch from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
-import { CancellationError, CancellationToken, ThemeIcon, Uri, window, workspace } from 'vscode';
+import { CancellationError, CancellationToken, ThemeIcon, Uri, workspace } from 'vscode';
 import which from 'which';
 
 import { createDeferred } from '../common/deferred';
@@ -48,10 +48,9 @@ export async function getPixi(): Promise<string> {
 
     const pixiPath = await findPixi();
     if (!pixiPath) {
-        const errorMsg =
-            'Pixi executable not found. Please install Pixi or set "pixi-python.pixiExecutable" in your settings.';
-        window.showErrorMessage(errorMsg);
-        throw new Error(errorMsg);
+        throw new Error(
+            'Pixi executable not found. Please install Pixi or set "pixi-python.pixiExecutable" in your settings.',
+        );
     }
     return pixiPath;
 }

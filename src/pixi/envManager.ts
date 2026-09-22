@@ -215,8 +215,7 @@ export class PixiEnvManager implements EnvironmentManager {
     async resolve(context: ResolveEnvironmentContext): Promise<PythonEnvironment | undefined> {
         traceVerbose(`Called resolve with context: ${context}`);
 
-        const project = this.api.getPythonProject(context);
-        return project ? this.activeEnv.get(project.uri.fsPath) : undefined;
+        return this.get(context);
     }
 
     async clearCache() {
