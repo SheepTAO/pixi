@@ -26,10 +26,12 @@
 ## ✨ Features
 
 - **Automatic Environment Discovery**: Instantly detects Pixi projects with `pixi.toml` or `pyproject.toml`.
+- **Core Workflow Management**: Sync environments (`pixi install`), update dependencies (`pixi update`), and add/remove packages with full Conda and PyPI channel support.
 - **Dynamic Per-File Environment Resolution**: Map file/directory patterns (e.g. `tests/**` → `dev`) to automatically switch Python interpreters for different files.
 - **Native Pixi Tasks Integration**: Auto-discovers Pixi tasks as native VS Code Tasks (`Terminal: Run Task...`) and provides a quick Command Palette runner (`Pixi: Run Task`).
 - **Unified Terminal Profile**: Launch interactive terminals pre-activated in any Pixi environment directly from the terminal profile menu or Command Palette.
-- **Native Package Inspection**: Full package tree view with explicit (direct) vs transitive (indirect) dependency distinction and package channels (`conda` / `pypi`).
+- **Native Package Inspection & Management**: Full package tree view with explicit (direct) vs transitive (indirect) dependency distinction and package channels (`conda` / `pypi`), with native install/uninstall support.
+- **Editor Toolbar Sync**: Quick sync and update action buttons directly in the editor header when editing `pixi.toml` or `pyproject.toml`.
 - **Pixi Features Support**: Discovers and exposes Pixi features (dev, test, lint, etc.) as distinct selectable environments.
 - **Interpreter & Terminal Integration**: Automatic interpreter selection for editing, running, debugging, and terminal activation.
 - **Multi-Platform Safe**: Gracefully handles platform-specific environments without interrupting workspace discovery.
@@ -61,12 +63,16 @@ _(Object format `{"tests/**": "dev"}` is also supported for backward compatibili
 
 ## ⌨️ Commands
 
-| Command                                   | Identifier                         | Description                                                            |
-| :---------------------------------------- | :--------------------------------- | :--------------------------------------------------------------------- |
-| **Pixi: Run Task**                        | `pixi-python.runTask`              | QuickPick menu to search and run any task defined in the Pixi project. |
-| **Pixi: Run Task in Environment...**      | `pixi-python.runTaskInEnvironment` | Select a task and choose a specific Pixi environment to run it in.     |
-| **Pixi: Open Terminal in Environment...** | `pixi-python.openTerminal`         | Open a dedicated VS Code terminal inside a selected Pixi environment.  |
-| **Pixi: Initialize Project...**           | `pixi-python.init`                 | Initialize a new Pixi project in the selected workspace folder.        |
+| Command                                   | Identifier                         | Description                                                                      |
+| :---------------------------------------- | :--------------------------------- | :------------------------------------------------------------------------------- |
+| **Pixi: Install (Sync Environments)**     | `pixi-python.install`              | Install all dependencies and sync environments for the selected Pixi project.    |
+| **Pixi: Update Dependencies**             | `pixi-python.update`               | Update dependencies and lockfile according to project constraints.               |
+| **Pixi: Add Package...**                  | `pixi-python.addPackage`           | Add packages with interactive channel selection (`Conda` vs `PyPI`) and target.  |
+| **Pixi: Remove Package...**               | `pixi-python.removePackage`        | Interactively pick and remove an installed package (auto-detects Conda vs PyPI). |
+| **Pixi: Run Task**                        | `pixi-python.runTask`              | QuickPick menu to search and run any task defined in the Pixi project.           |
+| **Pixi: Run Task in Environment...**      | `pixi-python.runTaskInEnvironment` | Select a task and choose a specific Pixi environment to run it in.               |
+| **Pixi: Open Terminal in Environment...** | `pixi-python.openTerminal`         | Open a dedicated VS Code terminal inside a selected Pixi environment.            |
+| **Pixi: Initialize Project...**           | `pixi-python.init`                 | Initialize a new Pixi project in the selected workspace folder.                  |
 
 ---
 

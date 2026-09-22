@@ -56,6 +56,7 @@ export class PixiPackageManager implements PackageManager, Disposable {
     private readonly _onDidChangePackages = new EventEmitter<DidChangePackagesEventArgs>();
     onDidChangePackages: Event<DidChangePackagesEventArgs> = this._onDidChangePackages.event;
     private packagesCache = new Map<string, Package[]>();
+    private readonly disposables: Disposable[] = [];
 
     constructor(
         public readonly api: PythonEnvironmentApi,
@@ -67,6 +68,14 @@ export class PixiPackageManager implements PackageManager, Disposable {
         this.description = 'Pixi Package Manager';
         this.tooltip = 'Pixi Package Manager';
         this.iconPath = new ThemeIcon('prefix-dev');
+
+        if (this.envManager) {
+            this.disposables.push(
+                this.envManager.onDidChangeEnvironments(() => {
+                    this.packagesCache.clear();
+                }),
+            );
+        }
     }
 
     readonly name: string;
@@ -77,6 +86,9 @@ export class PixiPackageManager implements PackageManager, Disposable {
 
     dispose() {
         this._onDidChangePackages.dispose();
+        for (const d of this.disposables) {
+            d.dispose();
+        }
     }
 
     async clearCache(): Promise<void> {
@@ -88,7 +100,94 @@ export class PixiPackageManager implements PackageManager, Disposable {
             `Called manage with environment: ${JSON.stringify(environment)}, options: ${JSON.stringify(options)}`,
         );
 
-        window.showErrorMessage('The Pixi extension does not support managing packages. Please use the CLI directly.');
+        const details = this.resolveEnvDetails(environment);
+        if (!details) {
+            window.showErrorMessage('Unable to determine Pixi project for this environment.');
+            return;
+        }
+
+        const installList = 'install' in options ? options.install : [];
+        const uninstallList = 'uninstall' in options && options.uninstall ? options.uninstall : [];
+
+        if (installList && installList.length > 0) {
+            const channel = await window.showQuickPick(
+                [
+                    {
+                        label: '$(package) Conda (default)',
+                        description: 'Install as Conda package from project channels',
+                        isPypi: false,
+                    },
+                    {
+                        label: '$(symbol-keyword) PyPI',
+                        description: 'Install as PyPI package from Python Package Index',
+                        isPypi: true,
+                    },
+                ],
+                {
+                    title: 'Pixi: Select Package Channel',
+                    placeHolder: `Choose channel to install ${installList.join(', ')}`,
+                },
+            );
+            if (!channel) {
+                return;
+            }
+
+            const args = ['add'];
+            if (channel.isPypi) {
+                args.push('--pypi');
+            }
+            args.push('-e', details.envName, ...installList);
+
+            await window.withProgress(
+                {
+                    location: ProgressLocation.Notification,
+                    title: `Pixi: Installing ${installList.join(', ')} (${channel.isPypi ? 'PyPI' : 'Conda'})...`,
+                    cancellable: true,
+                },
+                async (_progress, token) => {
+                    await runPixi(args, { cwd: details.projectPath }, token);
+                    await this.refresh(environment);
+                },
+            );
+        } else if (uninstallList && uninstallList.length > 0) {
+            const cached = this.packagesCache.get(environment.envId.id) || [];
+            const pypiPkgs: string[] = [];
+            const condaPkgs: string[] = [];
+
+            for (const pkg of uninstallList) {
+                const found = cached.find((p) => p.name === pkg);
+                if (found?.tooltip?.toString().includes('(pypi)')) {
+                    pypiPkgs.push(pkg);
+                } else {
+                    condaPkgs.push(pkg);
+                }
+            }
+
+            await window.withProgress(
+                {
+                    location: ProgressLocation.Notification,
+                    title: `Pixi: Uninstalling ${uninstallList.join(', ')}...`,
+                    cancellable: true,
+                },
+                async (_progress, token) => {
+                    if (condaPkgs.length > 0) {
+                        await runPixi(
+                            ['remove', '-e', details.envName, ...condaPkgs],
+                            { cwd: details.projectPath },
+                            token,
+                        );
+                    }
+                    if (pypiPkgs.length > 0) {
+                        await runPixi(
+                            ['remove', '--pypi', '-e', details.envName, ...pypiPkgs],
+                            { cwd: details.projectPath },
+                            token,
+                        );
+                    }
+                    await this.refresh(environment);
+                },
+            );
+        }
     }
 
     private resolveEnvDetails(environment: PythonEnvironment): { envName: string; projectPath: string } | undefined {

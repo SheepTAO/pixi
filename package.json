@@ -39,6 +39,30 @@
     "contributes": {
         "commands": [
             {
+                "command": "pixi-python.install",
+                "title": "Install (Sync Environments)",
+                "category": "Pixi",
+                "icon": "$(cloud-download)"
+            },
+            {
+                "command": "pixi-python.update",
+                "title": "Update Dependencies",
+                "category": "Pixi",
+                "icon": "$(sync)"
+            },
+            {
+                "command": "pixi-python.addPackage",
+                "title": "Add Package...",
+                "category": "Pixi",
+                "icon": "$(add)"
+            },
+            {
+                "command": "pixi-python.removePackage",
+                "title": "Remove Package...",
+                "category": "Pixi",
+                "icon": "$(trash)"
+            },
+            {
                 "command": "pixi-python.runTask",
                 "title": "Run Task",
                 "category": "Pixi"
@@ -66,6 +90,22 @@
                     "when": "!pixi-python.hasPixiProject"
                 },
                 {
+                    "command": "pixi-python.install",
+                    "when": "pixi-python.hasPixiProject"
+                },
+                {
+                    "command": "pixi-python.update",
+                    "when": "pixi-python.hasPixiProject"
+                },
+                {
+                    "command": "pixi-python.addPackage",
+                    "when": "pixi-python.hasPixiProject"
+                },
+                {
+                    "command": "pixi-python.removePackage",
+                    "when": "pixi-python.hasPixiProject"
+                },
+                {
                     "command": "pixi-python.runTask",
                     "when": "pixi-python.hasPixiProject"
                 },
@@ -76,6 +116,18 @@
                 {
                     "command": "pixi-python.openTerminal",
                     "when": "pixi-python.hasPixiProject"
+                }
+            ],
+            "editor/title": [
+                {
+                    "command": "pixi-python.install",
+                    "when": "resourceExtname == .toml && (resourceFilename == pixi.toml || resourceFilename == pyproject.toml) && pixi-python.hasPixiProject",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "pixi-python.update",
+                    "when": "resourceExtname == .toml && (resourceFilename == pixi.toml || resourceFilename == pyproject.toml) && pixi-python.hasPixiProject",
+                    "group": "navigation@2"
                 }
             ]
         },
