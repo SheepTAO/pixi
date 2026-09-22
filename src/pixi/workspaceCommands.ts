@@ -25,6 +25,10 @@ interface ChannelQuickPickItem extends QuickPickItem {
     isPypi: boolean;
 }
 
+interface ManifestFormatQuickPickItem extends QuickPickItem {
+    format: 'pixi' | 'pyproject';
+}
+
 interface PackageQuickPickItem extends QuickPickItem {
     pkg: PixiPackage;
 }
@@ -105,7 +109,11 @@ export function registerWorkspaceCommands(manager: PixiEnvManager): Disposable {
             let targetFolder: string | undefined;
 
             if (folderUri?.fsPath) {
-                targetFolder = folderUri.fsPath;
+                let p = folderUri.fsPath;
+                if (fs.existsSync(p) && !fs.statSync(p).isDirectory()) {
+                    p = path.dirname(p);
+                }
+                targetFolder = p;
             } else if (workspace.workspaceFolders && workspace.workspaceFolders.length > 0) {
                 if (workspace.workspaceFolders.length === 1) {
                     targetFolder = workspace.workspaceFolders[0].uri.fsPath;
@@ -139,13 +147,35 @@ export function registerWorkspaceCommands(manager: PixiEnvManager): Disposable {
                 return;
             }
 
+            const formatPick = await window.showQuickPick<ManifestFormatQuickPickItem>(
+                [
+                    {
+                        label: '$(file-code) pixi.toml',
+                        description: 'Dedicated Pixi manifest format (Recommended)',
+                        format: 'pixi',
+                    },
+                    {
+                        label: '$(file) pyproject.toml',
+                        description: 'Standard Python pyproject.toml format',
+                        format: 'pyproject',
+                    },
+                ],
+                { placeHolder: 'Select manifest format for the new Pixi project' },
+            );
+
+            if (!formatPick) {
+                return;
+            }
+
             try {
-                await runPixi(['init', '.'], { cwd: targetFolder });
+                await runPixi(['init', '--format', formatPick.format, '.'], { cwd: targetFolder });
+                manager.markProjectPrompted(targetFolder);
                 await commands.executeCommand('setContext', 'pixi-python.hasPixiProject', true);
                 await manager.refresh(undefined);
 
-                if (fs.existsSync(pixiToml)) {
-                    const doc = await workspace.openTextDocument(Uri.file(pixiToml));
+                const createdManifest = formatPick.format === 'pyproject' ? pyprojectToml : pixiToml;
+                if (fs.existsSync(createdManifest)) {
+                    const doc = await workspace.openTextDocument(Uri.file(createdManifest));
                     await window.showTextDocument(doc);
                 }
                 window.showInformationMessage('Pixi project initialized successfully.');
