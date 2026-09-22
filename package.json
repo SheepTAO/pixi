@@ -4,7 +4,7 @@
     "description": "Pixi Python environment manager for Visual Studio Code",
     "icon": "assets/icon.png",
     "license": "MIT",
-    "version": "0.2.3",
+    "version": "0.2.4",
     "homepage": "https://github.com/SheepTAO/pixi-python",
     "repository": {
         "type": "git",
@@ -37,6 +37,36 @@
     ],
     "main": "./dist/extension.js",
     "contributes": {
+        "commands": [
+            {
+                "command": "pixi-python.runTask",
+                "title": "Run Task",
+                "category": "Pixi"
+            },
+            {
+                "command": "pixi-python.runTaskInEnvironment",
+                "title": "Run Task in Environment...",
+                "category": "Pixi"
+            }
+        ],
+        "taskDefinitions": [
+            {
+                "type": "pixi",
+                "required": [
+                    "task"
+                ],
+                "properties": {
+                    "task": {
+                        "type": "string",
+                        "description": "The Pixi task name to execute"
+                    },
+                    "environment": {
+                        "type": "string",
+                        "description": "Optional environment in which to execute the task"
+                    }
+                }
+            }
+        ],
         "configurationDefaults": {
             "python-envs.workspaceSearchPaths": [
                 ".venv",

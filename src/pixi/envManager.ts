@@ -236,6 +236,14 @@ export class PixiEnvManager implements EnvironmentManager {
         return undefined;
     }
 
+    getProjectPaths(): string[] {
+        return Array.from(this.projectToEnvs.keys());
+    }
+
+    getEnvironmentsForProject(projectPath: string): PixiEnvironment[] {
+        return this.projectToEnvs.get(projectPath) || [];
+    }
+
     private buildEnvLookup(): Map<string, PixiEnvironment> {
         return new Map(
             Array.from(this.projectToEnvs.values()).flatMap((envs) => envs.map((env) => [env.envId.id, env])),

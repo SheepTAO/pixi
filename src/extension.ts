@@ -5,6 +5,7 @@ import { registerLogger } from './common/logging';
 import { setPersistentState } from './common/persistentState';
 import { PixiEnvManager } from './pixi/envManager';
 import { PixiPackageManager } from './pixi/projectManager';
+import { PixiTaskProvider } from './pixi/taskProvider';
 import { getPixi, runPixi } from './pixi/utils';
 import { getEnvExtApi } from './pythonEnvsApi';
 
@@ -45,4 +46,7 @@ export async function activate(context: ExtensionContext) {
 
     const packageManager = new PixiPackageManager(api, log, manager);
     context.subscriptions.push(api.registerPackageManager(packageManager));
+
+    const taskProvider = new PixiTaskProvider(manager, log);
+    context.subscriptions.push(taskProvider, taskProvider.registerCommands());
 }

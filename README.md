@@ -25,12 +25,13 @@
 
 ## ✨ Features
 
-- **🚀 Automatic Environment Discovery**: Instantly detects Pixi projects with `pixi.toml` or `pyproject.toml`.
-- **🎯 Dynamic Per-File Environment Resolution**: Map file/directory patterns (e.g. `tests/**` → `dev`) to automatically switch Python interpreters for different files.
-- **📦 Native Package Inspection**: Full package tree view with explicit (direct) vs transitive (indirect) dependency distinction and package channels (`conda` / `pypi`).
-- **🧩 Pixi Features Support**: Discovers and exposes Pixi features (dev, test, lint, etc.) as distinct selectable environments.
-- **⚡ Interpreter & Terminal Integration**: Automatic interpreter selection for editing, running, debugging, and terminal activation.
-- **🔒 Multi-Platform Safe**: Gracefully handles platform-specific environments without interrupting workspace discovery.
+- **Automatic Environment Discovery**: Instantly detects Pixi projects with `pixi.toml` or `pyproject.toml`.
+- **Dynamic Per-File Environment Resolution**: Map file/directory patterns (e.g. `tests/**` → `dev`) to automatically switch Python interpreters for different files.
+- **Native Pixi Tasks Integration**: Auto-discovers Pixi tasks as native VS Code Tasks (`Terminal: Run Task...`) and provides a quick Command Palette runner (`Pixi: Run Task`).
+- **Native Package Inspection**: Full package tree view with explicit (direct) vs transitive (indirect) dependency distinction and package channels (`conda` / `pypi`).
+- **Pixi Features Support**: Discovers and exposes Pixi features (dev, test, lint, etc.) as distinct selectable environments.
+- **Interpreter & Terminal Integration**: Automatic interpreter selection for editing, running, debugging, and terminal activation.
+- **Multi-Platform Safe**: Gracefully handles platform-specific environments without interrupting workspace discovery.
 
 ---
 
@@ -53,6 +54,15 @@ Add this to your project's `.vscode/settings.json` (or add items directly in the
 ```
 
 _(Object format `{"tests/**": "dev"}` is also supported for backward compatibility)_
+
+---
+
+## ⌨️ Commands
+
+| Command                              | Identifier                         | Description                                                            |
+| :----------------------------------- | :--------------------------------- | :--------------------------------------------------------------------- |
+| **Pixi: Run Task**                   | `pixi-python.runTask`              | QuickPick menu to search and run any task defined in the Pixi project. |
+| **Pixi: Run Task in Environment...** | `pixi-python.runTaskInEnvironment` | Select a task and choose a specific Pixi environment to run it in.     |
 
 ---
 

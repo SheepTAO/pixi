@@ -5,6 +5,12 @@ All notable changes to the "pixi-python" extension will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.4]
+
+- Add native Pixi Tasks provider (`vscode.tasks.registerTaskProvider`) for automatic discovery and execution of Pixi tasks via `Terminal: Run Task...`
+- Add `Pixi: Run Task` and `Pixi: Run Task in Environment...` commands to the Command Palette
+- Update extension icon with official Pixi puzzle piece vector and pure white Python snake eyes
+
 ## [0.2.3]
 
 - Add `pixi-python.environmentRules` setting with interactive "Add Item" list editor in VS Code Settings UI
