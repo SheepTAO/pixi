@@ -74,7 +74,14 @@ function resolveWorkspacePaths(searchPaths: string[]): string[] {
     return resolved;
 }
 
-const DEFAULT_SEARCH_IGNORE_PATTERNS = ['**/node_modules/**', '**/.git/**', '**/dist/**', '**/build/**', '**/.venv/**'];
+const DEFAULT_SEARCH_IGNORE_PATTERNS = [
+    '**/node_modules/**',
+    '**/.git/**',
+    '**/dist/**',
+    '**/build/**',
+    '**/.venv/**',
+    '**/.pixi/*/**',
+];
 
 function getSearchIgnorePatterns(): string[] {
     try {

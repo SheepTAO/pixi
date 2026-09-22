@@ -15,6 +15,7 @@ import {
 import * as path from 'path';
 import picomatch from 'picomatch';
 import {
+    Disposable,
     EventEmitter,
     LogOutputChannel,
     MarkdownString,
@@ -64,10 +65,11 @@ function matchEnvironmentRule(
     return undefined;
 }
 
-export class PixiEnvManager implements EnvironmentManager {
+export class PixiEnvManager implements EnvironmentManager, Disposable {
     private globalEnv: PythonEnvironment | undefined;
     private activeEnv = new Map<string, PythonEnvironment>(); // Selected environment for each project
     private projectToEnvs = new Map<string, PixiEnvironment[]>(); // Maps a project path to its `pixi info` output
+    private readonly disposables: Disposable[] = [];
 
     private readonly _onDidChangeEnvironment = new EventEmitter<DidChangeEnvironmentEventArgs>();
     readonly onDidChangeEnvironment = this._onDidChangeEnvironment.event;
@@ -84,6 +86,78 @@ export class PixiEnvManager implements EnvironmentManager {
         this.preferredPackageManagerId = PIXI_MANAGER_ID;
         this.tooltip = 'Pixi Environment Manager';
         this.iconPath = new ThemeIcon('prefix-dev');
+
+        // Watch manifest and lock files for changes (debounced by 500ms with project targeting)
+        let refreshTimer: NodeJS.Timeout | undefined;
+        let pendingChangedUris: Uri[] = [];
+
+        const scheduleRefresh = (uri?: Uri) => {
+            if (uri) {
+                pendingChangedUris.push(uri);
+            }
+            if (refreshTimer) {
+                clearTimeout(refreshTimer);
+            }
+            refreshTimer = setTimeout(async () => {
+                const uris = pendingChangedUris;
+                pendingChangedUris = [];
+
+                // Determine target scope: if all changes belong to a single project, refresh only that project
+                let targetScope: Uri | undefined = undefined;
+                if (uris.length > 0) {
+                    const projectUris = new Set<string>();
+                    for (const u of uris) {
+                        const proj = this.api.getPythonProject(u);
+                        if (proj) {
+                            projectUris.add(proj.uri.fsPath);
+                        } else {
+                            projectUris.clear();
+                            break;
+                        }
+                    }
+                    if (projectUris.size === 1) {
+                        targetScope = Uri.file(Array.from(projectUris)[0]);
+                    }
+                }
+
+                traceVerbose(
+                    `Manifest/lock changed, triggering debounced refresh (targetScope: ${targetScope?.fsPath ?? 'all'})`,
+                );
+                await this.refresh(targetScope);
+            }, 500);
+        };
+
+        const watcher = workspace.createFileSystemWatcher('**/{pixi.toml,pixi.lock,pyproject.toml}');
+        watcher.onDidChange((uri) => scheduleRefresh(uri), this, this.disposables);
+        watcher.onDidCreate((uri) => scheduleRefresh(uri), this, this.disposables);
+        watcher.onDidDelete((uri) => scheduleRefresh(uri), this, this.disposables);
+        this.disposables.push(watcher);
+        this.disposables.push({
+            dispose: () => {
+                if (refreshTimer) {
+                    clearTimeout(refreshTimer);
+                }
+            },
+        });
+
+        // Watch configuration changes
+        this.disposables.push(
+            workspace.onDidChangeConfiguration(async (e) => {
+                if (e.affectsConfiguration('pixi-python.displayNameFormat')) {
+                    traceVerbose('pixi-python.displayNameFormat changed, refreshing environments');
+                    await this.refresh(undefined);
+                }
+                if (e.affectsConfiguration('pixi-python.environmentRules')) {
+                    traceVerbose('pixi-python.environmentRules changed, updating environments for visible editors');
+                    for (const editor of window.visibleTextEditors) {
+                        if (editor.document.languageId === 'python') {
+                            const env = await this.get(editor.document.uri);
+                            this._onDidChangeEnvironment.fire({ uri: editor.document.uri, old: undefined, new: env });
+                        }
+                    }
+                }
+            }),
+        );
     }
 
     readonly name: string;
@@ -96,6 +170,9 @@ export class PixiEnvManager implements EnvironmentManager {
     dispose() {
         this._onDidChangeEnvironment.dispose();
         this._onDidChangeEnvironments.dispose();
+        for (const d of this.disposables) {
+            d.dispose();
+        }
         this.globalEnv = undefined;
         this.activeEnv.clear();
         this.projectToEnvs.clear();
@@ -117,13 +194,47 @@ export class PixiEnvManager implements EnvironmentManager {
         }
     }
 
-    async refresh(scope: RefreshEnvironmentsScope) {
+    private isRefreshing = false;
+    private hasPendingRefresh = false;
+    private pendingRefreshScope: RefreshEnvironmentsScope = undefined;
+
+    async refresh(scope: RefreshEnvironmentsScope): Promise<void> {
         traceVerbose(`Called refresh with scope: ${scope}`);
 
-        if (scope instanceof Uri) {
-            await this.refreshOne(scope);
-        } else {
-            await this.refreshAll();
+        if (this.isRefreshing) {
+            // Coalesce pending refreshes: if different projects or full refresh, fallback to all (undefined)
+            if (this.hasPendingRefresh) {
+                if (
+                    this.pendingRefreshScope instanceof Uri &&
+                    scope instanceof Uri &&
+                    this.pendingRefreshScope.fsPath === scope.fsPath
+                ) {
+                    // Same target project, keep targeted scope
+                } else {
+                    this.pendingRefreshScope = undefined;
+                }
+            } else {
+                this.pendingRefreshScope = scope;
+                this.hasPendingRefresh = true;
+            }
+            return;
+        }
+
+        this.isRefreshing = true;
+        try {
+            if (scope instanceof Uri) {
+                await this.refreshOne(scope);
+            } else {
+                await this.refreshAll();
+            }
+        } finally {
+            this.isRefreshing = false;
+            if (this.hasPendingRefresh) {
+                const nextScope = this.pendingRefreshScope;
+                this.hasPendingRefresh = false;
+                this.pendingRefreshScope = undefined;
+                await this.refresh(nextScope);
+            }
         }
     }
 

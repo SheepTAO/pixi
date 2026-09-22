@@ -51,7 +51,7 @@ export async function activate(context: ExtensionContext) {
     setPersistentState(context);
 
     const manager = new PixiEnvManager(api, log);
-    context.subscriptions.push(api.registerEnvironmentManager(manager));
+    context.subscriptions.push(manager, api.registerEnvironmentManager(manager));
 
     const packageManager = new PixiPackageManager(api, log, manager);
     context.subscriptions.push(api.registerPackageManager(packageManager));

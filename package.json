@@ -94,7 +94,8 @@
                         "**/.git/**",
                         "**/dist/**",
                         "**/build/**",
-                        "**/.venv/**"
+                        "**/.venv/**",
+                        "**/.pixi/*/**"
                     ],
                     "description": "Glob patterns to exclude when searching for Pixi projects in the workspace.",
                     "scope": "resource"
@@ -106,6 +107,12 @@
                     },
                     "default": [],
                     "description": "Rules to map glob patterns to Pixi environment names (format: 'pattern=env' or 'pattern:env', e.g. 'tests/**=dev', 'train/**=train'). Click 'Add Item' to add rules.",
+                    "scope": "resource"
+                },
+                "pixi-python.displayNameFormat": {
+                    "type": "string",
+                    "default": "${project}:${env}",
+                    "description": "Format template for environment display names. Supported placeholders: ${project} (or {{project}}), ${env}, ${python} (or ${version}).",
                     "scope": "resource"
                 }
             }
@@ -128,6 +135,7 @@
         "compile-tests": "tsc -p . --outDir out",
         "watch-tests": "tsc -p . -w --outDir out",
         "pretest": "npm run compile-tests && npm run compile && npm run lint",
+        "test": "npm run pretest",
         "lint": "eslint src",
         "format": "prettier --write .",
         "format:check": "prettier --check ."

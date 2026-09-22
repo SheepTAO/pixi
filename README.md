@@ -39,6 +39,7 @@
 
 | Setting                            | Type       | Default                       | Scope    | Description                                                                                                |
 | :--------------------------------- | :--------- | :---------------------------- | :------- | :--------------------------------------------------------------------------------------------------------- |
+| `pixi-python.displayNameFormat`    | `string`   | `"${project}:${env}"`         | Resource | Template for environment names. Placeholders: `${project}`, `${env}`, `${python}`.                         |
 | `pixi-python.environmentRules`     | `string[]` | `[]`                          | Resource | Map glob patterns to Pixi environment names (e.g. `tests/**=dev`). Also supports object format in JSON.    |
 | `pixi-python.pixiExecutable`       | `string`   | `""`                          | Machine  | Path to the Pixi binary. Supports `${workspaceFolder}` and relative paths. Uses `PATH` discovery if empty. |
 | `pixi-python.searchIgnorePatterns` | `string[]` | `["**/node_modules/**", ...]` | Resource | Glob patterns to exclude when scanning the workspace for Pixi projects.                                    |
