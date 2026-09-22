@@ -7,6 +7,7 @@ import { getPixi, runPixi } from './pixi/cli';
 import { PixiEnvManager } from './pixi/envManager';
 import { PixiPackageManager } from './pixi/packageManager';
 import { PixiTaskProvider } from './pixi/taskProvider';
+import { PixiTerminalProvider } from './pixi/terminalProvider';
 import { getEnvExtApi } from './pythonEnvsApi';
 
 const MINIMUM_PIXI_VERSION = '0.53.0';
@@ -58,6 +59,9 @@ export async function activate(context: ExtensionContext) {
 
     const taskProvider = new PixiTaskProvider(manager, log);
     context.subscriptions.push(taskProvider, taskProvider.registerCommands());
+
+    const terminalProvider = new PixiTerminalProvider(manager, log);
+    context.subscriptions.push(terminalProvider);
 
     // Re-validate and refresh when pixiExecutable setting changes
     context.subscriptions.push(

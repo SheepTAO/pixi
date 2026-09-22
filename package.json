@@ -47,8 +47,22 @@
                 "command": "pixi-python.runTaskInEnvironment",
                 "title": "Run Task in Environment...",
                 "category": "Pixi"
+            },
+            {
+                "command": "pixi-python.openTerminal",
+                "title": "Open Terminal in Environment...",
+                "category": "Pixi"
             }
         ],
+        "terminal": {
+            "profiles": [
+                {
+                    "id": "pixi-python.terminal",
+                    "title": "Pixi",
+                    "icon": "prefix-dev"
+                }
+            ]
+        },
         "taskDefinitions": [
             {
                 "type": "pixi",
