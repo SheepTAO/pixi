@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { ThemeIcon, Uri, workspace } from 'vscode';
+import { ThemeIcon, Uri, window, workspace } from 'vscode';
 
 import { findPythonExecutable } from '../common/findPython';
 import { traceInfo, traceVerbose } from '../common/logging';
@@ -25,6 +25,25 @@ export async function findPythonVersionFromMeta(prefix: string): Promise<string 
         // ignore
     }
     return undefined;
+}
+
+export async function pickManifestFormat(): Promise<'pixi' | 'pyproject' | undefined> {
+    const pick = await window.showQuickPick(
+        [
+            {
+                label: '$(file-code) pixi.toml',
+                description: 'Dedicated Pixi manifest format (Recommended)',
+                format: 'pixi' as const,
+            },
+            {
+                label: '$(file) pyproject.toml',
+                description: 'Standard Python pyproject.toml format',
+                format: 'pyproject' as const,
+            },
+        ],
+        { placeHolder: 'Select manifest format for the new Pixi project' },
+    );
+    return pick?.format;
 }
 
 export function isPixiProject(folderPath: string): boolean {

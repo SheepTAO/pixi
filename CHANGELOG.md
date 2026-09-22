@@ -5,6 +5,15 @@ All notable changes to the "pixi-python" extension will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0]
+
+- Add `Pixi: Create Environment...` command with interactive project initialization (manifest format and Python version selection) and named environment creation
+- Add `Pixi: Delete Environment...` command with modal safety confirmation, supporting disk cleaning and manifest removal options
+- Automatically register discovered Pixi projects into VS Code Python Projects (`api.addPythonProject`)
+- Fall back to default environment in `PixiEnvManager.get()` and project refresh routines
+- Enhance package removal (`Pixi: Remove Package...`) with target environment selection and automatic cache invalidation
+- Provide onboarding prompts to synchronize uninstalled environments when a Pixi project manifest is detected
+
 ## [0.2.4]
 
 - Add native Pixi Tasks provider (`vscode.tasks.registerTaskProvider`) for automatic discovery and execution of Pixi tasks via `Terminal: Run Task...`

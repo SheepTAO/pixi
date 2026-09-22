@@ -25,8 +25,8 @@
 
 ## ✨ Features
 
-- **Automatic Environment Discovery**: Instantly detects Pixi projects with `pixi.toml` or `pyproject.toml`, with automatic onboarding prompts to sync uninstalled environments.
-- **Core Workflow Management**: Sync environments (`pixi install`), update dependencies (`pixi update`), and add/remove packages with full Conda and PyPI channel support.
+- **Automatic Environment Discovery**: Instantly detects Pixi projects with `pixi.toml` or `pyproject.toml`, and provides onboarding prompts to sync uninstalled environments.
+- **Environment & Dependency Lifecycle**: Create and delete environments (`pixi workspace environment add/remove`, `pixi clean`), sync environments (`pixi install`), update dependencies (`pixi update`), and add/remove packages with target environment selection and full Conda/PyPI channel support.
 - **Dynamic Per-File Environment Resolution**: Map file/directory patterns (e.g. `tests/**` → `dev`) to automatically switch Python interpreters for different files.
 - **Native Pixi Tasks Integration**: Auto-discovers Pixi tasks as native VS Code Tasks (`Terminal: Run Task...`) and provides a quick Command Palette runner (`Pixi: Run Task`).
 - **Unified Terminal Profile**: Launch interactive terminals pre-activated in any Pixi environment directly from the terminal profile menu or Command Palette.
@@ -65,6 +65,8 @@ _(Object format `{"tests/**": "dev"}` is also supported for backward compatibili
 
 | Command                                   | Identifier                         | Description                                                                              |
 | :---------------------------------------- | :--------------------------------- | :--------------------------------------------------------------------------------------- |
+| **Pixi: Create Environment...**           | `pixi-python.createEnvironment`    | Create a new Pixi environment (or initialize project with Python version selection).     |
+| **Pixi: Delete Environment...**           | `pixi-python.deleteEnvironment`    | Delete or clean a Pixi environment from disk and manifest with safety confirmation.      |
 | **Pixi: Install (Sync Environments)**     | `pixi-python.install`              | Install all dependencies and sync environments for the selected Pixi project.            |
 | **Pixi: Update Dependencies**             | `pixi-python.update`               | Update dependencies and lockfile according to project constraints.                       |
 | **Pixi: Add Package...**                  | `pixi-python.addPackage`           | Add packages with interactive channel selection (`Conda` vs `PyPI`) and target.          |

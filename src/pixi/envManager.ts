@@ -8,6 +8,7 @@ import {
     IconPath,
     PythonEnvironment,
     PythonEnvironmentApi,
+    PythonProject,
     RefreshEnvironmentsScope,
     ResolveEnvironmentContext,
     SetEnvironmentScope,
@@ -211,6 +212,10 @@ export class PixiEnvManager implements EnvironmentManager, Disposable {
         }
     }
 
+    getDefaultProjectEnv(envs: PixiEnvironment[]): PixiEnvironment | undefined {
+        return envs.find((e) => e.pixiEnvName === 'default') || envs[0];
+    }
+
     async getEnvironments(scope: GetEnvironmentsScope): Promise<PythonEnvironment[]> {
         traceVerbose(`Called getEnvironments with scope: ${scope}`);
 
@@ -261,7 +266,13 @@ export class PixiEnvManager implements EnvironmentManager, Disposable {
             }
         }
 
-        return this.activeEnv.get(project.uri.fsPath) || this.globalEnv;
+        const active = this.activeEnv.get(project.uri.fsPath);
+        if (active) {
+            return active;
+        }
+
+        const projectEnvs = this.projectToEnvs.get(project.uri.fsPath) || [];
+        return this.getDefaultProjectEnv(projectEnvs) || this.globalEnv;
     }
 
     async set(scope: SetEnvironmentScope, environment?: PythonEnvironment) {
@@ -395,6 +406,21 @@ export class PixiEnvManager implements EnvironmentManager, Disposable {
         const allCandidatePaths = new Set([...projectMap.keys(), ...searchPathRoots]);
         const projectPaths = [...allCandidatePaths].filter((p) => isPixiProject(p));
 
+        const newProjects: PythonProject[] = [];
+        for (const projectPath of projectPaths) {
+            if (!projectMap.has(projectPath)) {
+                const proj: PythonProject = {
+                    name: path.basename(projectPath),
+                    uri: Uri.file(projectPath),
+                };
+                newProjects.push(proj);
+                projectMap.set(projectPath, proj);
+            }
+        }
+        if (newProjects.length > 0) {
+            this.api.addPythonProject(newProjects);
+        }
+
         const hasPixi = projectPaths.length > 0;
         await commands.executeCommand('setContext', 'pixi-python.hasPixiProject', hasPixi);
 
@@ -440,7 +466,11 @@ export class PixiEnvManager implements EnvironmentManager, Disposable {
 
                 for (const projectPath of projectPaths) {
                     const envId = await getProjectEnvId(projectPath);
-                    const env = envId ? envLookup.get(envId) : undefined;
+                    let env = envId ? envLookup.get(envId) : undefined;
+                    if (!env) {
+                        const projectEnvs = this.projectToEnvs.get(projectPath) || [];
+                        env = this.getDefaultProjectEnv(projectEnvs);
+                    }
 
                     if (env) {
                         this.activeEnv.set(projectPath, env);
@@ -459,14 +489,18 @@ export class PixiEnvManager implements EnvironmentManager, Disposable {
     }
 
     private async refreshOne(scope: Uri): Promise<void> {
-        const project = this.api.getPythonProject(scope);
-        if (!project) {
+        let project = this.api.getPythonProject(scope);
+        const projectPath = project ? project.uri.fsPath : scope.fsPath;
+        if (!isPixiProject(projectPath)) {
             return;
         }
 
-        const projectPath = project.uri.fsPath;
-        if (!isPixiProject(projectPath)) {
-            return;
+        if (!project) {
+            project = {
+                name: path.basename(projectPath),
+                uri: Uri.file(projectPath),
+            };
+            this.api.addPythonProject(project);
         }
 
         const oldEnvs = this.projectToEnvs.get(projectPath) || [];
@@ -477,7 +511,10 @@ export class PixiEnvManager implements EnvironmentManager, Disposable {
 
         // Update active environment for this project
         const envId = await getProjectEnvId(projectPath);
-        const env = envId ? newEnvs.find((e) => e.envId.id === envId) : undefined;
+        let env = envId ? newEnvs.find((e) => e.envId.id === envId) : undefined;
+        if (!env) {
+            env = this.getDefaultProjectEnv(newEnvs);
+        }
         this.triggerDidChangeEnvironment(project.uri, this.activeEnv.get(projectPath), env);
 
         if (env) {

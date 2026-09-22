@@ -64,7 +64,7 @@ export async function activate(context: ExtensionContext) {
     const terminalProvider = new PixiTerminalProvider(manager, log);
     context.subscriptions.push(terminalProvider);
 
-    context.subscriptions.push(registerWorkspaceCommands(manager));
+    context.subscriptions.push(registerWorkspaceCommands(manager, packageManager));
 
     // Re-validate and refresh when pixiExecutable setting changes
     context.subscriptions.push(

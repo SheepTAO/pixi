@@ -4,7 +4,7 @@
     "description": "Pixi Python environment manager for Visual Studio Code",
     "icon": "assets/icon.png",
     "license": "MIT",
-    "version": "0.2.4",
+    "version": "0.3.0",
     "homepage": "https://github.com/SheepTAO/pixi-python",
     "repository": {
         "type": "git",
@@ -81,6 +81,18 @@
                 "command": "pixi-python.init",
                 "title": "Initialize Project...",
                 "category": "Pixi"
+            },
+            {
+                "command": "pixi-python.createEnvironment",
+                "title": "Create Environment...",
+                "category": "Pixi",
+                "icon": "$(plus)"
+            },
+            {
+                "command": "pixi-python.deleteEnvironment",
+                "title": "Delete Environment...",
+                "category": "Pixi",
+                "icon": "$(trash)"
             }
         ],
         "menus": {
@@ -88,6 +100,13 @@
                 {
                     "command": "pixi-python.init",
                     "when": "!pixi-python.hasPixiProject"
+                },
+                {
+                    "command": "pixi-python.createEnvironment"
+                },
+                {
+                    "command": "pixi-python.deleteEnvironment",
+                    "when": "pixi-python.hasPixiProject"
                 },
                 {
                     "command": "pixi-python.install",
