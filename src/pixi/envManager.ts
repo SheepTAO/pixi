@@ -12,8 +12,10 @@ import {
     ResolveEnvironmentContext,
     SetEnvironmentScope,
 } from '@vscode/python-environments';
+import * as fs from 'fs';
 import * as path from 'path';
 import {
+    commands,
     Disposable,
     EventEmitter,
     LogOutputChannel,
@@ -343,27 +345,47 @@ export class PixiEnvManager implements EnvironmentManager, Disposable {
         ];
     }
 
+    private isPixiProjectFolder(folderPath: string): boolean {
+        return (
+            fs.existsSync(path.join(folderPath, 'pixi.toml')) ||
+            fs.existsSync(path.join(folderPath, 'pyproject.toml')) ||
+            fs.existsSync(path.join(folderPath, '.pixi'))
+        );
+    }
+
     private async refreshAll(): Promise<void> {
+        const oldProjectToEnvs = new Map(this.projectToEnvs);
+        this.projectToEnvs.clear();
+
+        // Collect project paths from registered Python projects and search paths
+        const projects = this.api.getPythonProjects();
+        const projectMap = new Map(projects.map((p) => [p.uri.fsPath, p]));
+
+        const searchPathRoots = await resolvePixiProjectPaths();
+        const allCandidatePaths = new Set([...projectMap.keys(), ...searchPathRoots]);
+        const projectPaths = [...allCandidatePaths].filter((p) => this.isPixiProjectFolder(p));
+
+        const hasPixi = projectPaths.length > 0;
+        await commands.executeCommand('setContext', 'pixi-python.hasPixiProject', hasPixi);
+
+        if (!hasPixi) {
+            const allOld = Array.from(oldProjectToEnvs.values()).flat();
+            if (allOld.length > 0) {
+                this._onDidChangeEnvironments.fire(this.diffEnvironments(allOld, []));
+            }
+            return;
+        }
+
         await window.withProgress(
             {
                 location: ProgressLocation.Window,
                 title: 'Discovering Pixi environments',
             },
             async () => {
-                const oldProjectToEnvs = new Map(this.projectToEnvs);
-                this.projectToEnvs.clear();
-
-                // Collect project paths from registered Python projects and search paths
-                const projects = this.api.getPythonProjects();
-                const projectMap = new Map(projects.map((p) => [p.uri.fsPath, p]));
-
-                const searchPathRoots = await resolvePixiProjectPaths();
-                const projectPaths = new Set([...projectMap.keys(), ...searchPathRoots]);
-
                 const changes: DidChangeEnvironmentsEventArgs = [];
 
                 await Promise.all(
-                    [...projectPaths].map(async (projectPath) => {
+                    projectPaths.map(async (projectPath) => {
                         const oldEnvs = oldProjectToEnvs.get(projectPath) || [];
                         const newEnvs = await refreshPixi(projectPath);
 
@@ -411,6 +433,10 @@ export class PixiEnvManager implements EnvironmentManager, Disposable {
         }
 
         const projectPath = project.uri.fsPath;
+        if (!this.isPixiProjectFolder(projectPath)) {
+            return;
+        }
+
         const oldEnvs = this.projectToEnvs.get(projectPath) || [];
         const newEnvs = await refreshPixi(projectPath);
 

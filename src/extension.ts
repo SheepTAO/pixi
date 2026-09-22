@@ -8,6 +8,7 @@ import { PixiEnvManager } from './pixi/envManager';
 import { PixiPackageManager } from './pixi/packageManager';
 import { PixiTaskProvider } from './pixi/taskProvider';
 import { PixiTerminalProvider } from './pixi/terminalProvider';
+import { registerWorkspaceCommands } from './pixi/workspaceCommands';
 import { getEnvExtApi } from './pythonEnvsApi';
 
 const MINIMUM_PIXI_VERSION = '0.53.0';
@@ -63,6 +64,8 @@ export async function activate(context: ExtensionContext) {
     const terminalProvider = new PixiTerminalProvider(manager, log);
     context.subscriptions.push(terminalProvider);
 
+    context.subscriptions.push(registerWorkspaceCommands(manager));
+
     // Re-validate and refresh when pixiExecutable setting changes
     context.subscriptions.push(
         workspace.onDidChangeConfiguration(async (e) => {
@@ -74,6 +77,9 @@ export async function activate(context: ExtensionContext) {
         }),
     );
 
-    // Initial validation
-    await validatePixi();
+    // Initial validation only if workspace has Pixi projects
+    await manager.initialize();
+    if (manager.getProjectPaths().length > 0) {
+        await validatePixi();
+    }
 }

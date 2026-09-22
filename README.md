@@ -66,6 +66,7 @@ _(Object format `{"tests/**": "dev"}` is also supported for backward compatibili
 | **Pixi: Run Task**                        | `pixi-python.runTask`              | QuickPick menu to search and run any task defined in the Pixi project. |
 | **Pixi: Run Task in Environment...**      | `pixi-python.runTaskInEnvironment` | Select a task and choose a specific Pixi environment to run it in.     |
 | **Pixi: Open Terminal in Environment...** | `pixi-python.openTerminal`         | Open a dedicated VS Code terminal inside a selected Pixi environment.  |
+| **Pixi: Initialize Project...**           | `pixi-python.init`                 | Initialize a new Pixi project in the selected workspace folder.        |
 
 ---
 

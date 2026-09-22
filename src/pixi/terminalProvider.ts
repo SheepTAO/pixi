@@ -45,7 +45,13 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
     private async pickEnvironment(token?: CancellationToken): Promise<PixiEnvironment | undefined> {
         const envs = (await this.envManager.getEnvironments('all')) as PixiEnvironment[];
         if (!envs || envs.length === 0) {
-            window.showWarningMessage('No Pixi environments found in current workspace.');
+            const choice = await window.showWarningMessage(
+                'No Pixi environments found in current workspace. Would you like to initialize a Pixi project?',
+                'Initialize Project',
+            );
+            if (choice === 'Initialize Project') {
+                await commands.executeCommand('pixi-python.init');
+            }
             return undefined;
         }
 

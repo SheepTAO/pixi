@@ -52,8 +52,33 @@
                 "command": "pixi-python.openTerminal",
                 "title": "Open Terminal in Environment...",
                 "category": "Pixi"
+            },
+            {
+                "command": "pixi-python.init",
+                "title": "Initialize Project...",
+                "category": "Pixi"
             }
         ],
+        "menus": {
+            "commandPalette": [
+                {
+                    "command": "pixi-python.init",
+                    "when": "!pixi-python.hasPixiProject"
+                },
+                {
+                    "command": "pixi-python.runTask",
+                    "when": "pixi-python.hasPixiProject"
+                },
+                {
+                    "command": "pixi-python.runTaskInEnvironment",
+                    "when": "pixi-python.hasPixiProject"
+                },
+                {
+                    "command": "pixi-python.openTerminal",
+                    "when": "pixi-python.hasPixiProject"
+                }
+            ]
+        },
         "terminal": {
             "profiles": [
                 {
