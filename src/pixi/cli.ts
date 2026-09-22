@@ -6,8 +6,14 @@ import which from 'which';
 
 import { createDeferred } from '../common/deferred';
 import { quoteArgs } from '../common/execUtils';
-import { traceError } from '../common/logging';
+import { traceError, traceVerbose } from '../common/logging';
 import { untildify } from '../common/utils';
+
+let _cachedPixi: string | undefined;
+
+export function clearPixiCache(): void {
+    _cachedPixi = undefined;
+}
 
 async function findPixi(): Promise<string | undefined> {
     try {
@@ -18,6 +24,10 @@ async function findPixi(): Promise<string | undefined> {
 }
 
 export async function getPixi(): Promise<string> {
+    if (_cachedPixi) {
+        return _cachedPixi;
+    }
+
     const config = workspace.getConfiguration('pixi-python');
     const value = config.get<string>('pixiExecutable');
 
@@ -36,6 +46,7 @@ export async function getPixi(): Promise<string> {
                 }
             }
         }
+        _cachedPixi = resolved;
         return resolved;
     }
 
@@ -45,6 +56,7 @@ export async function getPixi(): Promise<string> {
             'Pixi executable not found. Please install Pixi or set "pixi-python.pixiExecutable" in your settings.',
         );
     }
+    _cachedPixi = pixiPath;
     return pixiPath;
 }
 
@@ -81,7 +93,7 @@ export async function _runPixi(
     proc.stderr?.on('data', (data) => {
         const d = data.toString('utf-8');
         stderr += d;
-        traceError(d.trim());
+        traceVerbose(`[pixi stderr] ${d.trim()}`);
     });
     proc.on('error', (err) => {
         deferred.reject(err);
@@ -92,6 +104,7 @@ export async function _runPixi(
     proc.on('close', () => {
         cancelDisposable?.dispose();
         if (exitCode !== 0) {
+            traceError(`Failed to run "pixi ${args.join(' ')}":\n${stderr}`);
             deferred.reject(new Error(`Failed to run "pixi ${args.join(' ')}":\n ${stderr}`));
         } else {
             deferred.resolve(stdout);

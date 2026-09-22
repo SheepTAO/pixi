@@ -1,9 +1,9 @@
-import * as fs from 'fs-extra';
+import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 
 export async function findPythonExecutable(envPath: string): Promise<string | null> {
-    let candidates;
+    let candidates: string[];
 
     if (os.platform() === 'win32') {
         candidates = [
@@ -24,7 +24,7 @@ export async function findPythonExecutable(envPath: string): Promise<string | nu
     }
 
     for (const candidate of candidates) {
-        if (await fs.pathExists(candidate)) {
+        if (fs.existsSync(candidate)) {
             return candidate;
         }
     }

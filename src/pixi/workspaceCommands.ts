@@ -27,9 +27,18 @@ export function registerWorkspaceCommands(manager: PixiEnvManager): Disposable {
             return;
         }
 
-        const manifestPath = path.join(targetFolder, 'pixi.toml');
-        if (fs.existsSync(manifestPath)) {
-            window.showInformationMessage('A pixi.toml already exists in this folder.');
+        const pixiToml = path.join(targetFolder, 'pixi.toml');
+        const pyprojectToml = path.join(targetFolder, 'pyproject.toml');
+        const manifestPath = fs.existsSync(pixiToml)
+            ? pixiToml
+            : fs.existsSync(pyprojectToml)
+              ? pyprojectToml
+              : undefined;
+
+        if (manifestPath) {
+            window.showInformationMessage(
+                `A project manifest (${path.basename(manifestPath)}) already exists in this folder.`,
+            );
             const doc = await workspace.openTextDocument(Uri.file(manifestPath));
             await window.showTextDocument(doc);
             return;
@@ -40,8 +49,8 @@ export function registerWorkspaceCommands(manager: PixiEnvManager): Disposable {
             await commands.executeCommand('setContext', 'pixi-python.hasPixiProject', true);
             await manager.refresh(undefined);
 
-            if (fs.existsSync(manifestPath)) {
-                const doc = await workspace.openTextDocument(Uri.file(manifestPath));
+            if (fs.existsSync(pixiToml)) {
+                const doc = await workspace.openTextDocument(Uri.file(pixiToml));
                 await window.showTextDocument(doc);
             }
             window.showInformationMessage('Pixi project initialized successfully.');
@@ -50,4 +59,3 @@ export function registerWorkspaceCommands(manager: PixiEnvManager): Disposable {
         }
     });
 }
-

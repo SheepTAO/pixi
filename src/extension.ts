@@ -3,7 +3,7 @@ import { commands, ExtensionContext, window, workspace } from 'vscode';
 
 import { registerLogger, traceError } from './common/logging';
 import { setPersistentState } from './common/persistentState';
-import { getPixi, runPixi } from './pixi/cli';
+import { clearPixiCache, getPixi, runPixi } from './pixi/cli';
 import { PixiEnvManager } from './pixi/envManager';
 import { PixiPackageManager } from './pixi/packageManager';
 import { PixiTaskProvider } from './pixi/taskProvider';
@@ -56,7 +56,7 @@ export async function activate(context: ExtensionContext) {
     context.subscriptions.push(manager, api.registerEnvironmentManager(manager));
 
     const packageManager = new PixiPackageManager(api, log, manager);
-    context.subscriptions.push(api.registerPackageManager(packageManager));
+    context.subscriptions.push(packageManager, api.registerPackageManager(packageManager));
 
     const taskProvider = new PixiTaskProvider(manager, log);
     context.subscriptions.push(taskProvider, taskProvider.registerCommands());
@@ -70,6 +70,7 @@ export async function activate(context: ExtensionContext) {
     context.subscriptions.push(
         workspace.onDidChangeConfiguration(async (e) => {
             if (e.affectsConfiguration('pixi-python.pixiExecutable')) {
+                clearPixiCache();
                 if (await validatePixi()) {
                     await manager.refresh(undefined);
                 }

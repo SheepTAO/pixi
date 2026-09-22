@@ -27,6 +27,14 @@ export async function findPythonVersionFromMeta(prefix: string): Promise<string 
     return undefined;
 }
 
+export function isPixiProject(folderPath: string): boolean {
+    return (
+        fs.existsSync(path.join(folderPath, 'pixi.toml')) ||
+        fs.existsSync(path.join(folderPath, 'pyproject.toml')) ||
+        fs.existsSync(path.join(folderPath, '.pixi'))
+    );
+}
+
 export function formatDisplayName(
     template: string,
     projectName: string,
@@ -35,10 +43,10 @@ export function formatDisplayName(
 ): string {
     const defaultName = projectName ? `${projectName}:${envName}` : envName || 'default';
     const raw = (template || '${project}:${env}')
-        .replace(/\$\{project\}/g, projectName || '')
-        .replace(/\$\{env\}/g, envName || '')
-        .replace(/\$\{(python|version)\}/g, pythonVersion || '')
-        .replace(/\$\{[^}]+\}/g, '');
+        .replace(/(\$\{|\{\{)project(\}|\}\})/g, projectName || '')
+        .replace(/(\$\{|\{\{)env(\}|\}\})/g, envName || '')
+        .replace(/(\$\{|\{\{)(python|version)(\}|\}\})/g, pythonVersion || '')
+        .replace(/(\$\{|\{\{)[^}]+(\}|\}\})/g, '');
 
     const cleaned = raw
         .replace(/\(\s*\)/g, '')

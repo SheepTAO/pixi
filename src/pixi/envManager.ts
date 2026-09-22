@@ -12,7 +12,6 @@ import {
     ResolveEnvironmentContext,
     SetEnvironmentScope,
 } from '@vscode/python-environments';
-import * as fs from 'fs';
 import * as path from 'path';
 import {
     commands,
@@ -32,7 +31,7 @@ import { traceVerbose } from '../common/logging';
 import { getWorkspacePersistentState } from '../common/persistentState';
 import { resolvePixiProjectPaths } from '../common/searchPaths';
 import { PIXI_MANAGER_ID } from '../common/utils';
-import { refreshPixi } from './discovery';
+import { isPixiProject, refreshPixi } from './discovery';
 import { matchEnvironmentRule } from './ruleMatcher';
 import { PixiEnvironment } from './types';
 
@@ -345,14 +344,6 @@ export class PixiEnvManager implements EnvironmentManager, Disposable {
         ];
     }
 
-    private isPixiProjectFolder(folderPath: string): boolean {
-        return (
-            fs.existsSync(path.join(folderPath, 'pixi.toml')) ||
-            fs.existsSync(path.join(folderPath, 'pyproject.toml')) ||
-            fs.existsSync(path.join(folderPath, '.pixi'))
-        );
-    }
-
     private async refreshAll(): Promise<void> {
         const oldProjectToEnvs = new Map(this.projectToEnvs);
         this.projectToEnvs.clear();
@@ -363,7 +354,7 @@ export class PixiEnvManager implements EnvironmentManager, Disposable {
 
         const searchPathRoots = await resolvePixiProjectPaths();
         const allCandidatePaths = new Set([...projectMap.keys(), ...searchPathRoots]);
-        const projectPaths = [...allCandidatePaths].filter((p) => this.isPixiProjectFolder(p));
+        const projectPaths = [...allCandidatePaths].filter((p) => isPixiProject(p));
 
         const hasPixi = projectPaths.length > 0;
         await commands.executeCommand('setContext', 'pixi-python.hasPixiProject', hasPixi);
@@ -433,7 +424,7 @@ export class PixiEnvManager implements EnvironmentManager, Disposable {
         }
 
         const projectPath = project.uri.fsPath;
-        if (!this.isPixiProjectFolder(projectPath)) {
+        if (!isPixiProject(projectPath)) {
             return;
         }
 
