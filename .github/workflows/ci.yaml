@@ -6,6 +6,10 @@ on:
     branches:
       - main
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     name: Code Quality
@@ -39,6 +43,7 @@ jobs:
 
       - name: Package extension
         run: npx vsce package
+        run: npx @vscode/vsce package
 
   prerelease-code-marketplace:
     name: 'Pre-release (Code Marketplace)'
@@ -65,6 +70,32 @@ jobs:
 
       - name: Publish Extension (Code Marketplace, pre-release)
         run: npx vsce publish --pre-release --skip-duplicate --pat ${{ secrets.MARKETPLACE_TOKEN }}
+        run: |
+          MAX_RETRIES=5
+          DELAY=20
+          for i in $(seq 1 $MAX_RETRIES); do
+            echo "Attempt $i to publish to Code Marketplace..."
+            if output=$(npx @vscode/vsce publish --pre-release --skip-duplicate --pat "${{ secrets.MARKETPLACE_TOKEN }}" 2>&1); then
+              echo "$output"
+              exit 0
+            else
+              echo "$output"
+              if echo "$output" | grep -qiE "RequestBlockedException|Concurrency|Rate limits|429"; then
+                echo "::warning::Marketplace concurrency rate limit hit. Waiting ${DELAY}s before retrying (attempt $i/$MAX_RETRIES)..."
+                sleep $DELAY
+                DELAY=$((DELAY * 2))
+              elif echo "$output" | grep -qi "already published"; then
+                echo "::notice::Version already published on Code Marketplace, skipping."
+                exit 0
+              else
+                echo "::error::Publish failed with non-retryable error."
+                exit 1
+              fi
+            fi
+          done
+          echo "::error::Exceeded maximum retry attempts ($MAX_RETRIES) due to Marketplace concurrency limit."
+          exit 1
+        timeout-minutes: 5
 
   prerelease-openvsx:
     name: 'Pre-release (OpenVSX)'
