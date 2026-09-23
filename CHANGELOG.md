@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `Pixi: Clean...` command to clean specific environments, all project environments, or global package cache
 - Streamline `Pixi: Create Environment...` to directly prompt for environment name in existing projects
 - Unify sidebar Tree View and QuickPick UI by decoupling uninstalled and incompatible environments from synthetic error markers, ensuring clean custom icons (`$(cloud-download)` and `$(circle-slash)`) and rich tooltips
+- Add `Pixi: Lock Dependencies` and `Pixi: Reinstall Environment...` commands to Command Palette and manifest editor title bar
+- Fix parameter parsing in `Pixi: Install` to prevent `[object Object]` error when executed from editor title buttons
 
 ## [0.2.4]
 

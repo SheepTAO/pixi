@@ -12,7 +12,7 @@ import {
 } from 'vscode';
 
 import { runPixi } from './cli';
-import { getEnvironmentQuickPickInfo, isPixiProject, pickManifestFormat } from './discovery';
+import { getEnvironmentQuickPickInfo, isEnvironmentInvalid, isPixiProject, pickManifestFormat } from './discovery';
 import { PixiEnvManager } from './envManager';
 import { listPixiPackages, PixiPackageManager } from './packageManager';
 import { PixiEnvironment, PixiPackage } from './types';
@@ -578,6 +578,26 @@ export function registerWorkspaceCommands(manager: PixiEnvManager, packageManage
         }),
     );
 
+    // Pixi: Lock Dependencies
+    disposables.push(
+        commands.registerCommand('pixi-python.lock', async (folderUri?: Uri) => {
+            const projectPath = await pickPixiProject(manager, 'Select Pixi project to lock dependencies', folderUri);
+            if (!projectPath) {
+                return;
+            }
+
+            const projectName = path.basename(projectPath);
+            await runPixiWithProgress(
+                `Pixi: Solving and locking dependencies for ${projectName}...`,
+                ['lock'],
+                projectPath,
+                manager,
+                `Pixi: Lockfile (pixi.lock) updated successfully for ${projectName}.`,
+                packageManager,
+            );
+        }),
+    );
+
     // Pixi: Install (Sync Environments)
     disposables.push(
         commands.registerCommand('pixi-python.install', async (folderUri?: Uri, envName?: string) => {
@@ -591,40 +611,126 @@ export function registerWorkspaceCommands(manager: PixiEnvManager, packageManage
             }
 
             const projectName = path.basename(projectPath);
+            const validEnvName = typeof envName === 'string' && envName.trim() ? envName.trim() : undefined;
             const args = ['install'];
-            if (envName) {
-                args.push('-e', envName);
+            if (validEnvName) {
+                args.push('-e', validEnvName);
             }
             await runPixiWithProgress(
-                envName
-                    ? `Pixi: Installing environment '${envName}' for ${projectName}...`
+                validEnvName
+                    ? `Pixi: Installing environment '${validEnvName}' for ${projectName}...`
                     : `Pixi: Installing environments for ${projectName}...`,
                 args,
                 projectPath,
                 manager,
-                envName
-                    ? `Pixi: Environment '${envName}' installed successfully for ${projectName}.`
+                validEnvName
+                    ? `Pixi: Environment '${validEnvName}' installed successfully for ${projectName}.`
                     : `Pixi: Environments synchronized successfully for ${projectName}.`,
                 packageManager,
             );
         }),
     );
 
+    // Pixi: Reinstall Environment...
+    disposables.push(
+        commands.registerCommand('pixi-python.reinstall', async (folderUri?: Uri, envName?: string) => {
+            const projectPath = await pickPixiProject(
+                manager,
+                'Select Pixi project to reinstall environments',
+                folderUri,
+            );
+            if (!projectPath) {
+                return;
+            }
+
+            const projectName = path.basename(projectPath);
+            const validEnvName = typeof envName === 'string' && envName.trim() ? envName.trim() : undefined;
+
+            const runReinstall = async (target?: string, isAll?: boolean) => {
+                const title = target
+                    ? `Pixi: Re-installing environment '${target}' for ${projectName}...`
+                    : isAll
+                      ? `Pixi: Re-installing all environments for ${projectName}...`
+                      : `Pixi: Re-installing environments for ${projectName}...`;
+                const args = target ? ['reinstall', '-e', target] : isAll ? ['reinstall', '--all'] : ['reinstall'];
+                const successMsg = target
+                    ? `Pixi: Environment '${target}' re-installed successfully for ${projectName}.`
+                    : isAll
+                      ? `Pixi: All environments re-installed successfully for ${projectName}.`
+                      : `Pixi: Environments re-installed successfully for ${projectName}.`;
+                await runPixiWithProgress(title, args, projectPath, manager, successMsg, packageManager);
+            };
+
+            if (validEnvName) {
+                return runReinstall(validEnvName);
+            }
+
+            const envs = manager.getEnvironmentsForProject(projectPath);
+            const validEnvs = envs.filter((e) => !isEnvironmentInvalid(e));
+
+            if (validEnvs.length <= 1) {
+                return runReinstall(validEnvs[0]?.pixiEnvName);
+            }
+
+            interface ReinstallQuickPickItem extends QuickPickItem {
+                targetKind: 'env' | 'all';
+                envName?: string;
+            }
+
+            const items: ReinstallQuickPickItem[] = [
+                ...validEnvs.map((e) => ({
+                    label: `$(python) ${e.pixiEnvName}`,
+                    description: e.displayName,
+                    targetKind: 'env' as const,
+                    envName: e.pixiEnvName,
+                })),
+                {
+                    label: '$(sync) All Environments',
+                    description: `Re-install all environments in ${projectName}`,
+                    targetKind: 'all' as const,
+                },
+            ];
+
+            const selected = await window.showQuickPick(items, {
+                title: 'Pixi: Reinstall Environment',
+                placeHolder: `Select an environment to reinstall in ${projectName}`,
+            });
+            if (!selected) {
+                return;
+            }
+
+            if (selected.targetKind === 'env') {
+                return runReinstall(selected.envName);
+            } else {
+                return runReinstall(undefined, true);
+            }
+        }),
+    );
+
     // Pixi: Update Dependencies
     disposables.push(
-        commands.registerCommand('pixi-python.update', async (folderUri?: Uri) => {
+        commands.registerCommand('pixi-python.update', async (folderUri?: Uri, envName?: string) => {
             const projectPath = await pickPixiProject(manager, 'Select Pixi project to update dependencies', folderUri);
             if (!projectPath) {
                 return;
             }
 
             const projectName = path.basename(projectPath);
+            const validEnvName = typeof envName === 'string' && envName.trim() ? envName.trim() : undefined;
+            const args = ['update'];
+            if (validEnvName) {
+                args.push('-e', validEnvName);
+            }
             await runPixiWithProgress(
-                `Pixi: Updating dependencies for ${projectName}...`,
-                ['update'],
+                validEnvName
+                    ? `Pixi: Updating dependencies for environment '${validEnvName}' in ${projectName}...`
+                    : `Pixi: Updating dependencies for ${projectName}...`,
+                args,
                 projectPath,
                 manager,
-                `Pixi: Dependencies updated successfully for ${projectName}.`,
+                validEnvName
+                    ? `Pixi: Dependencies updated successfully for environment '${validEnvName}' in ${projectName}.`
+                    : `Pixi: Dependencies updated successfully for ${projectName}.`,
                 packageManager,
             );
         }),

@@ -68,7 +68,9 @@ _(Object format `{"tests/**": "dev"}` is also supported for backward compatibili
 | **Pixi: Create Environment...**           | `pixi-python.createEnvironment`    | Create a new Pixi environment (or initialize project with Python version selection).     |
 | **Pixi: Delete Environment...**           | `pixi-python.deleteEnvironment`    | Delete or clean a Pixi environment from disk and manifest with safety confirmation.      |
 | **Pixi: Clean...**                        | `pixi-python.clean`                | Clean specific environments, all environments in project, or global package cache.       |
+| **Pixi: Lock Dependencies**               | `pixi-python.lock`                 | Solve and update lockfile (`pixi.lock`) without modifying environments.                  |
 | **Pixi: Install (Sync Environments)**     | `pixi-python.install`              | Install all dependencies and sync environments for the selected Pixi project.            |
+| **Pixi: Reinstall Environment...**        | `pixi-python.reinstall`            | Re-install a specific environment or all environments from scratch.                      |
 | **Pixi: Update Dependencies**             | `pixi-python.update`               | Update dependencies and lockfile according to project constraints.                       |
 | **Pixi: Add Package...**                  | `pixi-python.addPackage`           | Add packages with interactive channel selection (`Conda` vs `PyPI`) and target.          |
 | **Pixi: Remove Package...**               | `pixi-python.removePackage`        | Interactively pick and remove an installed package (auto-detects Conda vs PyPI).         |

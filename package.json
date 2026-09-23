@@ -99,6 +99,18 @@
                 "title": "Clean...",
                 "category": "Pixi",
                 "icon": "$(clear-all)"
+            },
+            {
+                "command": "pixi-python.lock",
+                "title": "Lock Dependencies",
+                "category": "Pixi",
+                "icon": "$(lock)"
+            },
+            {
+                "command": "pixi-python.reinstall",
+                "title": "Reinstall Environment...",
+                "category": "Pixi",
+                "icon": "$(debug-restart)"
             }
         ],
         "menus": {
@@ -119,11 +131,19 @@
                     "when": "pixi-python.hasPixiProject"
                 },
                 {
+                    "command": "pixi-python.lock",
+                    "when": "pixi-python.hasPixiProject"
+                },
+                {
                     "command": "pixi-python.install",
                     "when": "pixi-python.hasPixiProject"
                 },
                 {
                     "command": "pixi-python.update",
+                    "when": "pixi-python.hasPixiProject"
+                },
+                {
+                    "command": "pixi-python.reinstall",
                     "when": "pixi-python.hasPixiProject"
                 },
                 {
@@ -149,14 +169,24 @@
             ],
             "editor/title": [
                 {
-                    "command": "pixi-python.install",
+                    "command": "pixi-python.lock",
                     "when": "resourceExtname == .toml && (resourceFilename == pixi.toml || resourceFilename == pyproject.toml) && pixi-python.hasPixiProject",
                     "group": "navigation@1"
                 },
                 {
-                    "command": "pixi-python.update",
+                    "command": "pixi-python.install",
                     "when": "resourceExtname == .toml && (resourceFilename == pixi.toml || resourceFilename == pyproject.toml) && pixi-python.hasPixiProject",
                     "group": "navigation@2"
+                },
+                {
+                    "command": "pixi-python.update",
+                    "when": "resourceExtname == .toml && (resourceFilename == pixi.toml || resourceFilename == pyproject.toml) && pixi-python.hasPixiProject",
+                    "group": "navigation@3"
+                },
+                {
+                    "command": "pixi-python.reinstall",
+                    "when": "resourceExtname == .toml && (resourceFilename == pixi.toml || resourceFilename == pyproject.toml) && pixi-python.hasPixiProject",
+                    "group": "navigation@4"
                 }
             ]
         },
