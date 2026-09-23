@@ -93,6 +93,12 @@
                 "title": "Delete Environment...",
                 "category": "Pixi",
                 "icon": "$(trash)"
+            },
+            {
+                "command": "pixi-python.clean",
+                "title": "Clean...",
+                "category": "Pixi",
+                "icon": "$(clear-all)"
             }
         ],
         "menus": {
@@ -106,6 +112,10 @@
                 },
                 {
                     "command": "pixi-python.deleteEnvironment",
+                    "when": "pixi-python.hasPixiProject"
+                },
+                {
+                    "command": "pixi-python.clean",
                     "when": "pixi-python.hasPixiProject"
                 },
                 {

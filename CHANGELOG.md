@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Differentiate environment discovery into Ready (installed), Cache (uninstalled but compatible, with one-click install), and Unavailable (incompatible) tiers
 - Optimize Pixi project detection in `pyproject.toml` by verifying `[tool.pixi]` configuration to eliminate false positives
 - Harmonize environment QuickPick icons and status badges across terminal, tasks, and workspace commands
+- Add `Pixi: Clean...` command to clean specific environments, all project environments, or global package cache
+- Streamline `Pixi: Create Environment...` to directly prompt for environment name in existing projects
 
 ## [0.2.4]
 

@@ -306,36 +306,9 @@ export function registerWorkspaceCommands(manager: PixiEnvManager, packageManage
             }
 
             if (isPixiProject(targetFolder)) {
-                const action = await window.showQuickPick(
-                    [
-                        {
-                            label: '$(plus) Add New Named Environment...',
-                            description: 'Add a new named environment (e.g. dev, test, py311) to this project',
-                            action: 'add' as const,
-                        },
-                        {
-                            label: '$(sync) Install / Sync Existing Environments',
-                            description: 'Install or sync all environments defined in the manifest',
-                            action: 'sync' as const,
-                        },
-                    ],
-                    {
-                        title: 'Pixi: Create Environment',
-                        placeHolder: `Project manifest exists in ${path.basename(targetFolder)}. Choose an action`,
-                    },
-                );
-                if (!action) {
-                    return;
-                }
-
-                if (action.action === 'sync') {
-                    await commands.executeCommand('pixi-python.install', Uri.file(targetFolder));
-                    return;
-                }
-
                 const existingEnvs = manager.getEnvironmentsForProject(targetFolder);
                 const envName = await window.showInputBox({
-                    title: 'Pixi: New Environment Name',
+                    title: 'Pixi: Create Environment',
                     prompt: 'Enter a name for the new environment',
                     placeHolder: 'e.g. dev, test, py311',
                     validateInput: (value) => {
@@ -515,6 +488,90 @@ export function registerWorkspaceCommands(manager: PixiEnvManager, packageManage
                     removeManifest
                         ? `Pixi: Environment '${envName}' deleted from disk and manifest.`
                         : `Pixi: Environment '${envName}' cleaned from disk.`,
+                    packageManager,
+                );
+            }
+        }),
+    );
+
+    // Pixi: Clean...
+    disposables.push(
+        commands.registerCommand('pixi-python.clean', async (folderUri?: Uri) => {
+            const projectPath = await pickPixiProject(manager, 'Select Pixi project to clean', folderUri);
+            if (!projectPath) {
+                return;
+            }
+
+            const envs = manager.getEnvironmentsForProject(projectPath);
+            const readyEnvs = envs.filter((e) => !e.error && (!e.pixiStatus || e.pixiStatus === 'ready'));
+
+            interface CleanQuickPickItem extends QuickPickItem {
+                targetKind: 'env' | 'all' | 'global-cache';
+                envName?: string;
+            }
+
+            const items: CleanQuickPickItem[] = [
+                ...readyEnvs.map((e) => ({
+                    label: `$(python) ${e.pixiEnvName}`,
+                    description: e.displayName,
+                    targetKind: 'env' as const,
+                    envName: e.pixiEnvName,
+                })),
+                {
+                    label: '$(trash) All Environments (.pixi)',
+                    description: 'Clean all installed environments in this project',
+                    targetKind: 'all' as const,
+                },
+                {
+                    label: '$(alert) Global Package Cache',
+                    description: 'Clean system-wide package tarball and repodata cache',
+                    targetKind: 'global-cache' as const,
+                },
+            ];
+
+            const selected = await window.showQuickPick(items, {
+                title: 'Pixi: Clean',
+                placeHolder: 'Select an environment or cache to clean',
+            });
+            if (!selected) {
+                return;
+            }
+
+            if (selected.targetKind === 'env') {
+                const envName = selected.envName!;
+                await runPixiWithProgress(
+                    `Pixi: Cleaning environment '${envName}'...`,
+                    [['clean', '-e', envName]],
+                    projectPath,
+                    manager,
+                    `Pixi: Environment '${envName}' cleaned.`,
+                    packageManager,
+                );
+            } else if (selected.targetKind === 'all') {
+                await runPixiWithProgress(
+                    'Pixi: Cleaning all environments...',
+                    [['clean']],
+                    projectPath,
+                    manager,
+                    'Pixi: All environments cleaned in this project.',
+                    packageManager,
+                );
+            } else if (selected.targetKind === 'global-cache') {
+                const confirmed = await window.showWarningMessage(
+                    'Are you sure you want to clean the global Pixi package cache? Subsequent installations will re-download packages from the network.',
+                    { modal: true },
+                    'Clean Global Cache',
+                );
+                if (confirmed !== 'Clean Global Cache') {
+                    return;
+                }
+
+                await runPixiWithProgress(
+                    'Pixi: Cleaning global package cache...',
+                    [['clean', 'cache', '-y']],
+                    projectPath,
+                    manager,
+                    'Pixi: Global package cache cleaned.',
                     packageManager,
                 );
             }
