@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fall back to default environment in `PixiEnvManager.get()` and project refresh routines
 - Enhance package removal (`Pixi: Remove Package...`) with target environment selection and automatic cache invalidation
 - Provide onboarding prompts to synchronize uninstalled environments when a Pixi project manifest is detected
+- Display all declared Pixi environments (including uninstalled and cross-platform incompatible ones) with warning icons, diagnostic errors, click blocking, and native `Ready` vs `Unavailable` environment grouping
 
 ## [0.2.4]
 

@@ -56,13 +56,19 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
         }
 
         if (envs.length === 1) {
+            if (envs[0].error) {
+                window.showErrorMessage(
+                    `Cannot open terminal for environment '${envs[0].displayName}': ${envs[0].error}`,
+                );
+                return undefined;
+            }
             return envs[0];
         }
 
         const items: EnvQuickPickItem[] = envs.map((env) => ({
-            label: `$(prefix-dev) ${env.pixiEnvName}`,
-            description: env.displayName,
-            detail: env.displayPath,
+            label: env.error ? `$(warning) ${env.pixiEnvName}` : `$(prefix-dev) ${env.pixiEnvName}`,
+            description: env.error ? `${env.displayName} (unavailable)` : env.displayName,
+            detail: env.error || env.displayPath,
             env,
         }));
 
@@ -74,6 +80,13 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
             },
             token,
         );
+
+        if (selected?.env.error) {
+            window.showErrorMessage(
+                `Cannot open terminal for environment '${selected.env.displayName}': ${selected.env.error}`,
+            );
+            return undefined;
+        }
 
         return selected?.env;
     }

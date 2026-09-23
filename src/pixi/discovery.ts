@@ -1,12 +1,35 @@
+import { EnvironmentGroupInfo, PythonEnvironment } from '@vscode/python-environments';
 import * as fs from 'fs';
 import * as path from 'path';
-import { ThemeIcon, Uri, window, workspace } from 'vscode';
+import { MarkdownString, ThemeIcon, Uri, window, workspace } from 'vscode';
 
 import { findPythonExecutable } from '../common/findPython';
 import { traceInfo, traceVerbose } from '../common/logging';
 import { PIXI_MANAGER_ID } from '../common/utils';
 import { _runPixi, getPixi } from './cli';
 import { PixiEnvironment, PixiInfo } from './types';
+
+export const READY_GROUP: EnvironmentGroupInfo = {
+    name: 'Ready',
+    description: 'Available Python environments',
+};
+
+export const UNAVAILABLE_GROUP: EnvironmentGroupInfo = {
+    name: 'Unavailable',
+    description: 'Incompatible or uninstalled environments',
+    iconPath: new ThemeIcon('warning'),
+};
+
+export function sortEnvironments<T extends PythonEnvironment>(envs: T[]): T[] {
+    return envs.sort((a, b) => {
+        const aReady = !('error' in a && a.error);
+        const bReady = !('error' in b && b.error);
+        if (aReady !== bReady) {
+            return aReady ? -1 : 1;
+        }
+        return a.displayName.localeCompare(b.displayName);
+    });
+}
 
 export async function findPythonVersionFromMeta(prefix: string): Promise<string | undefined> {
     try {
@@ -90,19 +113,56 @@ export async function refreshPixi(projectPath: string): Promise<PixiEnvironment[
 
         const projectName = pixiInfo.project_info.name;
         const manifestPath = pixiInfo.project_info.manifest_path;
+        const currentPlatform = pixiInfo.platform;
         const template =
             workspace.getConfiguration('pixi-python', Uri.file(projectPath)).get<string>('displayNameFormat') ||
             '${project}:${env}';
 
         const results = await Promise.all(
             pixiInfo.environments_info.map(async (pixiEnv) => {
-                const pythonExecutable = (await findPythonExecutable(pixiEnv.prefix)) || '';
-                if (!pythonExecutable) {
-                    return null;
+                const platformNames = (pixiEnv.platforms || []).map((p) => (typeof p === 'string' ? p : p.name));
+                const isPlatformSupported =
+                    !currentPlatform ||
+                    platformNames.length === 0 ||
+                    pixiEnv.platforms!.some((p) =>
+                        typeof p === 'string'
+                            ? p === currentPlatform
+                            : p.subdir === currentPlatform || p.name === currentPlatform,
+                    );
+
+                let error: string | undefined;
+                let statusDesc = 'pixi';
+                let pythonExecutable = '';
+                let pythonVersion = '';
+
+                if (!isPlatformSupported) {
+                    error = `Environment '${pixiEnv.name}' declared platforms [${platformNames.join(', ')}], which is incompatible with current host platform '${currentPlatform}'.`;
+                    statusDesc = 'pixi (incompatible)';
+                } else if (!fs.existsSync(pixiEnv.prefix)) {
+                    error = `Environment '${pixiEnv.name}' is not installed yet on disk. Run 'pixi install -e ${pixiEnv.name}' to create it.`;
+                    statusDesc = 'pixi (not installed)';
+                } else {
+                    pythonExecutable = (await findPythonExecutable(pixiEnv.prefix)) || '';
+                    pythonVersion = (await findPythonVersionFromMeta(pixiEnv.prefix)) || '';
+                    if (!pythonExecutable) {
+                        error = `No Python executable found in environment '${pixiEnv.name}'. Ensure 'python' dependency is added to the environment.`;
+                        statusDesc = 'pixi (no python)';
+                    }
                 }
 
-                const pythonVersion = (await findPythonVersionFromMeta(pixiEnv.prefix)) || '';
                 const displayName = formatDisplayName(template, projectName, pixiEnv.name, pythonVersion);
+                const isReady = !error;
+
+                let tooltip: string | MarkdownString;
+                if (error) {
+                    const md = new MarkdownString(
+                        `**${displayName}**\n\n$(warning) **Status**: ${error}\n\n*Prefix*: \`${pixiEnv.prefix}\``,
+                    );
+                    md.supportThemeIcons = true;
+                    tooltip = md;
+                } else {
+                    tooltip = pythonExecutable;
+                }
 
                 return {
                     name: displayName,
@@ -111,11 +171,13 @@ export async function refreshPixi(projectPath: string): Promise<PixiEnvironment[
                     displayPath: pixiEnv.prefix,
                     version: pythonVersion,
                     environmentPath: Uri.file(pixiEnv.prefix),
-                    description: 'pixi',
-                    tooltip: pythonExecutable,
-                    iconPath: new ThemeIcon('python'),
+                    description: statusDesc,
+                    tooltip,
+                    iconPath: isReady ? new ThemeIcon('python') : new ThemeIcon('warning'),
+                    group: isReady ? READY_GROUP : UNAVAILABLE_GROUP,
+                    error,
                     execInfo: {
-                        run: { executable: pythonExecutable },
+                        run: { executable: pythonExecutable || 'python' },
                         activatedRun: {
                             executable: pixi,
                             args: ['run', '--manifest-path', manifestPath, '-e', pixiEnv.name, 'python'],
@@ -140,7 +202,7 @@ export async function refreshPixi(projectPath: string): Promise<PixiEnvironment[
             }),
         );
 
-        return results.filter((env): env is PixiEnvironment => env !== null);
+        return sortEnvironments(results);
     } catch (error) {
         traceInfo(`Failed to get pixi environments: ${error}`);
         return [];

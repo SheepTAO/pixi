@@ -50,8 +50,8 @@ async function pickTargetEnvironment(
             envName: undefined,
         },
         ...namedEnvs.map((e) => ({
-            label: `$(prefix-dev) ${e.pixiEnvName}`,
-            description: `Environment: ${e.displayName}`,
+            label: e.error ? `$(warning) ${e.pixiEnvName}` : `$(prefix-dev) ${e.pixiEnvName}`,
+            description: e.error ? `${e.displayName} (unavailable)` : `Environment: ${e.displayName}`,
             envName: e.pixiEnvName,
         })),
     ];
@@ -167,11 +167,19 @@ async function pickPixiProject(
     folderUri?: Uri,
 ): Promise<string | undefined> {
     const direct = normalizeFolderPath(folderUri);
-    if (direct && isPixiProject(direct)) {
-        return direct;
+    const projectPaths = manager.getProjectPaths();
+
+    if (direct) {
+        if (isPixiProject(direct)) {
+            return direct;
+        }
+        for (const p of projectPaths) {
+            if (direct === p || direct.startsWith(p + path.sep)) {
+                return p;
+            }
+        }
     }
 
-    const projectPaths = manager.getProjectPaths();
     if (projectPaths.length === 0) {
         window.showWarningMessage('No Pixi projects found in the current workspace.');
         return undefined;
@@ -418,8 +426,8 @@ export function registerWorkspaceCommands(manager: PixiEnvManager, packageManage
 
             const envItems = [
                 ...envs.map((e) => ({
-                    label: `$(prefix-dev) ${e.pixiEnvName}`,
-                    description: `Environment: ${e.displayName}`,
+                    label: e.error ? `$(warning) ${e.pixiEnvName}` : `$(prefix-dev) ${e.pixiEnvName}`,
+                    description: e.error ? `${e.displayName} (unavailable)` : `Environment: ${e.displayName}`,
                     envName: e.pixiEnvName,
                 })),
                 {
@@ -509,7 +517,7 @@ export function registerWorkspaceCommands(manager: PixiEnvManager, packageManage
 
     // Pixi: Install (Sync Environments)
     disposables.push(
-        commands.registerCommand('pixi-python.install', async (folderUri?: Uri) => {
+        commands.registerCommand('pixi-python.install', async (folderUri?: Uri, envName?: string) => {
             const projectPath = await pickPixiProject(
                 manager,
                 'Select Pixi project to install and sync environments',
@@ -520,12 +528,20 @@ export function registerWorkspaceCommands(manager: PixiEnvManager, packageManage
             }
 
             const projectName = path.basename(projectPath);
+            const args = ['install'];
+            if (envName) {
+                args.push('-e', envName);
+            }
             await runPixiWithProgress(
-                `Pixi: Installing environments for ${projectName}...`,
-                ['install'],
+                envName
+                    ? `Pixi: Installing environment '${envName}' for ${projectName}...`
+                    : `Pixi: Installing environments for ${projectName}...`,
+                args,
                 projectPath,
                 manager,
-                `Pixi: Environments synchronized successfully for ${projectName}.`,
+                envName
+                    ? `Pixi: Environment '${envName}' installed successfully for ${projectName}.`
+                    : `Pixi: Environments synchronized successfully for ${projectName}.`,
                 packageManager,
             );
         }),

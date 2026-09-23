@@ -33,7 +33,7 @@ import { traceVerbose } from '../common/logging';
 import { getWorkspacePersistentState } from '../common/persistentState';
 import { resolvePixiProjectPaths } from '../common/searchPaths';
 import { PIXI_MANAGER_ID } from '../common/utils';
-import { isPixiProject, refreshPixi } from './discovery';
+import { isPixiProject, refreshPixi, sortEnvironments } from './discovery';
 import { matchEnvironmentRule } from './ruleMatcher';
 import { PixiEnvironment } from './types';
 
@@ -213,7 +213,13 @@ export class PixiEnvManager implements EnvironmentManager, Disposable {
     }
 
     getDefaultProjectEnv(envs: PixiEnvironment[]): PixiEnvironment | undefined {
-        return envs.find((e) => e.pixiEnvName === 'default') || envs[0];
+        const healthyEnvs = envs.filter((e) => !e.error);
+        return (
+            healthyEnvs.find((e) => e.pixiEnvName === 'default') ||
+            healthyEnvs[0] ||
+            envs.find((e) => e.pixiEnvName === 'default') ||
+            envs[0]
+        );
     }
 
     async getEnvironments(scope: GetEnvironmentsScope): Promise<PythonEnvironment[]> {
@@ -222,12 +228,13 @@ export class PixiEnvManager implements EnvironmentManager, Disposable {
         await this.initialize();
 
         if (scope === 'all') {
-            return [...this.buildEnvLookup().values()].sort((a, b) => a.displayName.localeCompare(b.displayName));
+            return sortEnvironments([...this.buildEnvLookup().values()]);
         }
 
         if (scope instanceof Uri) {
             const project = this.api.getPythonProject(scope);
-            return project ? this.projectToEnvs.get(project.uri.fsPath) || [] : [];
+            const envs = project ? this.projectToEnvs.get(project.uri.fsPath) || [] : [];
+            return sortEnvironments([...envs]);
         }
 
         return [];
@@ -277,6 +284,23 @@ export class PixiEnvManager implements EnvironmentManager, Disposable {
 
     async set(scope: SetEnvironmentScope, environment?: PythonEnvironment) {
         traceVerbose(`Called set with scope: ${scope}, environment: ${JSON.stringify(environment)}`);
+
+        if (environment?.error) {
+            const pixiEnv = environment as PixiEnvironment;
+            const isUninstalled = environment.error.includes('not installed');
+            const msg = `Cannot activate environment '${environment.displayName}': ${environment.error}`;
+            if (isUninstalled) {
+                void window.showWarningMessage(msg, 'Install Environment').then((action) => {
+                    if (action === 'Install Environment') {
+                        const targetFolder = scope instanceof Uri ? scope : undefined;
+                        void commands.executeCommand('pixi-python.install', targetFolder, pixiEnv.pixiEnvName);
+                    }
+                });
+            } else {
+                void window.showErrorMessage(msg);
+            }
+            return;
+        }
 
         if (scope === undefined) {
             await setGlobalEnvId(environment?.envId.id);
@@ -467,9 +491,12 @@ export class PixiEnvManager implements EnvironmentManager, Disposable {
                 for (const projectPath of projectPaths) {
                     const envId = await getProjectEnvId(projectPath);
                     let env = envId ? envLookup.get(envId) : undefined;
-                    if (!env) {
+                    if (!env || env.error) {
                         const projectEnvs = this.projectToEnvs.get(projectPath) || [];
-                        env = this.getDefaultProjectEnv(projectEnvs);
+                        const candidate = this.getDefaultProjectEnv(projectEnvs);
+                        if (!env || (candidate && !candidate.error)) {
+                            env = candidate;
+                        }
                     }
 
                     if (env) {
@@ -512,8 +539,11 @@ export class PixiEnvManager implements EnvironmentManager, Disposable {
         // Update active environment for this project
         const envId = await getProjectEnvId(projectPath);
         let env = envId ? newEnvs.find((e) => e.envId.id === envId) : undefined;
-        if (!env) {
-            env = this.getDefaultProjectEnv(newEnvs);
+        if (!env || env.error) {
+            const candidate = this.getDefaultProjectEnv(newEnvs);
+            if (!env || (candidate && !candidate.error)) {
+                env = candidate;
+            }
         }
         this.triggerDidChangeEnvironment(project.uri, this.activeEnv.get(projectPath), env);
 

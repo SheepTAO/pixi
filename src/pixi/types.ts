@@ -1,6 +1,12 @@
 import { Package, PythonEnvironment } from '@vscode/python-environments';
 
+export interface PixiEnvironmentPlatform {
+    name: string;
+    subdir?: string;
+}
+
 export interface PixiInfo {
+    platform?: string;
     project_info?: {
         name: string;
         manifest_path: string;
@@ -8,6 +14,7 @@ export interface PixiInfo {
     environments_info: Array<{
         name: string;
         prefix: string;
+        platforms?: Array<PixiEnvironmentPlatform | string>;
     }>;
 }
 
