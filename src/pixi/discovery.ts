@@ -9,11 +9,6 @@ import { PIXI_MANAGER_ID } from '../common/utils';
 import { _runPixi, getPixi } from './cli';
 import { PixiEnvironment, PixiInfo } from './types';
 
-export const READY_GROUP: EnvironmentGroupInfo = {
-    name: 'Ready',
-    description: 'Available Python environments',
-};
-
 export const UNAVAILABLE_GROUP: EnvironmentGroupInfo = {
     name: 'Unavailable',
     description: 'Incompatible or uninstalled environments',
@@ -174,7 +169,7 @@ export async function refreshPixi(projectPath: string): Promise<PixiEnvironment[
                     description: statusDesc,
                     tooltip,
                     iconPath: isReady ? new ThemeIcon('python') : new ThemeIcon('warning'),
-                    group: isReady ? READY_GROUP : UNAVAILABLE_GROUP,
+                    group: isReady ? undefined : UNAVAILABLE_GROUP,
                     error,
                     execInfo: {
                         run: { executable: pythonExecutable || 'python' },

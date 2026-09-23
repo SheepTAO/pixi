@@ -34,7 +34,7 @@
 - **Editor Toolbar Sync**: Quick sync and update action buttons directly in the editor header when editing `pixi.toml` or `pyproject.toml`.
 - **Pixi Features Support**: Discovers and exposes Pixi features (dev, test, lint, etc.) as distinct selectable environments.
 - **Interpreter & Terminal Integration**: Automatic interpreter selection for editing, running, debugging, and terminal activation.
-- **Multi-Platform Safe & Status Diagnostics**: Discovers all declared environments across platforms, grouping them into Ready vs Unavailable with warning indicators, diagnostic error details, and safe activation blocking for incompatible or uninstalled environments.
+- **Multi-Platform Safe & Status Diagnostics**: Discovers all declared environments across platforms with warning indicators, diagnostic error details, and safe activation blocking for incompatible or uninstalled environments.
 
 ---
 
