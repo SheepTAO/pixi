@@ -25,7 +25,7 @@
 
 ## ✨ Features
 
-- **Automatic Environment Discovery**: Instantly detects Pixi projects with `pixi.toml` or `pyproject.toml`, and provides onboarding prompts to sync uninstalled environments.
+- **Automatic Environment Discovery**: Instantly detects Pixi projects with `pixi.toml` or `pyproject.toml`, discovering and diagnosing all declared environments with actionable warning indicators.
 - **Environment & Dependency Lifecycle**: Create and delete environments (`pixi workspace environment add/remove`, `pixi clean`), sync environments (`pixi install`), update dependencies (`pixi update`), and add/remove packages with target environment selection and full Conda/PyPI channel support.
 - **Dynamic Per-File Environment Resolution**: Map file/directory patterns (e.g. `tests/**` → `dev`) to automatically switch Python interpreters for different files.
 - **Native Pixi Tasks Integration**: Auto-discovers Pixi tasks as native VS Code Tasks (`Terminal: Run Task...`) and provides a quick Command Palette runner (`Pixi: Run Task`).

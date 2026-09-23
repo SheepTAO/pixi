@@ -47,7 +47,6 @@ jobs:
       - run: npm ci
 
       - name: Publish Extension (Code Marketplace)
-        run: npx vsce publish --skip-duplicate --pat ${{ secrets.MARKETPLACE_TOKEN }}
         run: |
           MAX_RETRIES=5
           DELAY=20
@@ -128,7 +127,6 @@ jobs:
         run: npm run compile
 
       - name: Package extension
-        run: npx vsce package --no-git-tag-version
         run: npx @vscode/vsce package --no-git-tag-version
 
       - name: Create GitHub Release

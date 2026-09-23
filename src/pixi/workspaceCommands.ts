@@ -287,7 +287,6 @@ export function registerWorkspaceCommands(manager: PixiEnvManager, packageManage
                 'Pixi: Project initialized successfully.',
                 packageManager,
             );
-            manager.markProjectPrompted(targetFolder);
 
             const createdManifest = format === 'pyproject' ? pyprojectToml : pixiToml;
             await openDocumentIfExists(createdManifest);
@@ -394,7 +393,6 @@ export function registerWorkspaceCommands(manager: PixiEnvManager, packageManage
                         : 'Pixi: Environment created successfully.',
                     packageManager,
                 );
-                manager.markProjectPrompted(targetFolder);
 
                 const createdManifest =
                     format === 'pyproject'

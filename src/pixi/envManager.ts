@@ -13,7 +13,6 @@ import {
     ResolveEnvironmentContext,
     SetEnvironmentScope,
 } from '@vscode/python-environments';
-import * as fs from 'fs';
 import * as path from 'path';
 import {
     commands,
@@ -41,7 +40,6 @@ export class PixiEnvManager implements EnvironmentManager, Disposable {
     private globalEnv: PythonEnvironment | undefined;
     private activeEnv = new Map<string, PythonEnvironment>(); // Selected environment for each project
     private projectToEnvs = new Map<string, PixiEnvironment[]>(); // Maps a project path to its `pixi info` output
-    private readonly promptedProjects = new Set<string>();
     private readonly disposables: Disposable[] = [];
 
     private readonly _onDidChangeEnvironment = new EventEmitter<DidChangeEnvironmentEventArgs>();
@@ -149,7 +147,6 @@ export class PixiEnvManager implements EnvironmentManager, Disposable {
         this.globalEnv = undefined;
         this.activeEnv.clear();
         this.projectToEnvs.clear();
-        this.promptedProjects.clear();
     }
 
     private _initialized: Deferred<void> | undefined;
@@ -292,7 +289,9 @@ export class PixiEnvManager implements EnvironmentManager, Disposable {
             if (isUninstalled) {
                 void window.showWarningMessage(msg, 'Install Environment').then((action) => {
                     if (action === 'Install Environment') {
-                        const targetFolder = scope instanceof Uri ? scope : undefined;
+                        const targetFolder =
+                            (scope instanceof Uri ? scope : Array.isArray(scope) ? scope[0] : undefined) ??
+                            pixiEnv.environmentPath;
                         void commands.executeCommand('pixi-python.install', targetFolder, pixiEnv.pixiEnvName);
                     }
                 });
@@ -360,42 +359,6 @@ export class PixiEnvManager implements EnvironmentManager, Disposable {
 
     getEnvironmentsForProject(projectPath: string): PixiEnvironment[] {
         return this.projectToEnvs.get(projectPath) || [];
-    }
-
-    markProjectPrompted(projectPath: string): void {
-        this.promptedProjects.add(path.normalize(projectPath));
-    }
-
-    private async checkUninstalledProjects(projectPaths: string[]): Promise<void> {
-        for (const projectPath of projectPaths) {
-            const normalized = path.normalize(projectPath);
-            if (this.promptedProjects.has(normalized)) {
-                continue;
-            }
-            if (fs.existsSync(path.join(projectPath, '.pixi'))) {
-                continue;
-            }
-            if (await isDontAskInstall(projectPath)) {
-                continue;
-            }
-
-            this.promptedProjects.add(normalized);
-
-            const projectName = path.basename(projectPath);
-            void window
-                .showInformationMessage(
-                    `Pixi project detected in '${projectName}', but environments have not been installed yet.`,
-                    'Install Environments',
-                    "Don't Ask Again",
-                )
-                .then(async (selection) => {
-                    if (selection === 'Install Environments') {
-                        await commands.executeCommand('pixi-python.install', Uri.file(projectPath));
-                    } else if (selection === "Don't Ask Again") {
-                        await setDontAskInstall(projectPath);
-                    }
-                });
-        }
     }
 
     private buildEnvLookup(): Map<string, PixiEnvironment> {
@@ -511,8 +474,6 @@ export class PixiEnvManager implements EnvironmentManager, Disposable {
                 }
             },
         );
-
-        void this.checkUninstalledProjects(projectPaths);
     }
 
     private async refreshOne(scope: Uri): Promise<void> {
@@ -552,8 +513,6 @@ export class PixiEnvManager implements EnvironmentManager, Disposable {
         } else {
             this.activeEnv.delete(projectPath);
         }
-
-        void this.checkUninstalledProjects([projectPath]);
     }
 
     private triggerDidChangeEnvironment(
@@ -575,26 +534,9 @@ type PixiPersistentState = {
     [projectPath: string]: string;
 };
 
-type DontAskInstallState = {
-    [projectPath: string]: boolean;
-};
-
 async function clearExtensionCache(): Promise<void> {
     const state = await getWorkspacePersistentState();
     await state.clear([PIXI_WORKSPACE_KEY, PIXI_GLOBAL_KEY, PIXI_DONT_ASK_INSTALL_KEY]);
-}
-
-async function isDontAskInstall(projectPath: string): Promise<boolean> {
-    const state = await getWorkspacePersistentState();
-    const data: DontAskInstallState = (await state.get(PIXI_DONT_ASK_INSTALL_KEY)) ?? {};
-    return !!data[path.normalize(projectPath)];
-}
-
-async function setDontAskInstall(projectPath: string): Promise<void> {
-    const state = await getWorkspacePersistentState();
-    const data: DontAskInstallState = (await state.get(PIXI_DONT_ASK_INSTALL_KEY)) ?? {};
-    data[path.normalize(projectPath)] = true;
-    await state.set(PIXI_DONT_ASK_INSTALL_KEY, data);
 }
 
 async function getGlobalEnvId(): Promise<string | undefined> {
