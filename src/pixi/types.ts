@@ -26,8 +26,11 @@ export interface PixiPackage {
     build?: string;
 }
 
+export type PixiEnvironmentStatus = 'ready' | 'cache' | 'unable';
+
 export interface PixiEnvironment extends PythonEnvironment {
     pixiInfo: PixiInfo;
     packages: Package[];
     pixiEnvName: string;
+    pixiStatus?: PixiEnvironmentStatus;
 }

@@ -211,9 +211,14 @@ export class PixiEnvManager implements EnvironmentManager, Disposable {
 
     getDefaultProjectEnv(envs: PixiEnvironment[]): PixiEnvironment | undefined {
         const healthyEnvs = envs.filter((e) => !e.error);
+        const cacheEnvs = envs.filter(
+            (e) => e.pixiStatus === 'cache' || (e.error && e.error.includes('not installed')),
+        );
         return (
             healthyEnvs.find((e) => e.pixiEnvName === 'default') ||
             healthyEnvs[0] ||
+            cacheEnvs.find((e) => e.pixiEnvName === 'default') ||
+            cacheEnvs[0] ||
             envs.find((e) => e.pixiEnvName === 'default') ||
             envs[0]
         );
@@ -284,17 +289,25 @@ export class PixiEnvManager implements EnvironmentManager, Disposable {
 
         if (environment?.error) {
             const pixiEnv = environment as PixiEnvironment;
-            const isUninstalled = environment.error.includes('not installed');
+            const isUninstalled = pixiEnv.pixiStatus === 'cache' || environment.error.includes('not installed');
             const msg = `Cannot activate environment '${environment.displayName}': ${environment.error}`;
             if (isUninstalled) {
-                void window.showWarningMessage(msg, 'Install Environment').then((action) => {
-                    if (action === 'Install Environment') {
-                        const targetFolder =
-                            (scope instanceof Uri ? scope : Array.isArray(scope) ? scope[0] : undefined) ??
-                            pixiEnv.environmentPath;
-                        void commands.executeCommand('pixi-python.install', targetFolder, pixiEnv.pixiEnvName);
-                    }
-                });
+                void window
+                    .showWarningMessage(
+                        `Environment '${pixiEnv.pixiEnvName}' is not installed yet on disk. Would you like to install it now?`,
+                        'Install Environment',
+                    )
+                    .then((action) => {
+                        if (action === 'Install Environment') {
+                            const manifestPath = pixiEnv.pixiInfo?.project_info?.manifest_path;
+                            const projectFolder = manifestPath ? Uri.file(path.dirname(manifestPath)) : undefined;
+                            const targetFolder =
+                                (scope instanceof Uri ? scope : Array.isArray(scope) ? scope[0] : undefined) ??
+                                projectFolder ??
+                                pixiEnv.environmentPath;
+                            void commands.executeCommand('pixi-python.install', targetFolder, pixiEnv.pixiEnvName);
+                        }
+                    });
             } else {
                 void window.showErrorMessage(msg);
             }

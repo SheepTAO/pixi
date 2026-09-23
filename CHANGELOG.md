@@ -13,7 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fall back to default environment in `PixiEnvManager.get()` and project refresh routines
 - Enhance package removal (`Pixi: Remove Package...`) with target environment selection and automatic cache invalidation
 - Support on-demand single-environment installation from interpreter activation warning prompts
-- Display all declared Pixi environments with warning icons, diagnostic errors, click blocking, and quarantine unavailable environments into a dedicated group
+- Differentiate environment discovery into Ready (installed), Cache (uninstalled but compatible, with one-click install), and Unavailable (incompatible) tiers
+- Optimize Pixi project detection in `pyproject.toml` by verifying `[tool.pixi]` configuration to eliminate false positives
 
 ## [0.2.4]
 
