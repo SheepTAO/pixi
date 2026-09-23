@@ -18,7 +18,9 @@ import {
 
 import { traceError, traceVerbose } from '../common/logging';
 import { getPixi, runPixi } from './cli';
+import { getEnvironmentQuickPickInfo } from './discovery';
 import { PixiEnvManager } from './envManager';
+import { PixiEnvironment } from './types';
 
 export interface PixiTaskDefinition extends TaskDefinition {
     type: 'pixi';
@@ -266,19 +268,48 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
         }
 
         const envs = this.envManager.getEnvironmentsForProject(selectedTask.pixiTask.projectPath);
-        const envNames = envs.length > 0 ? envs.map((e) => e.pixiEnvName) : ['default'];
+        interface TaskEnvItem extends QuickPickItem {
+            envName: string;
+            pixiEnv?: PixiEnvironment;
+        }
 
-        const selectedEnv = await window.showQuickPick(envNames, {
+        const envItems: TaskEnvItem[] =
+            envs.length > 0
+                ? envs.map((e) => {
+                      const info = getEnvironmentQuickPickInfo(e);
+                      return {
+                          label: `${info.icon} ${e.pixiEnvName}`,
+                          description: info.statusText ? `${e.displayName} ${info.statusText}` : e.displayName,
+                          envName: e.pixiEnvName,
+                          pixiEnv: e,
+                      };
+                  })
+                : [
+                      {
+                          label: '$(globe) default',
+                          description: 'Default environment',
+                          envName: 'default',
+                      },
+                  ];
+
+        const selectedEnvItem = await window.showQuickPick(envItems, {
             placeHolder: `Step 2: Select environment to run '${selectedTask.label}'`,
         });
 
-        if (!selectedEnv) {
+        if (!selectedEnvItem) {
+            return;
+        }
+
+        if (selectedEnvItem.pixiEnv?.pixiStatus === 'unable') {
+            window.showErrorMessage(
+                `Cannot run task in environment '${selectedEnvItem.pixiEnv.displayName}': ${selectedEnvItem.pixiEnv.error}`,
+            );
             return;
         }
 
         const taskWithEnv: PixiTask = {
             ...selectedTask.pixiTask,
-            default_environment: selectedEnv,
+            default_environment: selectedEnvItem.envName,
         };
 
         const vsTask = await this.createVsCodeTask(taskWithEnv);

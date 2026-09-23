@@ -9,11 +9,13 @@ import {
     TerminalProfile,
     TerminalProfileProvider,
     ThemeIcon,
+    Uri,
     window,
 } from 'vscode';
 
 import { traceError, traceVerbose } from '../common/logging';
 import { getPixi } from './cli';
+import { getEnvironmentQuickPickInfo } from './discovery';
 import { PixiEnvManager } from './envManager';
 import { PixiEnvironment } from './types';
 
@@ -55,22 +57,46 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
             return undefined;
         }
 
+        const handleUninstalledOrError = (env: PixiEnvironment): boolean => {
+            if (!env.error) {
+                return false;
+            }
+            const isUninstalled = env.pixiStatus === 'cache' || env.error.includes('not installed');
+            if (isUninstalled) {
+                const manifestPath = env.pixiInfo?.project_info?.manifest_path;
+                const projectFolder = manifestPath ? Uri.file(path.dirname(manifestPath)) : undefined;
+                void window
+                    .showWarningMessage(
+                        `Environment '${env.pixiEnvName}' is not installed yet on disk. Would you like to install it now?`,
+                        'Install Environment',
+                    )
+                    .then((action) => {
+                        if (action === 'Install Environment') {
+                            void commands.executeCommand('pixi-python.install', projectFolder, env.pixiEnvName);
+                        }
+                    });
+            } else {
+                window.showErrorMessage(`Cannot open terminal for environment '${env.displayName}': ${env.error}`);
+            }
+            return true;
+        };
+
         if (envs.length === 1) {
-            if (envs[0].error) {
-                window.showErrorMessage(
-                    `Cannot open terminal for environment '${envs[0].displayName}': ${envs[0].error}`,
-                );
+            if (handleUninstalledOrError(envs[0])) {
                 return undefined;
             }
             return envs[0];
         }
 
-        const items: EnvQuickPickItem[] = envs.map((env) => ({
-            label: env.error ? `$(warning) ${env.pixiEnvName}` : `$(prefix-dev) ${env.pixiEnvName}`,
-            description: env.error ? `${env.displayName} (unavailable)` : env.displayName,
-            detail: env.error || env.displayPath,
-            env,
-        }));
+        const items: EnvQuickPickItem[] = envs.map((env) => {
+            const info = getEnvironmentQuickPickInfo(env);
+            return {
+                label: `${info.icon} ${env.pixiEnvName}`,
+                description: info.statusText ? `${env.displayName} ${info.statusText}` : env.displayName,
+                detail: env.error || env.displayPath,
+                env,
+            };
+        });
 
         const selected = await window.showQuickPick(
             items,
@@ -81,14 +107,15 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
             token,
         );
 
-        if (selected?.env.error) {
-            window.showErrorMessage(
-                `Cannot open terminal for environment '${selected.env.displayName}': ${selected.env.error}`,
-            );
+        if (!selected) {
             return undefined;
         }
 
-        return selected?.env;
+        if (handleUninstalledOrError(selected.env)) {
+            return undefined;
+        }
+
+        return selected.env;
     }
 
     private async createTerminalOptions(env: PixiEnvironment): Promise<TerminalOptions> {

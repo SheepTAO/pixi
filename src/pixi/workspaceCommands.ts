@@ -12,7 +12,7 @@ import {
 } from 'vscode';
 
 import { runPixi } from './cli';
-import { isPixiProject, pickManifestFormat } from './discovery';
+import { getEnvironmentQuickPickInfo, isPixiProject, pickManifestFormat } from './discovery';
 import { PixiEnvManager } from './envManager';
 import { listPixiPackages, PixiPackageManager } from './packageManager';
 import { PixiEnvironment, PixiPackage } from './types';
@@ -49,11 +49,14 @@ async function pickTargetEnvironment(
             description: `${isAdd ? 'Default environment / feature (available to all environments)' : 'Default environment'}`,
             envName: undefined,
         },
-        ...namedEnvs.map((e) => ({
-            label: e.error ? `$(warning) ${e.pixiEnvName}` : `$(prefix-dev) ${e.pixiEnvName}`,
-            description: e.error ? `${e.displayName} (unavailable)` : `Environment: ${e.displayName}`,
-            envName: e.pixiEnvName,
-        })),
+        ...namedEnvs.map((e) => {
+            const info = getEnvironmentQuickPickInfo(e);
+            return {
+                label: `${info.icon} ${e.pixiEnvName}`,
+                description: info.statusText ? `${e.displayName} ${info.statusText}` : `Environment: ${e.displayName}`,
+                envName: e.pixiEnvName,
+            };
+        }),
     ];
 
     const selected = await window.showQuickPick(items, {
@@ -423,11 +426,16 @@ export function registerWorkspaceCommands(manager: PixiEnvManager, packageManage
             }
 
             const envItems = [
-                ...envs.map((e) => ({
-                    label: e.error ? `$(warning) ${e.pixiEnvName}` : `$(prefix-dev) ${e.pixiEnvName}`,
-                    description: e.error ? `${e.displayName} (unavailable)` : `Environment: ${e.displayName}`,
-                    envName: e.pixiEnvName,
-                })),
+                ...envs.map((e) => {
+                    const info = getEnvironmentQuickPickInfo(e);
+                    return {
+                        label: `${info.icon} ${e.pixiEnvName}`,
+                        description: info.statusText
+                            ? `${e.displayName} ${info.statusText}`
+                            : `Environment: ${e.displayName}`,
+                        envName: e.pixiEnvName,
+                    };
+                }),
                 {
                     label: '$(trash) All Environments (.pixi)',
                     description: 'Clean all installed environments in .pixi directory',

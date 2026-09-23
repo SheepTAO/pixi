@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support on-demand single-environment installation from interpreter activation warning prompts
 - Differentiate environment discovery into Ready (installed), Cache (uninstalled but compatible, with one-click install), and Unavailable (incompatible) tiers
 - Optimize Pixi project detection in `pyproject.toml` by verifying `[tool.pixi]` configuration to eliminate false positives
+- Harmonize environment QuickPick icons and status badges across terminal, tasks, and workspace commands
 
 ## [0.2.4]
 
