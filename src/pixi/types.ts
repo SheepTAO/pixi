@@ -33,4 +33,5 @@ export interface PixiEnvironment extends PythonEnvironment {
     packages: Package[];
     pixiEnvName: string;
     pixiStatus?: PixiEnvironmentStatus;
+    statusReason?: string;
 }

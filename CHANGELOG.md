@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Harmonize environment QuickPick icons and status badges across terminal, tasks, and workspace commands
 - Add `Pixi: Clean...` command to clean specific environments, all project environments, or global package cache
 - Streamline `Pixi: Create Environment...` to directly prompt for environment name in existing projects
+- Unify sidebar Tree View and QuickPick UI by decoupling uninstalled and incompatible environments from synthetic error markers, ensuring clean custom icons (`$(cloud-download)` and `$(circle-slash)`) and rich tooltips
 
 ## [0.2.4]
 

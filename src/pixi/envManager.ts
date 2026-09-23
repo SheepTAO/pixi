@@ -32,7 +32,13 @@ import { traceVerbose } from '../common/logging';
 import { getWorkspacePersistentState } from '../common/persistentState';
 import { resolvePixiProjectPaths } from '../common/searchPaths';
 import { PIXI_MANAGER_ID } from '../common/utils';
-import { isPixiProject, refreshPixi, sortEnvironments } from './discovery';
+import {
+    isEnvironmentInvalid,
+    isPixiProject,
+    promptToInstallEnvironment,
+    refreshPixi,
+    sortEnvironments,
+} from './discovery';
 import { matchEnvironmentRule } from './ruleMatcher';
 import { PixiEnvironment } from './types';
 
@@ -210,13 +216,13 @@ export class PixiEnvManager implements EnvironmentManager, Disposable {
     }
 
     getDefaultProjectEnv(envs: PixiEnvironment[]): PixiEnvironment | undefined {
-        const healthyEnvs = envs.filter((e) => !e.error);
+        const readyEnvs = envs.filter((e) => e.pixiStatus === 'ready' || (!e.pixiStatus && !e.error));
         const cacheEnvs = envs.filter(
             (e) => e.pixiStatus === 'cache' || (e.error && e.error.includes('not installed')),
         );
         return (
-            healthyEnvs.find((e) => e.pixiEnvName === 'default') ||
-            healthyEnvs[0] ||
+            readyEnvs.find((e) => e.pixiEnvName === 'default') ||
+            readyEnvs[0] ||
             cacheEnvs.find((e) => e.pixiEnvName === 'default') ||
             cacheEnvs[0] ||
             envs.find((e) => e.pixiEnvName === 'default') ||
@@ -287,31 +293,26 @@ export class PixiEnvManager implements EnvironmentManager, Disposable {
     async set(scope: SetEnvironmentScope, environment?: PythonEnvironment) {
         traceVerbose(`Called set with scope: ${scope}, environment: ${JSON.stringify(environment)}`);
 
-        if (environment?.error) {
+        if (environment) {
             const pixiEnv = environment as PixiEnvironment;
-            const isUninstalled = pixiEnv.pixiStatus === 'cache' || environment.error.includes('not installed');
-            const msg = `Cannot activate environment '${environment.displayName}': ${environment.error}`;
-            if (isUninstalled) {
-                void window
-                    .showWarningMessage(
-                        `Environment '${pixiEnv.pixiEnvName}' is not installed yet on disk. Would you like to install it now?`,
-                        'Install Environment',
-                    )
-                    .then((action) => {
-                        if (action === 'Install Environment') {
-                            const manifestPath = pixiEnv.pixiInfo?.project_info?.manifest_path;
-                            const projectFolder = manifestPath ? Uri.file(path.dirname(manifestPath)) : undefined;
-                            const targetFolder =
-                                (scope instanceof Uri ? scope : Array.isArray(scope) ? scope[0] : undefined) ??
-                                projectFolder ??
-                                pixiEnv.environmentPath;
-                            void commands.executeCommand('pixi-python.install', targetFolder, pixiEnv.pixiEnvName);
-                        }
-                    });
-            } else {
-                void window.showErrorMessage(msg);
+            if (
+                pixiEnv.pixiStatus === 'cache' ||
+                (!pixiEnv.pixiStatus && environment.error?.includes('not installed'))
+            ) {
+                const targetFolder = scope instanceof Uri ? scope : Array.isArray(scope) ? scope[0] : undefined;
+                void promptToInstallEnvironment(pixiEnv, targetFolder);
+                return;
             }
-            return;
+
+            if (isEnvironmentInvalid(environment)) {
+                const reason =
+                    pixiEnv.statusReason ||
+                    environment.error ||
+                    'The environment is incompatible with the current platform or missing Python.';
+                const msg = `Cannot activate environment '${environment.displayName}': ${reason}`;
+                void window.showErrorMessage(msg);
+                return;
+            }
         }
 
         if (scope === undefined) {
@@ -467,10 +468,10 @@ export class PixiEnvManager implements EnvironmentManager, Disposable {
                 for (const projectPath of projectPaths) {
                     const envId = await getProjectEnvId(projectPath);
                     let env = envId ? envLookup.get(envId) : undefined;
-                    if (!env || env.error) {
+                    if (isEnvironmentInvalid(env)) {
                         const projectEnvs = this.projectToEnvs.get(projectPath) || [];
                         const candidate = this.getDefaultProjectEnv(projectEnvs);
-                        if (!env || (candidate && !candidate.error)) {
+                        if (!isEnvironmentInvalid(candidate)) {
                             env = candidate;
                         }
                     }
@@ -513,9 +514,9 @@ export class PixiEnvManager implements EnvironmentManager, Disposable {
         // Update active environment for this project
         const envId = await getProjectEnvId(projectPath);
         let env = envId ? newEnvs.find((e) => e.envId.id === envId) : undefined;
-        if (!env || env.error) {
+        if (isEnvironmentInvalid(env)) {
             const candidate = this.getDefaultProjectEnv(newEnvs);
-            if (!env || (candidate && !candidate.error)) {
+            if (!isEnvironmentInvalid(candidate)) {
                 env = candidate;
             }
         }

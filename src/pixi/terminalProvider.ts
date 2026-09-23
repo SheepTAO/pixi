@@ -9,13 +9,12 @@ import {
     TerminalProfile,
     TerminalProfileProvider,
     ThemeIcon,
-    Uri,
     window,
 } from 'vscode';
 
 import { traceError, traceVerbose } from '../common/logging';
 import { getPixi } from './cli';
-import { getEnvironmentQuickPickInfo } from './discovery';
+import { getEnvironmentQuickPickInfo, isEnvironmentInvalid, promptToInstallEnvironment } from './discovery';
 import { PixiEnvManager } from './envManager';
 import { PixiEnvironment } from './types';
 
@@ -58,27 +57,16 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
         }
 
         const handleUninstalledOrError = (env: PixiEnvironment): boolean => {
-            if (!env.error) {
-                return false;
+            if (env.pixiStatus === 'cache' || (!env.pixiStatus && env.error?.includes('not installed'))) {
+                void promptToInstallEnvironment(env);
+                return true;
             }
-            const isUninstalled = env.pixiStatus === 'cache' || env.error.includes('not installed');
-            if (isUninstalled) {
-                const manifestPath = env.pixiInfo?.project_info?.manifest_path;
-                const projectFolder = manifestPath ? Uri.file(path.dirname(manifestPath)) : undefined;
-                void window
-                    .showWarningMessage(
-                        `Environment '${env.pixiEnvName}' is not installed yet on disk. Would you like to install it now?`,
-                        'Install Environment',
-                    )
-                    .then((action) => {
-                        if (action === 'Install Environment') {
-                            void commands.executeCommand('pixi-python.install', projectFolder, env.pixiEnvName);
-                        }
-                    });
-            } else {
-                window.showErrorMessage(`Cannot open terminal for environment '${env.displayName}': ${env.error}`);
+            if (isEnvironmentInvalid(env)) {
+                const reason = env.statusReason || env.error || 'The environment is incompatible or broken.';
+                window.showErrorMessage(`Cannot open terminal for environment '${env.displayName}': ${reason}`);
+                return true;
             }
-            return true;
+            return false;
         };
 
         if (envs.length === 1) {
@@ -93,7 +81,7 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
             return {
                 label: `${info.icon} ${env.pixiEnvName}`,
                 description: info.statusText ? `${env.displayName} ${info.statusText}` : env.displayName,
-                detail: env.error || env.displayPath,
+                detail: env.statusReason || env.error || env.displayPath,
                 env,
             };
         });

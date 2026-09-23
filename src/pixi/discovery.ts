@@ -1,7 +1,7 @@
-import { EnvironmentGroupInfo, PythonEnvironment } from '@vscode/python-environments';
+import { PythonEnvironment } from '@vscode/python-environments';
 import * as fs from 'fs';
 import * as path from 'path';
-import { MarkdownString, ThemeIcon, Uri, window, workspace } from 'vscode';
+import { commands, MarkdownString, ThemeIcon, Uri, window, workspace } from 'vscode';
 
 import { findPythonExecutable } from '../common/findPython';
 import { traceInfo, traceVerbose } from '../common/logging';
@@ -9,27 +9,41 @@ import { PIXI_MANAGER_ID } from '../common/utils';
 import { _runPixi, getPixi } from './cli';
 import { PixiEnvironment, PixiEnvironmentStatus, PixiInfo } from './types';
 
-export const UNAVAILABLE_GROUP: EnvironmentGroupInfo = {
-    name: 'Unavailable',
-    description: 'Incompatible or broken environments',
-    iconPath: new ThemeIcon('circle-slash'),
-};
+export function isEnvironmentInvalid(env?: PythonEnvironment): boolean {
+    if (!env) {
+        return true;
+    }
+    const pixiEnv = env as PixiEnvironment;
+    return pixiEnv.pixiStatus === 'unable' || !!env.error;
+}
+
+export async function promptToInstallEnvironment(env: PixiEnvironment, targetFolder?: Uri): Promise<boolean> {
+    const action = await window.showWarningMessage(
+        `Environment '${env.pixiEnvName}' is not installed yet on disk. Would you like to install it now?`,
+        'Install Environment',
+    );
+    if (action === 'Install Environment') {
+        const manifestPath = env.pixiInfo?.project_info?.manifest_path;
+        const projectFolder = manifestPath ? Uri.file(path.dirname(manifestPath)) : undefined;
+        const folder = targetFolder ?? projectFolder ?? env.environmentPath;
+        void commands.executeCommand('pixi-python.install', folder, env.pixiEnvName);
+        return true;
+    }
+    return false;
+}
 
 export function getEnvironmentPriority(env: PythonEnvironment): number {
     const pixiEnv = env as PixiEnvironment;
     if (pixiEnv.pixiStatus === 'ready') {
         return 0;
     }
-    if (pixiEnv.pixiStatus === 'cache') {
+    if (pixiEnv.pixiStatus === 'cache' || env.error?.includes('not installed')) {
         return 1;
     }
-    if (pixiEnv.pixiStatus === 'unable') {
+    if (pixiEnv.pixiStatus === 'unable' || env.error) {
         return 2;
     }
-    if (!('error' in env && env.error)) {
-        return 0;
-    }
-    return env.error.includes('not installed') ? 1 : 2;
+    return 0;
 }
 
 export interface EnvironmentQuickPickInfo {
@@ -39,10 +53,10 @@ export interface EnvironmentQuickPickInfo {
 
 export function getEnvironmentQuickPickInfo(env: PythonEnvironment): EnvironmentQuickPickInfo {
     const pixiEnv = env as PixiEnvironment;
-    if (pixiEnv.pixiStatus === 'cache' || (!pixiEnv.pixiStatus && env.error?.includes('not installed'))) {
+    if (pixiEnv.pixiStatus === 'cache' || env.error?.includes('not installed')) {
         return { icon: '$(cloud-download)', statusText: '(not installed)' };
     }
-    if (pixiEnv.pixiStatus === 'unable' || (!pixiEnv.pixiStatus && env.error)) {
+    if (pixiEnv.pixiStatus === 'unable' || env.error) {
         return { icon: '$(circle-slash)', statusText: '(unavailable)' };
     }
     return { icon: '$(python)' };
@@ -158,33 +172,27 @@ export async function refreshPixi(projectPath: string): Promise<PixiEnvironment[
             pixiInfo.environments_info.map(async (pixiEnv) => {
                 const platformNames = (pixiEnv.platforms || []).map((p) => (typeof p === 'string' ? p : p.name));
                 const isPlatformSupported =
-                    !currentPlatform ||
-                    platformNames.length === 0 ||
-                    pixiEnv.platforms!.some((p) =>
-                        typeof p === 'string'
-                            ? p === currentPlatform
-                            : p.subdir === currentPlatform || p.name === currentPlatform,
-                    );
+                    !currentPlatform || platformNames.length === 0 || platformNames.includes(currentPlatform);
 
-                let error: string | undefined;
+                let statusReason: string | undefined;
                 let statusDesc = 'pixi';
                 let pythonExecutable = '';
                 let pythonVersion = '';
                 let pixiStatus: PixiEnvironmentStatus = 'ready';
 
                 if (!isPlatformSupported) {
-                    error = `Environment '${pixiEnv.name}' declared platforms [${platformNames.join(', ')}], which is incompatible with current host platform '${currentPlatform}'.`;
+                    statusReason = `Environment '${pixiEnv.name}' declared platforms [${platformNames.join(', ')}], which is incompatible with current host platform '${currentPlatform}'.`;
                     statusDesc = 'pixi (incompatible)';
                     pixiStatus = 'unable';
                 } else if (!fs.existsSync(pixiEnv.prefix)) {
-                    error = `Environment '${pixiEnv.name}' is not installed yet on disk. Run 'pixi install -e ${pixiEnv.name}' to create it.`;
+                    statusReason = `Environment '${pixiEnv.name}' is not installed yet on disk. Run 'pixi install -e ${pixiEnv.name}' to create it.`;
                     statusDesc = 'pixi (not installed)';
                     pixiStatus = 'cache';
                 } else {
                     pythonExecutable = (await findPythonExecutable(pixiEnv.prefix)) || '';
                     pythonVersion = (await findPythonVersionFromMeta(pixiEnv.prefix)) || '';
                     if (!pythonExecutable) {
-                        error = `No Python executable found in environment '${pixiEnv.name}'. Ensure 'python' dependency is added to the environment.`;
+                        statusReason = `No Python executable found in environment '${pixiEnv.name}'. Ensure 'python' dependency is added to the environment.`;
                         statusDesc = 'pixi (no python)';
                         pixiStatus = 'unable';
                     }
@@ -203,7 +211,7 @@ export async function refreshPixi(projectPath: string): Promise<PixiEnvironment[
                     iconPath = new ThemeIcon('cloud-download');
                 } else if (pixiStatus === 'unable') {
                     const md = new MarkdownString(
-                        `**${displayName}**\n\n$(circle-slash) **Status**: ${error}\n\n*Prefix*: \`${pixiEnv.prefix}\``,
+                        `**${displayName}**\n\n$(circle-slash) **Status**: ${statusReason}\n\n*Prefix*: \`${pixiEnv.prefix}\``,
                     );
                     md.supportThemeIcons = true;
                     tooltip = md;
@@ -223,8 +231,8 @@ export async function refreshPixi(projectPath: string): Promise<PixiEnvironment[
                     description: statusDesc,
                     tooltip,
                     iconPath,
-                    group: pixiStatus === 'unable' ? UNAVAILABLE_GROUP : undefined,
-                    error,
+                    group: undefined,
+                    error: undefined,
                     execInfo: {
                         run: { executable: pythonExecutable || 'python' },
                         activatedRun: {
@@ -248,6 +256,7 @@ export async function refreshPixi(projectPath: string): Promise<PixiEnvironment[
                     packages: [],
                     pixiEnvName: pixiEnv.name,
                     pixiStatus,
+                    statusReason,
                 } as PixiEnvironment;
             }),
         );

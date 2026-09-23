@@ -18,7 +18,7 @@ import {
 
 import { traceError, traceVerbose } from '../common/logging';
 import { getPixi, runPixi } from './cli';
-import { getEnvironmentQuickPickInfo } from './discovery';
+import { getEnvironmentQuickPickInfo, isEnvironmentInvalid } from './discovery';
 import { PixiEnvManager } from './envManager';
 import { PixiEnvironment } from './types';
 
@@ -300,9 +300,13 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
             return;
         }
 
-        if (selectedEnvItem.pixiEnv?.pixiStatus === 'unable') {
+        if (isEnvironmentInvalid(selectedEnvItem.pixiEnv)) {
+            const reason =
+                selectedEnvItem.pixiEnv?.statusReason ||
+                selectedEnvItem.pixiEnv?.error ||
+                'The environment is incompatible with the current platform or missing Python.';
             window.showErrorMessage(
-                `Cannot run task in environment '${selectedEnvItem.pixiEnv.displayName}': ${selectedEnvItem.pixiEnv.error}`,
+                `Cannot run task in environment '${selectedEnvItem.pixiEnv?.displayName}': ${reason}`,
             );
             return;
         }
