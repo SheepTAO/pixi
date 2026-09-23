@@ -47,32 +47,8 @@ jobs:
       - run: npm ci
 
       - name: Publish Extension (Code Marketplace)
-        run: |
-          MAX_RETRIES=5
-          DELAY=20
-          for i in $(seq 1 $MAX_RETRIES); do
-            echo "Attempt $i to publish to Code Marketplace..."
-            if output=$(npx @vscode/vsce publish --skip-duplicate --pat "${{ secrets.MARKETPLACE_TOKEN }}" 2>&1); then
-              echo "$output"
-              exit 0
-            else
-              echo "$output"
-              if echo "$output" | grep -qiE "RequestBlockedException|Concurrency|Rate limits|429"; then
-                echo "::warning::Marketplace concurrency rate limit hit. Waiting ${DELAY}s before retrying (attempt $i/$MAX_RETRIES)..."
-                sleep $DELAY
-                DELAY=$((DELAY * 2))
-              elif echo "$output" | grep -qi "already published"; then
-                echo "::notice::Version already published on Code Marketplace, skipping."
-                exit 0
-              else
-                echo "::error::Publish failed with non-retryable error."
-                exit 1
-              fi
-            fi
-          done
-          echo "::error::Exceeded maximum retry attempts ($MAX_RETRIES) due to Marketplace concurrency limit."
-          exit 1
-        timeout-minutes: 5
+        run: npx @vscode/vsce publish --skip-duplicate --pat "${{ secrets.MARKETPLACE_TOKEN }}"
+        timeout-minutes: 3
 
   publish-openvsx:
     name: 'Publish (OpenVSX)'
