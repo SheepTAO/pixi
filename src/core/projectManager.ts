@@ -217,8 +217,14 @@ export class PixiProjectManager implements Disposable {
     public async refresh(scope?: Uri): Promise<void> {
         if (scope) {
             const projectPath = this.findProjectForUri(scope);
-            if (projectPath) {
-                await this.refreshProject(projectPath);
+            if (projectPath && isPixiProject(projectPath)) {
+                const normalized = path.normalize(projectPath);
+                if (!this.projectPaths.map(path.normalize).includes(normalized)) {
+                    this.projectPaths.push(normalized);
+                    await this.updateHasPixiProjectContext();
+                    this._onDidProjectsChanged.fire(this.projectPaths);
+                }
+                await this.refreshProject(normalized);
                 this._onDidChangeEnvironments.fire();
                 return;
             }
