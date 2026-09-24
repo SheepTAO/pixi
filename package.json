@@ -5,13 +5,13 @@
     "icon": "assets/icon.png",
     "license": "MIT",
     "version": "1.0.0",
-    "homepage": "https://github.com/SheepTAO/pixi-python",
+    "homepage": "https://github.com/SheepTAO/pixi#readme",
     "repository": {
         "type": "git",
-        "url": "https://github.com/SheepTAO/pixi-python.git"
+        "url": "https://github.com/SheepTAO/pixi.git"
     },
     "bugs": {
-        "url": "https://github.com/SheepTAO/pixi-python/issues"
+        "url": "https://github.com/SheepTAO/pixi/issues"
     },
     "keywords": [
         "pixi",
@@ -51,13 +51,13 @@
             },
             {
                 "command": "pixi.addPackage",
-                "title": "Add Package...",
+                "title": "Add Package ...",
                 "category": "Pixi",
                 "icon": "$(add)"
             },
             {
                 "command": "pixi.removePackage",
-                "title": "Remove Package...",
+                "title": "Remove Package ...",
                 "category": "Pixi",
                 "icon": "$(trash)"
             },
@@ -68,34 +68,34 @@
             },
             {
                 "command": "pixi.runTaskInEnvironment",
-                "title": "Run Task in Environment...",
+                "title": "Run Task in Environment ...",
                 "category": "Pixi"
             },
             {
                 "command": "pixi.openTerminal",
-                "title": "Open Terminal in Environment...",
+                "title": "Open Terminal in Environment ...",
                 "category": "Pixi"
             },
             {
                 "command": "pixi.init",
-                "title": "Initialize Project...",
+                "title": "Initialize Project ...",
                 "category": "Pixi"
             },
             {
                 "command": "pixi.createEnvironment",
-                "title": "Create Environment...",
+                "title": "Create Environment ...",
                 "category": "Pixi",
                 "icon": "$(plus)"
             },
             {
                 "command": "pixi.deleteEnvironment",
-                "title": "Delete Environment...",
+                "title": "Delete Environment ...",
                 "category": "Pixi",
                 "icon": "$(trash)"
             },
             {
                 "command": "pixi.clean",
-                "title": "Clean...",
+                "title": "Clean ...",
                 "category": "Pixi",
                 "icon": "$(clear-all)"
             },
@@ -107,7 +107,7 @@
             },
             {
                 "command": "pixi.reinstall",
-                "title": "Reinstall Environment...",
+                "title": "Reinstall Environment ...",
                 "category": "Pixi",
                 "icon": "$(debug-restart)"
             }

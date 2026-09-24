@@ -13,8 +13,8 @@ Thank you for your interest in contributing to Pixi! This document provides guid
 ### 2. Clone and Install
 
 ```bash
-git clone https://github.com/SheepTAO/pixi-python.git
-cd pixi-python
+git clone https://github.com/SheepTAO/pixi.git
+cd pixi
 npm install
 ```
 

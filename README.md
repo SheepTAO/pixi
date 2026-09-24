@@ -6,10 +6,10 @@
 
 **Fast multi-language package management and workspace integration for Pixi in Visual Studio Code**
 
-[![GitHub Release](https://img.shields.io/github/v/release/SheepTAO/pixi-python?style=flat-square&logo=github&label=Release)](https://github.com/SheepTAO/pixi-python/releases)
+[![GitHub Release](https://img.shields.io/github/v/release/SheepTAO/pixi?style=flat-square&logo=github&label=Release)](https://github.com/SheepTAO/pixi/releases)
 [![VS Code Marketplace](https://img.shields.io/badge/Marketplace-VS_Code-007ACC?style=flat-square&logo=visual-studio-code&logoColor=white)](https://marketplace.visualstudio.com/items?itemName=sheeptao.pixi)
 [![Open VSX](https://img.shields.io/badge/Open_VSX-Registry-purple?style=flat-square&logo=vscodium&logoColor=white)](https://open-vsx.org/extension/sheeptao/pixi)
-[![CI Status](https://img.shields.io/github/actions/workflow/status/SheepTAO/pixi-python/ci.yaml?branch=main&style=flat-square&logo=github&label=CI)](https://github.com/SheepTAO/pixi-python/actions/workflows/ci.yaml)
+[![CI Status](https://img.shields.io/github/actions/workflow/status/SheepTAO/pixi/ci.yaml?branch=main&style=flat-square&logo=github&label=CI)](https://github.com/SheepTAO/pixi/actions/workflows/ci.yaml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 
 [English](README.md) | [简体中文](README.zh-CN.md)
