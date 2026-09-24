@@ -62,6 +62,18 @@
                 "icon": "$(trash)"
             },
             {
+                "command": "pixi.addChannel",
+                "title": "Add Channel ...",
+                "category": "Pixi",
+                "icon": "$(globe)"
+            },
+            {
+                "command": "pixi.removeChannel",
+                "title": "Remove Channel ...",
+                "category": "Pixi",
+                "icon": "$(trash)"
+            },
+            {
                 "command": "pixi.runTask",
                 "title": "Run Task",
                 "category": "Pixi"
@@ -151,6 +163,14 @@
                 },
                 {
                     "command": "pixi.removePackage",
+                    "when": "pixi.hasPixiProject"
+                },
+                {
+                    "command": "pixi.addChannel",
+                    "when": "pixi.hasPixiProject"
+                },
+                {
+                    "command": "pixi.removeChannel",
                     "when": "pixi.hasPixiProject"
                 },
                 {

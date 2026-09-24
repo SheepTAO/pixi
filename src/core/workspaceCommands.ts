@@ -20,8 +20,10 @@ interface ProjectQuickPickItem extends QuickPickItem {
     projectPath: string;
 }
 
-interface ChannelQuickPickItem extends QuickPickItem {
-    isPypi: boolean;
+export type SourceMode = 'conda' | 'pypi' | 'pypi-custom' | 'path' | 'git';
+
+interface SourceQuickPickItem extends QuickPickItem {
+    mode: SourceMode;
 }
 
 interface PackageQuickPickItem extends QuickPickItem {
@@ -697,26 +699,40 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
             }
             const specs = specInput.trim().split(/\s+/);
 
-            const channel = await window.showQuickPick<ChannelQuickPickItem>(
+            const source = await window.showQuickPick<SourceQuickPickItem>(
                 [
                     {
                         label: '$(package) Conda (default)',
                         description: 'Install as Conda package from project channels (writes to [dependencies])',
-                        isPypi: false,
+                        mode: 'conda',
                     },
                     {
                         label: '$(symbol-keyword) PyPI',
-                        description:
-                            'Install as PyPI package from Python Package Index (writes to [pypi-dependencies])',
-                        isPypi: true,
+                        description: 'Install from official Python Package Index (writes to [pypi-dependencies])',
+                        mode: 'pypi',
+                    },
+                    {
+                        label: '$(globe) PyPI (Custom Index / Mirror...)',
+                        description: 'Install from custom PyPI index/mirror (e.g. Tsinghua, Aliyun, private index)',
+                        mode: 'pypi-custom',
+                    },
+                    {
+                        label: '$(folder) Local Path / Editable...',
+                        description: 'Install a local directory as a path or editable dependency',
+                        mode: 'path',
+                    },
+                    {
+                        label: '$(git-branch) Git Repository...',
+                        description: 'Install dependency directly from Git repository URL',
+                        mode: 'git',
                     },
                 ],
                 {
-                    title: 'Pixi: Select Package Channel',
-                    placeHolder: 'Choose package source channel',
+                    title: 'Pixi: Select Package Source Channel',
+                    placeHolder: 'Choose package source channel or dependency type',
                 },
             );
-            if (!channel) {
+            if (!source) {
                 return;
             }
 
@@ -727,20 +743,114 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
             }
 
             const args = ['add'];
-            if (channel.isPypi) {
-                args.push('--pypi');
-            }
             if (targetEnv) {
                 args.push('-e', targetEnv);
             }
-            args.push(...specs);
+
+            let sourceLabel = 'Conda';
+
+            if (source.mode === 'conda') {
+                args.push(...specs);
+            } else if (source.mode === 'pypi') {
+                sourceLabel = 'PyPI';
+                args.push('--pypi', ...specs);
+            } else if (source.mode === 'pypi-custom') {
+                const indexUrl = await window.showInputBox({
+                    title: 'Pixi: Custom PyPI Index URL',
+                    prompt: 'Enter custom PyPI index/mirror URL',
+                    placeHolder: 'https://pypi.tuna.tsinghua.edu.cn/simple',
+                    value: 'https://pypi.tuna.tsinghua.edu.cn/simple',
+                    ignoreFocusOut: true,
+                });
+                if (!indexUrl || !indexUrl.trim()) {
+                    return;
+                }
+                sourceLabel = `PyPI [${indexUrl.trim()}]`;
+                args.push('--pypi', '--index', indexUrl.trim(), ...specs);
+            } else if (source.mode === 'path') {
+                const folderUris = await window.showOpenDialog({
+                    canSelectFiles: false,
+                    canSelectFolders: true,
+                    canSelectMany: false,
+                    openLabel: 'Select Package Directory',
+                    title: 'Pixi: Select Local Package Directory',
+                    defaultUri: Uri.file(projectPath),
+                });
+                if (!folderUris || folderUris.length === 0) {
+                    return;
+                }
+                const selectedDir = folderUris[0].fsPath;
+                const relPath = path.relative(projectPath, selectedDir) || '.';
+
+                const modePick = await window.showQuickPick(
+                    [
+                        {
+                            label: '$(edit) Editable Mode (--editable)',
+                            description: 'Changes to local source code reflect immediately (PyPI dependency)',
+                            isPypi: true,
+                            editable: true,
+                        },
+                        {
+                            label: '$(symbol-keyword) PyPI Path Dependency',
+                            description: 'Install as standard local PyPI dependency (non-editable)',
+                            isPypi: true,
+                            editable: false,
+                        },
+                        {
+                            label: '$(package) Conda Path Dependency',
+                            description: 'Install as local Conda path dependency',
+                            isPypi: false,
+                            editable: false,
+                        },
+                    ],
+                    {
+                        title: 'Pixi: Select Path Dependency Type',
+                        placeHolder: 'Choose installation mode for local directory',
+                    },
+                );
+                if (!modePick) {
+                    return;
+                }
+
+                if (modePick.isPypi) {
+                    args.push('--pypi');
+                }
+                if (modePick.editable) {
+                    args.push('--editable');
+                }
+                sourceLabel = modePick.editable ? `Editable Path [${relPath}]` : `Path [${relPath}]`;
+                args.push(...specs, '--path', relPath);
+            } else if (source.mode === 'git') {
+                const gitUrl = await window.showInputBox({
+                    title: 'Pixi: Git Repository URL',
+                    prompt: 'Enter Git repository URL (e.g. https://github.com/org/repo.git)',
+                    placeHolder: 'https://github.com/org/repo.git',
+                    ignoreFocusOut: true,
+                });
+                if (!gitUrl || !gitUrl.trim()) {
+                    return;
+                }
+
+                const rev = await window.showInputBox({
+                    title: 'Pixi: Git Branch, Tag, or Revision (Optional)',
+                    prompt: 'Enter branch, tag, or commit hash (leave empty for default branch)',
+                    placeHolder: 'e.g. main, v1.0.0, or commit hash',
+                    ignoreFocusOut: true,
+                });
+
+                sourceLabel = `Git [${gitUrl.trim()}]`;
+                args.push(...specs, '--git', gitUrl.trim());
+                if (rev && rev.trim()) {
+                    args.push('--rev', rev.trim());
+                }
+            }
 
             await runPixiWithProgress(
-                `Pixi: Adding ${specs.join(', ')} (${channel.isPypi ? 'PyPI' : 'Conda'})...`,
+                `Pixi: Adding ${specs.join(', ')} (${sourceLabel})...`,
                 args,
                 projectPath,
                 manager,
-                `Pixi: Successfully added ${specs.join(', ')} (${channel.isPypi ? 'PyPI' : 'Conda'}).`,
+                `Pixi: Successfully added ${specs.join(', ')} (${sourceLabel}).`,
             );
         }),
     );
@@ -806,6 +916,178 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                 projectPath,
                 manager,
                 `Pixi: Removed ${selected.pkg.name}${envLabel}.`,
+            );
+        }),
+    );
+
+    // Pixi: Add Channel...
+    disposables.push(
+        commands.registerCommand('pixi.addChannel', async (folderUri?: Uri) => {
+            const projectPath = await pickPixiProject(manager, 'Select Pixi project to add channel to', folderUri);
+            if (!projectPath) {
+                return;
+            }
+
+            interface ChannelPresetItem extends QuickPickItem {
+                channel?: string;
+                isCustom?: boolean;
+            }
+
+            const presets: ChannelPresetItem[] = [
+                {
+                    label: '$(globe) Custom Channel Name or URL...',
+                    description: 'Enter a custom channel name, internal mirror, or URL',
+                    isCustom: true,
+                },
+                {
+                    label: '$(server) conda-forge',
+                    description: 'Community-driven Conda repository (default)',
+                    channel: 'conda-forge',
+                },
+                {
+                    label: '$(rocket) Tsinghua Mirror (conda-forge)',
+                    description: 'https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge',
+                    channel: 'https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge',
+                },
+                {
+                    label: '$(rocket) BFSU Mirror (conda-forge)',
+                    description: 'https://mirrors.bfsu.edu.cn/anaconda/cloud/conda-forge',
+                    channel: 'https://mirrors.bfsu.edu.cn/anaconda/cloud/conda-forge',
+                },
+                {
+                    label: '$(rocket) Aliyun Mirror (conda-forge)',
+                    description: 'https://mirrors.aliyun.com/anaconda/cloud/conda-forge',
+                    channel: 'https://mirrors.aliyun.com/anaconda/cloud/conda-forge',
+                },
+                {
+                    label: '$(server) pytorch',
+                    description: 'Official PyTorch Conda channel',
+                    channel: 'pytorch',
+                },
+                {
+                    label: '$(server) nvidia',
+                    description: 'Official NVIDIA CUDA packages channel',
+                    channel: 'nvidia',
+                },
+                {
+                    label: '$(server) bioconda',
+                    description: 'Bioinformatics and biology package channel',
+                    channel: 'bioconda',
+                },
+            ];
+
+            const pick = await window.showQuickPick(presets, {
+                title: 'Pixi: Add Channel',
+                placeHolder: 'Select a channel preset or enter a custom channel / mirror URL',
+            });
+            if (!pick) {
+                return;
+            }
+
+            let targetChannel = pick.channel;
+            if (pick.isCustom) {
+                const input = await window.showInputBox({
+                    title: 'Pixi: Enter Channel Name or URL',
+                    prompt: 'Enter Conda channel name or URL (e.g. bioconda or https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge)',
+                    placeHolder: 'e.g. bioconda or https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge',
+                    ignoreFocusOut: true,
+                });
+                if (!input || !input.trim()) {
+                    return;
+                }
+                targetChannel = input.trim();
+            }
+
+            if (!targetChannel) {
+                return;
+            }
+
+            const priorityPick = await window.showQuickPick(
+                [
+                    {
+                        label: '$(arrow-down) Append (Default Priority)',
+                        description: 'Add to the end of the channel list',
+                        prepend: false,
+                    },
+                    {
+                        label: '$(arrow-up) Prepend (--prepend, Highest Priority)',
+                        description: 'Add to the start of the channel list (recommended for mirrors)',
+                        prepend: true,
+                    },
+                ],
+                {
+                    title: 'Pixi: Channel Priority',
+                    placeHolder: 'Choose priority position in channels list',
+                },
+            );
+            if (!priorityPick) {
+                return;
+            }
+
+            const args = ['workspace', 'channel', 'add'];
+            if (priorityPick.prepend) {
+                args.push('--prepend');
+            }
+            args.push(targetChannel);
+
+            await runPixiWithProgress(
+                `Pixi: Adding channel '${targetChannel}'...`,
+                args,
+                projectPath,
+                manager,
+                `Pixi: Channel '${targetChannel}' added successfully.`,
+            );
+        }),
+    );
+
+    // Pixi: Remove Channel...
+    disposables.push(
+        commands.registerCommand('pixi.removeChannel', async (folderUri?: Uri) => {
+            const projectPath = await pickPixiProject(manager, 'Select Pixi project to remove channel from', folderUri);
+            if (!projectPath) {
+                return;
+            }
+
+            let output = '';
+            try {
+                output = await runPixi(['workspace', 'channel', 'list'], { cwd: projectPath });
+            } catch (err) {
+                window.showErrorMessage(`Failed to list channels: ${err instanceof Error ? err.message : String(err)}`);
+                return;
+            }
+
+            const channels = output
+                .split(/\r?\n/)
+                .map((l) => l.trim())
+                .filter((l) => l.startsWith('- '))
+                .map((l) => l.substring(2).trim());
+
+            const uniqueChannels = Array.from(new Set(channels));
+            if (uniqueChannels.length === 0) {
+                window.showInformationMessage('No configurable channels found in this Pixi project.');
+                return;
+            }
+
+            const selected = await window.showQuickPick(
+                uniqueChannels.map((c) => ({
+                    label: `$(globe) ${c}`,
+                    channel: c,
+                })),
+                {
+                    title: 'Pixi: Remove Channel',
+                    placeHolder: 'Select a channel to remove from project manifest',
+                },
+            );
+            if (!selected) {
+                return;
+            }
+
+            await runPixiWithProgress(
+                `Pixi: Removing channel '${selected.channel}'...`,
+                ['workspace', 'channel', 'remove', selected.channel],
+                projectPath,
+                manager,
+                `Pixi: Channel '${selected.channel}' removed successfully.`,
             );
         }),
     );

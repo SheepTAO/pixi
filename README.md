@@ -64,21 +64,23 @@ Add this to your project's `.vscode/settings.json`:
 
 ## ⌨️ Commands
 
-| Command                                   | Identifier                  | Description                                                                              |
-| :---------------------------------------- | :-------------------------- | :--------------------------------------------------------------------------------------- |
-| **Pixi: Lock Dependencies**               | `pixi.lock`                 | Solve and update lockfile (`pixi.lock`) without modifying environments.                  |
-| **Pixi: Install (Sync Environments)**     | `pixi.install`              | Install all dependencies and sync environments for the selected Pixi project.            |
-| **Pixi: Reinstall Environment...**        | `pixi.reinstall`            | Re-install a specific environment or all environments from scratch.                      |
-| **Pixi: Update Dependencies**             | `pixi.update`               | Update dependencies and lockfile according to project constraints.                       |
-| **Pixi: Clean...**                        | `pixi.clean`                | Clean specific environments, all environments in project, or global package cache.       |
-| **Pixi: Create Environment...**           | `pixi.createEnvironment`    | Create a new Pixi environment in the project (or initialize a new project).              |
-| **Pixi: Delete Environment...**           | `pixi.deleteEnvironment`    | Delete or clean a Pixi environment from disk and manifest with safety confirmation.      |
-| **Pixi: Initialize Project...**           | `pixi.init`                 | Initialize a new Pixi project in the workspace folder (`pixi.toml` or `pyproject.toml`). |
-| **Pixi: Add Package...**                  | `pixi.addPackage`           | Add packages with interactive channel selection (`Conda` vs `PyPI`) and target.          |
-| **Pixi: Remove Package...**               | `pixi.removePackage`        | Interactively pick and remove an installed package (auto-detects Conda vs PyPI).         |
-| **Pixi: Run Task**                        | `pixi.runTask`              | QuickPick menu to search and run any task defined in the Pixi project.                   |
-| **Pixi: Run Task in Environment...**      | `pixi.runTaskInEnvironment` | Select a task and choose a specific Pixi environment to run it in.                       |
-| **Pixi: Open Terminal in Environment...** | `pixi.openTerminal`         | Open a dedicated VS Code terminal inside a selected Pixi environment.                    |
+| Command                                   | Identifier                  | Description                                                                                                      |
+| :---------------------------------------- | :-------------------------- | :--------------------------------------------------------------------------------------------------------------- |
+| **Pixi: Lock Dependencies**               | `pixi.lock`                 | Solve and update lockfile (`pixi.lock`) without modifying environments.                                          |
+| **Pixi: Install (Sync Environments)**     | `pixi.install`              | Install all dependencies and sync environments for the selected Pixi project.                                    |
+| **Pixi: Reinstall Environment...**        | `pixi.reinstall`            | Re-install a specific environment or all environments from scratch.                                              |
+| **Pixi: Update Dependencies**             | `pixi.update`               | Update dependencies and lockfile according to project constraints.                                               |
+| **Pixi: Clean...**                        | `pixi.clean`                | Clean specific environments, all environments in project, or global package cache.                               |
+| **Pixi: Create Environment...**           | `pixi.createEnvironment`    | Create a new Pixi environment in the project (or initialize a new project).                                      |
+| **Pixi: Delete Environment...**           | `pixi.deleteEnvironment`    | Delete or clean a Pixi environment from disk and manifest with safety confirmation.                              |
+| **Pixi: Initialize Project...**           | `pixi.init`                 | Initialize a new Pixi project in the workspace folder (`pixi.toml` or `pyproject.toml`).                         |
+| **Pixi: Add Package...**                  | `pixi.addPackage`           | Add dependencies with interactive source selection (Conda, PyPI, Custom Index/Mirror, Local Path/Editable, Git). |
+| **Pixi: Remove Package...**               | `pixi.removePackage`        | Interactively pick and remove an installed package (auto-detects Conda vs PyPI).                                 |
+| **Pixi: Add Channel...**                  | `pixi.addChannel`           | Add a Conda channel or mirror URL to the project manifest with priority placement.                               |
+| **Pixi: Remove Channel...**               | `pixi.removeChannel`        | Interactively pick and remove a configured Conda channel from the project manifest.                              |
+| **Pixi: Run Task**                        | `pixi.runTask`              | QuickPick menu to search and run any task defined in the Pixi project.                                           |
+| **Pixi: Run Task in Environment...**      | `pixi.runTaskInEnvironment` | Select a task and choose a specific Pixi environment to run it in.                                               |
+| **Pixi: Open Terminal in Environment...** | `pixi.openTerminal`         | Open a dedicated VS Code terminal inside a selected Pixi environment.                                            |
 
 ---
 

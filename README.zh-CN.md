@@ -64,21 +64,23 @@
 
 ## ⌨️ 命令列表
 
-| 命令名称                                  | 命令 ID                     | 功能说明                                                                 |
-| :---------------------------------------- | :-------------------------- | :----------------------------------------------------------------------- |
-| **Pixi: Lock Dependencies**               | `pixi.lock`                 | 求解并更新锁文件（`pixi.lock`），不修改现有环境。                        |
-| **Pixi: Install (Sync Environments)**     | `pixi.install`              | 安装所有依赖并同步工程的所有环境。                                       |
-| **Pixi: Reinstall Environment...**        | `pixi.reinstall`            | 从头重新安装指定环境或所有环境。                                         |
-| **Pixi: Update Dependencies**             | `pixi.update`               | 依据工程约束更新依赖并刷新锁文件。                                       |
-| **Pixi: Clean...**                        | `pixi.clean`                | 清理指定环境、项目所有环境，或清理系统级全局包缓存。                     |
-| **Pixi: Create Environment...**           | `pixi.createEnvironment`    | 在当前项目中新建环境（或在空白文件夹中初始化项目）。                     |
-| **Pixi: Delete Environment...**           | `pixi.deleteEnvironment`    | 从磁盘清理或从清单中移除 Pixi 环境（具备安全确认弹窗）。                 |
-| **Pixi: Initialize Project...**           | `pixi.init`                 | 在当前文件夹初始化 Pixi 项目（可选择 `pixi.toml` 或 `pyproject.toml`）。 |
-| **Pixi: Add Package...**                  | `pixi.addPackage`           | 交互式添加包（支持 Conda 与 PyPI 渠道选择及目标环境指定）。              |
-| **Pixi: Remove Package...**               | `pixi.removePackage`        | 交互式选择并移除已安装包（自动识别 Conda 或 PyPI 渠道）。                |
-| **Pixi: Run Task**                        | `pixi.runTask`              | 快速搜索并运行当前工程中定义的任意 Pixi task。                           |
-| **Pixi: Run Task in Environment...**      | `pixi.runTaskInEnvironment` | 选择一个 task 并指定在特定 Pixi 环境中运行。                             |
-| **Pixi: Open Terminal in Environment...** | `pixi.openTerminal`         | 在指定的 Pixi 环境中打开一个预激活终端。                                 |
+| 命令名称                                  | 命令 ID                     | 功能说明                                                                           |
+| :---------------------------------------- | :-------------------------- | :--------------------------------------------------------------------------------- |
+| **Pixi: Lock Dependencies**               | `pixi.lock`                 | 求解并更新锁文件（`pixi.lock`），不修改现有环境。                                  |
+| **Pixi: Install (Sync Environments)**     | `pixi.install`              | 安装所有依赖并同步工程的所有环境。                                                 |
+| **Pixi: Reinstall Environment...**        | `pixi.reinstall`            | 从头重新安装指定环境或所有环境。                                                   |
+| **Pixi: Update Dependencies**             | `pixi.update`               | 依据工程约束更新依赖并刷新锁文件。                                                 |
+| **Pixi: Clean...**                        | `pixi.clean`                | 清理指定环境、项目所有环境，或清理系统级全局包缓存。                               |
+| **Pixi: Create Environment...**           | `pixi.createEnvironment`    | 在当前项目中新建环境（或在空白文件夹中初始化项目）。                               |
+| **Pixi: Delete Environment...**           | `pixi.deleteEnvironment`    | 从磁盘清理或从清单中移除 Pixi 环境（具备安全确认弹窗）。                           |
+| **Pixi: Initialize Project...**           | `pixi.init`                 | 在当前文件夹初始化 Pixi 项目（可选择 `pixi.toml` 或 `pyproject.toml`）。           |
+| **Pixi: Add Package...**                  | `pixi.addPackage`           | 交互式添加依赖（支持 Conda、PyPI、自定义镜像源、本地/可编辑路径依赖及 Git 仓库）。 |
+| **Pixi: Remove Package...**               | `pixi.removePackage`        | 交互式选择并移除已安装包（自动识别 Conda 或 PyPI 渠道）。                          |
+| **Pixi: Add Channel...**                  | `pixi.addChannel`           | 为项目清单添加 Conda 渠道或镜像 URL，并支持指定优先级顺序。                        |
+| **Pixi: Remove Channel...**               | `pixi.removeChannel`        | 交互式选择并从项目清单中移除已配置的 Conda 渠道。                                  |
+| **Pixi: Run Task**                        | `pixi.runTask`              | 快速搜索并运行当前工程中定义的任意 Pixi task。                                     |
+| **Pixi: Run Task in Environment...**      | `pixi.runTaskInEnvironment` | 选择一个 task 并指定在特定 Pixi 环境中运行。                                       |
+| **Pixi: Open Terminal in Environment...** | `pixi.openTerminal`         | 在指定的 Pixi 环境中打开一个预激活终端。                                           |
 
 ---
 
