@@ -4,6 +4,7 @@ import { createPixiApi, PixiExtensionApi } from './api';
 import { registerLogger } from './common/logging';
 import { setPersistentState } from './common/persistentState';
 import { clearPixiCache, validatePixiCli } from './core/cli';
+import { clearGlobalManifestCache, registerGlobalCommands } from './core/globalCommands';
 import { PixiProjectManager } from './core/projectManager';
 import { PixiTaskProvider } from './core/taskProvider';
 import { PixiTerminalProvider } from './core/terminalProvider';
@@ -30,6 +31,9 @@ export async function activate(context: ExtensionContext): Promise<PixiExtension
     const workspaceCommands = registerWorkspaceCommands(projectManager);
     context.subscriptions.push(workspaceCommands);
 
+    const globalCommands = registerGlobalCommands();
+    context.subscriptions.push(globalCommands);
+
     // 2. Conditionally activate Python support (if ms-python.vscode-python-envs is available)
     const pythonSupport = await activatePythonSupport(projectManager, log);
     if (pythonSupport) {
@@ -41,6 +45,7 @@ export async function activate(context: ExtensionContext): Promise<PixiExtension
         workspace.onDidChangeConfiguration(async (e) => {
             if (e.affectsConfiguration('pixi.executablePath')) {
                 clearPixiCache();
+                clearGlobalManifestCache();
                 if (await validatePixiCli()) {
                     await projectManager.refresh(undefined);
                 }

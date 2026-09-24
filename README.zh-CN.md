@@ -81,6 +81,7 @@
 | **Pixi: Run Task**                        | `pixi.runTask`              | 快速搜索并运行当前工程中定义的任意 Pixi task。                                     |
 | **Pixi: Run Task in Environment...**      | `pixi.runTaskInEnvironment` | 选择一个 task 并指定在特定 Pixi 环境中运行。                                       |
 | **Pixi: Open Terminal in Environment...** | `pixi.openTerminal`         | 在指定的 Pixi 环境中打开一个预激活终端。                                           |
+| **Pixi: Global Tools ...**                | `pixi.global`               | 交互式管理全局 CLI 工具（安装、列表查看、同步、更新、卸载及编辑全局清单配置）。    |
 
 ---
 

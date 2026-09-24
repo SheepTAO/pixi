@@ -81,6 +81,7 @@ Add this to your project's `.vscode/settings.json`:
 | **Pixi: Run Task**                        | `pixi.runTask`              | QuickPick menu to search and run any task defined in the Pixi project.                                           |
 | **Pixi: Run Task in Environment...**      | `pixi.runTaskInEnvironment` | Select a task and choose a specific Pixi environment to run it in.                                               |
 | **Pixi: Open Terminal in Environment...** | `pixi.openTerminal`         | Open a dedicated VS Code terminal inside a selected Pixi environment.                                            |
+| **Pixi: Global Tools ...**                | `pixi.global`               | Interactive management for global CLI tools (install, list, sync, update, uninstall, open manifest).             |
 
 ---
 

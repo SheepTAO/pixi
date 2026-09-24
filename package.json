@@ -122,10 +122,19 @@
                 "title": "Reinstall Environment ...",
                 "category": "Pixi",
                 "icon": "$(debug-restart)"
+            },
+            {
+                "command": "pixi.global",
+                "title": "Global Tools ...",
+                "category": "Pixi",
+                "icon": "$(tools)"
             }
         ],
         "menus": {
             "commandPalette": [
+                {
+                    "command": "pixi.global"
+                },
                 {
                     "command": "pixi.init",
                     "when": "!pixi.hasPixiProject"
