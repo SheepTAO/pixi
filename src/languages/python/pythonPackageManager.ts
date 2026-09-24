@@ -9,29 +9,16 @@ import {
     PythonEnvironmentApi,
 } from '@vscode/python-environments';
 import * as path from 'path';
-import {
-    Disposable,
-    Event,
-    EventEmitter,
-    LogOutputChannel,
-    MarkdownString,
-    ProgressLocation,
-    ThemeIcon,
-    window,
-} from 'vscode';
+import { Disposable, Event, EventEmitter, LogOutputChannel, ProgressLocation, ThemeIcon, window } from 'vscode';
 
-import { traceError, traceInfo, traceVerbose } from '../common/logging';
-import { PIXI_MANAGER_ID } from '../common/utils';
-import { runPixi } from './cli';
-import { PixiEnvManager } from './envManager';
-import { PixiEnvironment, PixiPackage } from './types';
-
-export async function listPixiPackages(envName: string, projectPath: string): Promise<PixiPackage[]> {
-    const stdout = await runPixi(['list', '--no-install', '--frozen', '--json', '--environment', envName], {
-        cwd: projectPath,
-    });
-    return JSON.parse(stdout);
-}
+import { traceError, traceInfo, traceVerbose } from '../../common/logging';
+import { runPixi } from '../../core/cli';
+import { listPixiPackages } from '../../core/packageManager';
+import { PixiProjectManager } from '../../core/projectManager';
+import { PixiPackage } from '../../core/types';
+import { PIXI_MANAGER_ID } from './constants';
+import { PixiPythonEnvManager } from './pythonEnvManager';
+import { PixiPythonEnvironment } from './types';
 
 export function pixiPkgsToPackages(pixiPackages: PixiPackage[], environmentId: string): Package[] {
     return pixiPackages.map((pkg) => {
@@ -52,23 +39,24 @@ export function pixiPkgsToPackages(pixiPackages: PixiPackage[], environmentId: s
     });
 }
 
-export class PixiPackageManager implements PackageManager, Disposable {
+export class PixiPythonPackageManager implements PackageManager, Disposable {
     private readonly _onDidChangePackages = new EventEmitter<DidChangePackagesEventArgs>();
     onDidChangePackages: Event<DidChangePackagesEventArgs> = this._onDidChangePackages.event;
     private packagesCache = new Map<string, Package[]>();
     private readonly disposables: Disposable[] = [];
 
+    readonly name = 'pixi';
+    readonly displayName = 'Pixi';
+    readonly description = 'Pixi Package Manager';
+    readonly tooltip = 'Pixi Package Manager';
+    readonly iconPath: IconPath = new ThemeIcon('prefix-dev');
+
     constructor(
         public readonly api: PythonEnvironmentApi,
-        public readonly log: LogOutputChannel,
-        private readonly envManager?: PixiEnvManager,
+        public readonly log?: LogOutputChannel,
+        private readonly envManager?: PixiPythonEnvManager,
+        private readonly projectManager?: PixiProjectManager,
     ) {
-        this.name = 'pixi';
-        this.displayName = 'Pixi';
-        this.description = 'Pixi Package Manager';
-        this.tooltip = 'Pixi Package Manager';
-        this.iconPath = new ThemeIcon('prefix-dev');
-
         if (this.envManager) {
             this.disposables.push(
                 this.envManager.onDidChangeEnvironments(() => {
@@ -77,12 +65,6 @@ export class PixiPackageManager implements PackageManager, Disposable {
             );
         }
     }
-
-    readonly name: string;
-    readonly displayName?: string;
-    readonly description?: string;
-    readonly tooltip?: string | MarkdownString;
-    readonly iconPath?: IconPath;
 
     dispose() {
         this._onDidChangePackages.dispose();
@@ -96,9 +78,7 @@ export class PixiPackageManager implements PackageManager, Disposable {
     }
 
     async manage(environment: PythonEnvironment, options: PackageManagementOptions): Promise<void> {
-        traceVerbose(
-            `Called manage with environment: ${JSON.stringify(environment)}, options: ${JSON.stringify(options)}`,
-        );
+        traceVerbose(`Called manage with options: ${JSON.stringify(options)}`);
 
         const details = this.resolveEnvDetails(environment);
         if (!details) {
@@ -146,6 +126,7 @@ export class PixiPackageManager implements PackageManager, Disposable {
                 },
                 async (_progress, token) => {
                     await runPixi(args, { cwd: details.projectPath }, token);
+                    this.projectManager?.clearPackagesCache(details.projectPath);
                     await this.refresh(environment);
                 },
             );
@@ -184,6 +165,7 @@ export class PixiPackageManager implements PackageManager, Disposable {
                             token,
                         );
                     }
+                    this.projectManager?.clearPackagesCache(details.projectPath);
                     await this.refresh(environment);
                 },
             );
@@ -195,9 +177,7 @@ export class PixiPackageManager implements PackageManager, Disposable {
         const pixiEnv = this.envManager?.getPixiEnvironment(envId);
 
         let envName = pixiEnv?.pixiEnvName;
-        let projectPath = pixiEnv?.pixiInfo?.project_info?.manifest_path
-            ? path.dirname(pixiEnv.pixiInfo.project_info.manifest_path)
-            : undefined;
+        let projectPath = pixiEnv?.projectPath;
 
         if (!envName || !projectPath) {
             const normalized = path.normalize(envId);
@@ -223,7 +203,7 @@ export class PixiPackageManager implements PackageManager, Disposable {
 
     private async fetchAndCachePackages(
         environment: PythonEnvironment,
-        pixiEnv?: PixiEnvironment,
+        pixiEnv?: PixiPythonEnvironment,
     ): Promise<Package[] | undefined> {
         const envId = environment.envId.id;
         const details = this.resolveEnvDetails(environment);
@@ -233,7 +213,9 @@ export class PixiPackageManager implements PackageManager, Disposable {
         }
 
         try {
-            const pixiPackages = await listPixiPackages(details.envName, details.projectPath);
+            const pixiPackages = this.projectManager
+                ? await this.projectManager.getPackagesForEnvironment(details.envName, details.projectPath)
+                : await listPixiPackages(details.envName, details.projectPath);
             const packages = pixiPkgsToPackages(pixiPackages, envId);
             this.packagesCache.set(envId, packages);
             if (pixiEnv) {
@@ -271,27 +253,23 @@ export class PixiPackageManager implements PackageManager, Disposable {
         const envId = environment.envId.id;
         traceVerbose(`Called getPackages for environment: ${envId}`);
 
-        // 1. Check internal cache
         const cached = this.packagesCache.get(envId);
         if (cached && cached.length > 0) {
             return cached;
         }
 
-        // 2. Check PixiEnvManager cache
         const pixiEnv = this.envManager?.getPixiEnvironment(envId);
         if (pixiEnv?.packages && pixiEnv.packages.length > 0) {
             this.packagesCache.set(envId, pixiEnv.packages);
             return pixiEnv.packages;
         }
 
-        // 3. Fallback: on-demand fetch
         return this.fetchAndCachePackages(environment, pixiEnv);
     }
 
     private triggerOnDidChangePackages(environment: PythonEnvironment, before: Package[], after: Package[]): void {
         const changes: { kind: PackageChangeKind; pkg: Package }[] = [];
 
-        // Find removed packages
         const beforeByName = new Map(before.map((p) => [p.name, p]));
         const afterByName = new Map(after.map((p) => [p.name, p]));
 
@@ -301,14 +279,11 @@ export class PixiPackageManager implements PackageManager, Disposable {
             }
         }
 
-        // Find added and updated packages
         for (const pkg of after) {
             const prev = beforeByName.get(pkg.name);
             if (!prev) {
-                // Package was added
                 changes.push({ kind: PackageChangeKind.add, pkg });
             } else if (prev.version !== pkg.version) {
-                // Package version changed - treat as remove then add
                 changes.push({ kind: PackageChangeKind.remove, pkg: prev });
                 changes.push({ kind: PackageChangeKind.add, pkg });
             }

@@ -12,10 +12,9 @@ import {
 } from 'vscode';
 
 import { runPixi } from './cli';
-import { getEnvironmentQuickPickInfo, isEnvironmentInvalid, isPixiProject, pickManifestFormat } from './discovery';
-import { PixiEnvManager } from './envManager';
-import { listPixiPackages, PixiPackageManager } from './packageManager';
-import { PixiEnvironment, PixiPackage } from './types';
+import { isPixiProject } from './projectDiscovery';
+import { PixiProjectManager } from './projectManager';
+import { PixiEnvironmentInfo, PixiPackage } from './types';
 
 interface ProjectQuickPickItem extends QuickPickItem {
     projectPath: string;
@@ -33,8 +32,27 @@ interface EnvQuickPickItem extends QuickPickItem {
     envName?: string;
 }
 
+export async function pickManifestFormat(): Promise<'pixi' | 'pyproject' | undefined> {
+    const pick = await window.showQuickPick(
+        [
+            {
+                label: '$(file-code) pixi.toml',
+                description: 'Dedicated Pixi manifest format (Recommended)',
+                format: 'pixi' as const,
+            },
+            {
+                label: '$(file) pyproject.toml',
+                description: 'Standard Python pyproject.toml format',
+                format: 'pyproject' as const,
+            },
+        ],
+        { placeHolder: 'Select manifest format for the new Pixi project' },
+    );
+    return pick?.format;
+}
+
 async function pickTargetEnvironment(
-    envs: PixiEnvironment[],
+    envs: PixiEnvironmentInfo[],
     action: 'add' | 'remove',
 ): Promise<string | undefined | null> {
     if (envs.length <= 1) {
@@ -50,10 +68,18 @@ async function pickTargetEnvironment(
             envName: undefined,
         },
         ...namedEnvs.map((e) => {
-            const info = getEnvironmentQuickPickInfo(e);
+            let icon = '$(layers)';
+            let statusText = '';
+            if (e.pixiStatus === 'uninstalled') {
+                icon = '$(cloud-download)';
+                statusText = '(not installed)';
+            } else if (e.pixiStatus === 'incompatible') {
+                icon = '$(circle-slash)';
+                statusText = '(incompatible)';
+            }
             return {
-                label: `${info.icon} ${e.pixiEnvName}`,
-                description: info.statusText ? `${e.displayName} ${info.statusText}` : `Environment: ${e.displayName}`,
+                label: `${icon} ${e.pixiEnvName}`,
+                description: statusText ? `${e.projectName} ${statusText}` : e.projectName,
                 envName: e.pixiEnvName,
             };
         }),
@@ -101,71 +127,8 @@ async function resolveTargetFolder(folderUri?: Uri, placeHolder?: string): Promi
     return pick?.uri.fsPath;
 }
 
-async function pickPythonVersionSpec(): Promise<string | undefined | null> {
-    const pythonPick = await window.showQuickPick(
-        [
-            {
-                label: '$(symbol-variable) Python 3.12 (Recommended)',
-                description: 'Install Python 3.12',
-                version: '3.12',
-            },
-            {
-                label: '$(symbol-variable) Python 3.11',
-                description: 'Install Python 3.11',
-                version: '3.11',
-            },
-            {
-                label: '$(symbol-variable) Python 3.10',
-                description: 'Install Python 3.10',
-                version: '3.10',
-            },
-            {
-                label: '$(symbol-variable) Python (Latest)',
-                description: 'Install latest available Python',
-                version: 'latest',
-            },
-            {
-                label: '$(edit) Custom Version...',
-                description: 'Specify custom Python version or constraints',
-                version: 'custom',
-            },
-            {
-                label: '$(dash) None (No Python)',
-                description: 'Initialize empty environment without Python',
-                version: 'none',
-            },
-        ],
-        {
-            title: 'Pixi: Select Python Version',
-            placeHolder: 'Select Python version for the new environment',
-        },
-    );
-    if (!pythonPick) {
-        return null;
-    }
-
-    if (pythonPick.version === 'latest') {
-        return 'python';
-    }
-    if (pythonPick.version === 'custom') {
-        const custom = await window.showInputBox({
-            title: 'Pixi: Custom Python Version',
-            placeHolder: 'e.g. 3.11 or >=3.10,<3.12',
-            prompt: 'Specify Python package version specifier',
-        });
-        if (!custom || !custom.trim()) {
-            return null;
-        }
-        return custom.trim().startsWith('python') ? custom.trim() : `python=${custom.trim()}`;
-    }
-    if (pythonPick.version !== 'none') {
-        return `python=${pythonPick.version}`;
-    }
-    return '';
-}
-
 async function pickPixiProject(
-    manager: PixiEnvManager,
+    manager: PixiProjectManager,
     placeHolder: string,
     folderUri?: Uri,
 ): Promise<string | undefined> {
@@ -217,9 +180,8 @@ async function runPixiWithProgress(
     title: string,
     commandsToRun: string[] | string[][],
     cwd: string,
-    manager: PixiEnvManager,
+    manager: PixiProjectManager,
     successMsg: string,
-    packageManager?: PixiPackageManager,
 ): Promise<void> {
     const cmdList: string[][] = Array.isArray(commandsToRun[0])
         ? (commandsToRun as string[][])
@@ -236,7 +198,7 @@ async function runPixiWithProgress(
                     await runPixi(args, { cwd }, token);
                 }
                 await manager.refresh(Uri.file(cwd));
-                await packageManager?.clearCache();
+                manager.clearPackagesCache(cwd);
                 window.showInformationMessage(successMsg);
             },
         );
@@ -248,12 +210,12 @@ async function runPixiWithProgress(
     }
 }
 
-export function registerWorkspaceCommands(manager: PixiEnvManager, packageManager?: PixiPackageManager): Disposable {
+export function registerWorkspaceCommands(manager: PixiProjectManager): Disposable {
     const disposables: Disposable[] = [];
 
     // Pixi: Initialize Project...
     disposables.push(
-        commands.registerCommand('pixi-python.init', async (folderUri?: Uri) => {
+        commands.registerCommand('pixi.init', async (folderUri?: Uri) => {
             const targetFolder = await resolveTargetFolder(folderUri, 'Select folder to initialize Pixi project in');
             if (!targetFolder) {
                 window.showWarningMessage('Please open a folder to initialize a Pixi project.');
@@ -288,7 +250,6 @@ export function registerWorkspaceCommands(manager: PixiEnvManager, packageManage
                 targetFolder,
                 manager,
                 'Pixi: Project initialized successfully.',
-                packageManager,
             );
 
             const createdManifest = format === 'pyproject' ? pyprojectToml : pixiToml;
@@ -298,7 +259,7 @@ export function registerWorkspaceCommands(manager: PixiEnvManager, packageManage
 
     // Pixi: Create Environment...
     disposables.push(
-        commands.registerCommand('pixi-python.createEnvironment', async (folderUri?: Uri) => {
+        commands.registerCommand('pixi.createEnvironment', async (folderUri?: Uri) => {
             const targetFolder = await resolveTargetFolder(folderUri, 'Select folder to create Pixi environment in');
             if (!targetFolder) {
                 window.showWarningMessage('Please open a folder to create a Pixi environment.');
@@ -310,7 +271,7 @@ export function registerWorkspaceCommands(manager: PixiEnvManager, packageManage
                 const envName = await window.showInputBox({
                     title: 'Pixi: Create Environment',
                     prompt: 'Enter a name for the new environment',
-                    placeHolder: 'e.g. dev, test, py311',
+                    placeHolder: 'e.g. dev, test, native',
                     validateInput: (value) => {
                         const trimmed = value?.trim();
                         if (!trimmed) {
@@ -339,7 +300,6 @@ export function registerWorkspaceCommands(manager: PixiEnvManager, packageManage
                     targetFolder,
                     manager,
                     `Pixi: Environment '${trimmedName}' created and ready.`,
-                    packageManager,
                 );
             } else {
                 const format = await pickManifestFormat();
@@ -347,27 +307,12 @@ export function registerWorkspaceCommands(manager: PixiEnvManager, packageManage
                     return;
                 }
 
-                const pythonSpec = await pickPythonVersionSpec();
-                if (pythonSpec === null) {
-                    return;
-                }
-
-                const cmds: string[][] = [['init', '--format', format, '.']];
-                if (pythonSpec) {
-                    cmds.push(['add', pythonSpec]);
-                } else {
-                    cmds.push(['install']);
-                }
-
                 await runPixiWithProgress(
                     'Pixi: Initializing project and environment...',
-                    cmds,
+                    [['init', '--format', format, '.'], ['install']],
                     targetFolder,
                     manager,
-                    pythonSpec
-                        ? `Pixi: Environment created and initialized with ${pythonSpec}.`
-                        : 'Pixi: Environment created successfully.',
-                    packageManager,
+                    'Pixi: Project and default environment initialized successfully.',
                 );
 
                 const createdManifest =
@@ -381,7 +326,7 @@ export function registerWorkspaceCommands(manager: PixiEnvManager, packageManage
 
     // Pixi: Delete Environment...
     disposables.push(
-        commands.registerCommand('pixi-python.deleteEnvironment', async (folderUri?: Uri) => {
+        commands.registerCommand('pixi.deleteEnvironment', async (folderUri?: Uri) => {
             const projectPath = await pickPixiProject(
                 manager,
                 'Select Pixi project to delete environment from',
@@ -400,12 +345,18 @@ export function registerWorkspaceCommands(manager: PixiEnvManager, packageManage
 
             const envItems = [
                 ...envs.map((e) => {
-                    const info = getEnvironmentQuickPickInfo(e);
+                    let icon = '$(layers)';
+                    let statusText = '';
+                    if (e.pixiStatus === 'uninstalled') {
+                        icon = '$(cloud-download)';
+                        statusText = '(not installed)';
+                    } else if (e.pixiStatus === 'incompatible') {
+                        icon = '$(circle-slash)';
+                        statusText = '(incompatible)';
+                    }
                     return {
-                        label: `${info.icon} ${e.pixiEnvName}`,
-                        description: info.statusText
-                            ? `${e.displayName} ${info.statusText}`
-                            : `Environment: ${e.displayName}`,
+                        label: `${icon} ${e.pixiEnvName}`,
+                        description: statusText,
                         envName: e.pixiEnvName,
                     };
                 }),
@@ -440,7 +391,6 @@ export function registerWorkspaceCommands(manager: PixiEnvManager, packageManage
                     projectPath,
                     manager,
                     'Pixi: All environments cleaned.',
-                    packageManager,
                 );
                 return;
             }
@@ -462,7 +412,6 @@ export function registerWorkspaceCommands(manager: PixiEnvManager, packageManage
                     projectPath,
                     manager,
                     "Pixi: 'default' environment deleted from disk.",
-                    packageManager,
                 );
             } else {
                 const choice = await window.showWarningMessage(
@@ -488,7 +437,6 @@ export function registerWorkspaceCommands(manager: PixiEnvManager, packageManage
                     removeManifest
                         ? `Pixi: Environment '${envName}' deleted from disk and manifest.`
                         : `Pixi: Environment '${envName}' cleaned from disk.`,
-                    packageManager,
                 );
             }
         }),
@@ -496,14 +444,14 @@ export function registerWorkspaceCommands(manager: PixiEnvManager, packageManage
 
     // Pixi: Clean...
     disposables.push(
-        commands.registerCommand('pixi-python.clean', async (folderUri?: Uri) => {
+        commands.registerCommand('pixi.clean', async (folderUri?: Uri) => {
             const projectPath = await pickPixiProject(manager, 'Select Pixi project to clean', folderUri);
             if (!projectPath) {
                 return;
             }
 
             const envs = manager.getEnvironmentsForProject(projectPath);
-            const readyEnvs = envs.filter((e) => !e.error && (!e.pixiStatus || e.pixiStatus === 'ready'));
+            const installedEnvs = envs.filter((e) => e.pixiStatus === 'installed');
 
             interface CleanQuickPickItem extends QuickPickItem {
                 targetKind: 'env' | 'all' | 'global-cache';
@@ -511,9 +459,9 @@ export function registerWorkspaceCommands(manager: PixiEnvManager, packageManage
             }
 
             const items: CleanQuickPickItem[] = [
-                ...readyEnvs.map((e) => ({
-                    label: `$(python) ${e.pixiEnvName}`,
-                    description: e.displayName,
+                ...installedEnvs.map((e) => ({
+                    label: `$(layers) ${e.pixiEnvName}`,
+                    description: e.projectName,
                     targetKind: 'env' as const,
                     envName: e.pixiEnvName,
                 })),
@@ -545,7 +493,6 @@ export function registerWorkspaceCommands(manager: PixiEnvManager, packageManage
                     projectPath,
                     manager,
                     `Pixi: Environment '${envName}' cleaned.`,
-                    packageManager,
                 );
             } else if (selected.targetKind === 'all') {
                 await runPixiWithProgress(
@@ -554,7 +501,6 @@ export function registerWorkspaceCommands(manager: PixiEnvManager, packageManage
                     projectPath,
                     manager,
                     'Pixi: All environments cleaned in this project.',
-                    packageManager,
                 );
             } else if (selected.targetKind === 'global-cache') {
                 const confirmed = await window.showWarningMessage(
@@ -572,7 +518,6 @@ export function registerWorkspaceCommands(manager: PixiEnvManager, packageManage
                     projectPath,
                     manager,
                     'Pixi: Global package cache cleaned.',
-                    packageManager,
                 );
             }
         }),
@@ -580,7 +525,7 @@ export function registerWorkspaceCommands(manager: PixiEnvManager, packageManage
 
     // Pixi: Lock Dependencies
     disposables.push(
-        commands.registerCommand('pixi-python.lock', async (folderUri?: Uri) => {
+        commands.registerCommand('pixi.lock', async (folderUri?: Uri) => {
             const projectPath = await pickPixiProject(manager, 'Select Pixi project to lock dependencies', folderUri);
             if (!projectPath) {
                 return;
@@ -593,14 +538,13 @@ export function registerWorkspaceCommands(manager: PixiEnvManager, packageManage
                 projectPath,
                 manager,
                 `Pixi: Lockfile (pixi.lock) updated successfully for ${projectName}.`,
-                packageManager,
             );
         }),
     );
 
     // Pixi: Install (Sync Environments)
     disposables.push(
-        commands.registerCommand('pixi-python.install', async (folderUri?: Uri, envName?: string) => {
+        commands.registerCommand('pixi.install', async (folderUri?: Uri, envName?: string) => {
             const projectPath = await pickPixiProject(
                 manager,
                 'Select Pixi project to install and sync environments',
@@ -626,14 +570,13 @@ export function registerWorkspaceCommands(manager: PixiEnvManager, packageManage
                 validEnvName
                     ? `Pixi: Environment '${validEnvName}' installed successfully for ${projectName}.`
                     : `Pixi: Environments synchronized successfully for ${projectName}.`,
-                packageManager,
             );
         }),
     );
 
     // Pixi: Reinstall Environment...
     disposables.push(
-        commands.registerCommand('pixi-python.reinstall', async (folderUri?: Uri, envName?: string) => {
+        commands.registerCommand('pixi.reinstall', async (folderUri?: Uri, envName?: string) => {
             const projectPath = await pickPixiProject(
                 manager,
                 'Select Pixi project to reinstall environments',
@@ -658,7 +601,7 @@ export function registerWorkspaceCommands(manager: PixiEnvManager, packageManage
                     : isAll
                       ? `Pixi: All environments re-installed successfully for ${projectName}.`
                       : `Pixi: Environments re-installed successfully for ${projectName}.`;
-                await runPixiWithProgress(title, args, projectPath, manager, successMsg, packageManager);
+                await runPixiWithProgress(title, args, projectPath, manager, successMsg);
             };
 
             if (validEnvName) {
@@ -666,7 +609,7 @@ export function registerWorkspaceCommands(manager: PixiEnvManager, packageManage
             }
 
             const envs = manager.getEnvironmentsForProject(projectPath);
-            const validEnvs = envs.filter((e) => !isEnvironmentInvalid(e));
+            const validEnvs = envs.filter((e) => e.pixiStatus !== 'incompatible');
 
             if (validEnvs.length <= 1) {
                 return runReinstall(validEnvs[0]?.pixiEnvName);
@@ -679,8 +622,8 @@ export function registerWorkspaceCommands(manager: PixiEnvManager, packageManage
 
             const items: ReinstallQuickPickItem[] = [
                 ...validEnvs.map((e) => ({
-                    label: `$(python) ${e.pixiEnvName}`,
-                    description: e.displayName,
+                    label: `$(layers) ${e.pixiEnvName}`,
+                    description: e.projectName,
                     targetKind: 'env' as const,
                     envName: e.pixiEnvName,
                 })),
@@ -709,7 +652,7 @@ export function registerWorkspaceCommands(manager: PixiEnvManager, packageManage
 
     // Pixi: Update Dependencies
     disposables.push(
-        commands.registerCommand('pixi-python.update', async (folderUri?: Uri, envName?: string) => {
+        commands.registerCommand('pixi.update', async (folderUri?: Uri, envName?: string) => {
             const projectPath = await pickPixiProject(manager, 'Select Pixi project to update dependencies', folderUri);
             if (!projectPath) {
                 return;
@@ -731,14 +674,13 @@ export function registerWorkspaceCommands(manager: PixiEnvManager, packageManage
                 validEnvName
                     ? `Pixi: Dependencies updated successfully for environment '${validEnvName}' in ${projectName}.`
                     : `Pixi: Dependencies updated successfully for ${projectName}.`,
-                packageManager,
             );
         }),
     );
 
     // Pixi: Add Package...
     disposables.push(
-        commands.registerCommand('pixi-python.addPackage', async (folderUri?: Uri) => {
+        commands.registerCommand('pixi.addPackage', async (folderUri?: Uri) => {
             const projectPath = await pickPixiProject(manager, 'Select Pixi project to add package to', folderUri);
             if (!projectPath) {
                 return;
@@ -799,14 +741,13 @@ export function registerWorkspaceCommands(manager: PixiEnvManager, packageManage
                 projectPath,
                 manager,
                 `Pixi: Successfully added ${specs.join(', ')} (${channel.isPypi ? 'PyPI' : 'Conda'}).`,
-                packageManager,
             );
         }),
     );
 
     // Pixi: Remove Package...
     disposables.push(
-        commands.registerCommand('pixi-python.removePackage', async (folderUri?: Uri) => {
+        commands.registerCommand('pixi.removePackage', async (folderUri?: Uri) => {
             const projectPath = await pickPixiProject(manager, 'Select Pixi project to remove package from', folderUri);
             if (!projectPath) {
                 return;
@@ -820,13 +761,7 @@ export function registerWorkspaceCommands(manager: PixiEnvManager, packageManage
 
             const queryEnv = targetEnv || envs[0]?.pixiEnvName || 'default';
 
-            let packages: PixiPackage[];
-            try {
-                packages = await listPixiPackages(queryEnv, projectPath);
-            } catch (error) {
-                window.showErrorMessage(`Failed to list packages for project: ${error}`);
-                return;
-            }
+            const packages = await manager.getPackagesForEnvironment(queryEnv, projectPath);
 
             const explicitPkgs = packages.filter((p) => p.is_explicit);
             const candidates = explicitPkgs.length > 0 ? explicitPkgs : packages;
@@ -871,7 +806,6 @@ export function registerWorkspaceCommands(manager: PixiEnvManager, packageManage
                 projectPath,
                 manager,
                 `Pixi: Removed ${selected.pkg.name}${envLabel}.`,
-                packageManager,
             );
         }),
     );

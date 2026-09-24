@@ -1,9 +1,23 @@
 # Changelog
 
-All notable changes to the "pixi-python" extension will be documented in this file.
+All notable changes to the "pixi" extension will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.0.0]
+
+- **Major Architectural Decoupling**: Separated language-agnostic Pixi Core (`src/core/`) from language providers (`src/languages/`), providing a polyglot foundation for Visual Studio Code.
+- **Polyglot Toolchain Scanner**: Added multi-language toolchain scanner (`src/core/toolchains.ts`) detecting Python, C/C++ (compilers, CMake, Ninja, headers), R (`R`, `Rscript`), and Rust (`rustc`, `cargo`) across environments and `conda-meta`.
+- **Official Paxton Mascot Icon**: Adopted the official Pixi fairy mascot Paxton with polished dark-mode drop shadow as the extension icon.
+- **Rebrand to "Pixi"**: Renamed package and display name to `Pixi` (`sheeptao.pixi`), establishing canonical `pixi.*` commands and settings.
+- **Public Extension API**: Exported `PixiExtensionApi` (`sheeptao.pixi` exports) allowing third-party extensions to query Pixi projects, environments, and trigger workflow events.
+- **Optional & Resilient Python Provider**: Decoupled `@vscode/python-environments` into an optional module, allowing Pixi Core (Tasks, Terminal, Lock, Clean, Workspace) to run in any VS Code or Open VSX distribution without requiring Python extensions.
+- **Settings & Command Normalization**: Standardized all settings to `pixi.*` (`pixi.executablePath`, `pixi.displayNameFormat`, `pixi.environmentRules`, `pixi.searchIgnorePatterns`) and all commands to `pixi.*`.
+- **Lifecycle Status Model**: Standardized environment status lifecycle to `'installed'`, `'uninstalled'`, and `'incompatible'`, providing clearer diagnostic semantics and UI badges across tasks, terminals, and interpreters.
+- **Manifest Editor Navigation**: One-click editor title buttons for Lock, Install, Update, and Reinstall when viewing `pixi.toml` and `pyproject.toml`.
+- **Unified Package Caching & Performance**: Shared package query cache between project manager and Python package manager, with fast-path URI environment resolution.
+- **Bilingual Documentation & Contribution Guides**: Synchronized bilingual documentation (`README.md` and `README.zh-CN.md`), updated `RELEASE.md` and `CONTRIBUTING.md`.
 
 ## [0.3.0]
 

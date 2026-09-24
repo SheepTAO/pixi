@@ -18,9 +18,8 @@ import {
 
 import { traceError, traceVerbose } from '../common/logging';
 import { getPixi, runPixi } from './cli';
-import { getEnvironmentQuickPickInfo, isEnvironmentInvalid } from './discovery';
-import { PixiEnvManager } from './envManager';
-import { PixiEnvironment } from './types';
+import { PixiProjectManager } from './projectManager';
+import { PixiEnvironmentInfo } from './types';
 
 export interface PixiTaskDefinition extends TaskDefinition {
     type: 'pixi';
@@ -47,8 +46,8 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
     private taskCache = new Map<string, PixiTask[]>();
 
     constructor(
-        private readonly envManager: PixiEnvManager,
-        private readonly log: LogOutputChannel,
+        private readonly projectManager: PixiProjectManager,
+        public readonly log?: LogOutputChannel,
     ) {
         // Invalidate cache when manifest files change
         const watcher = workspace.createFileSystemWatcher('**/{pixi.toml,pyproject.toml}');
@@ -68,15 +67,13 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
     }
 
     registerCommands(): Disposable {
-        const d1 = commands.registerCommand('pixi-python.runTask', () => this.promptAndRunTask());
-        const d2 = commands.registerCommand('pixi-python.runTaskInEnvironment', () =>
-            this.promptAndRunTaskInEnvironment(),
-        );
+        const d1 = commands.registerCommand('pixi.runTask', () => this.promptAndRunTask());
+        const d2 = commands.registerCommand('pixi.runTaskInEnvironment', () => this.promptAndRunTaskInEnvironment());
         return Disposable.from(d1, d2);
     }
 
     async provideTasks(): Promise<Task[]> {
-        const projectPaths = this.envManager.getProjectPaths();
+        const projectPaths = this.projectManager.getProjectPaths();
         if (projectPaths.length === 0) {
             return [];
         }
@@ -102,7 +99,7 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
         }
 
         const projectPath =
-            def.project || this.envManager.getProjectPaths()[0] || workspace.workspaceFolders?.[0]?.uri.fsPath;
+            def.project || this.projectManager.getProjectPaths()[0] || workspace.workspaceFolders?.[0]?.uri.fsPath;
         if (!projectPath) {
             return undefined;
         }
@@ -196,7 +193,7 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
     }
 
     private async promptAndRunTask() {
-        const projectPaths = this.envManager.getProjectPaths();
+        const projectPaths = this.projectManager.getProjectPaths();
         if (projectPaths.length === 0) {
             window.showWarningMessage('No Pixi projects found in the workspace.');
             return;
@@ -237,7 +234,7 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
     }
 
     private async promptAndRunTaskInEnvironment() {
-        const projectPaths = this.envManager.getProjectPaths();
+        const projectPaths = this.projectManager.getProjectPaths();
         if (projectPaths.length === 0) {
             window.showWarningMessage('No Pixi projects found in the workspace.');
             return;
@@ -267,19 +264,27 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
             return;
         }
 
-        const envs = this.envManager.getEnvironmentsForProject(selectedTask.pixiTask.projectPath);
+        const envs = this.projectManager.getEnvironmentsForProject(selectedTask.pixiTask.projectPath);
         interface TaskEnvItem extends QuickPickItem {
             envName: string;
-            pixiEnv?: PixiEnvironment;
+            pixiEnv?: PixiEnvironmentInfo;
         }
 
         const envItems: TaskEnvItem[] =
             envs.length > 0
                 ? envs.map((e) => {
-                      const info = getEnvironmentQuickPickInfo(e);
+                      let icon = '$(layers)';
+                      let statusText = '';
+                      if (e.pixiStatus === 'uninstalled') {
+                          icon = '$(cloud-download)';
+                          statusText = '(not installed)';
+                      } else if (e.pixiStatus === 'incompatible') {
+                          icon = '$(circle-slash)';
+                          statusText = '(incompatible)';
+                      }
                       return {
-                          label: `${info.icon} ${e.pixiEnvName}`,
-                          description: info.statusText ? `${e.displayName} ${info.statusText}` : e.displayName,
+                          label: `${icon} ${e.pixiEnvName}`,
+                          description: statusText,
                           envName: e.pixiEnvName,
                           pixiEnv: e,
                       };
@@ -300,13 +305,10 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
             return;
         }
 
-        if (isEnvironmentInvalid(selectedEnvItem.pixiEnv)) {
-            const reason =
-                selectedEnvItem.pixiEnv?.statusReason ||
-                selectedEnvItem.pixiEnv?.error ||
-                'The environment is incompatible with the current platform or missing Python.';
+        if (selectedEnvItem.pixiEnv?.pixiStatus === 'incompatible') {
+            const reason = selectedEnvItem.pixiEnv.statusReason || 'The environment is incompatible with the platform.';
             window.showErrorMessage(
-                `Cannot run task in environment '${selectedEnvItem.pixiEnv?.displayName}': ${reason}`,
+                `Cannot run task in environment '${selectedEnvItem.pixiEnv.pixiEnvName}': ${reason}`,
             );
             return;
         }

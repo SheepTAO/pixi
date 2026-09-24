@@ -103,9 +103,9 @@ jobs:
         run: npm run compile
 
       - name: Package extension
-        run: npx @vscode/vsce package --no-git-tag-version
+        run: npx @vscode/vsce package --no-git-tag-version -o dist/
 
       - name: Create GitHub Release
-        run: gh release create ${{ github.ref_name }} *.vsix --generate-notes
+        run: gh release create ${{ github.ref_name }} dist/*.vsix --generate-notes
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

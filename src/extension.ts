@@ -1,86 +1,59 @@
-import semver from 'semver';
-import { commands, ExtensionContext, window, workspace } from 'vscode';
+import { ExtensionContext, window, workspace } from 'vscode';
 
-import { registerLogger, traceError } from './common/logging';
+import { createPixiApi, PixiExtensionApi } from './api';
+import { registerLogger } from './common/logging';
 import { setPersistentState } from './common/persistentState';
-import { clearPixiCache, getPixi, runPixi } from './pixi/cli';
-import { PixiEnvManager } from './pixi/envManager';
-import { PixiPackageManager } from './pixi/packageManager';
-import { PixiTaskProvider } from './pixi/taskProvider';
-import { PixiTerminalProvider } from './pixi/terminalProvider';
-import { registerWorkspaceCommands } from './pixi/workspaceCommands';
-import { getEnvExtApi } from './pythonEnvsApi';
+import { clearPixiCache, validatePixiCli } from './core/cli';
+import { PixiProjectManager } from './core/projectManager';
+import { PixiTaskProvider } from './core/taskProvider';
+import { PixiTerminalProvider } from './core/terminalProvider';
+import { registerWorkspaceCommands } from './core/workspaceCommands';
+import { activatePythonSupport } from './languages/python';
 
-const MINIMUM_PIXI_VERSION = '0.53.0';
-
-async function validatePixi(): Promise<boolean> {
-    try {
-        const stdout = await runPixi(['--version']);
-        const versionMatch = stdout.trim().match(/^pixi (\d+\.\d+\.\d+)/);
-        if (!versionMatch) {
-            window.showErrorMessage(`Found invalid Pixi binary at "${await getPixi()}".`);
-            return false;
-        }
-
-        const currentVersion = versionMatch[1];
-        if (!semver.gte(currentVersion, MINIMUM_PIXI_VERSION)) {
-            window.showErrorMessage(
-                `Pixi version ${currentVersion} is too old. Requires >= ${MINIMUM_PIXI_VERSION}. Run: pixi self-update`,
-            );
-            return false;
-        }
-        return true;
-    } catch (err) {
-        traceError('Pixi validation failed:', err);
-        const choice = await window.showErrorMessage(
-            'Pixi executable not found. Please install Pixi or set "pixi-python.pixiExecutable" in settings.',
-            'Open Settings',
-        );
-        if (choice === 'Open Settings') {
-            commands.executeCommand('workbench.action.openSettings', 'pixi-python.pixiExecutable');
-        }
-        return false;
-    }
-}
-
-export async function activate(context: ExtensionContext) {
-    const api = await getEnvExtApi();
-
-    const log = window.createOutputChannel('Pixi Environment Manager', { log: true });
+export async function activate(context: ExtensionContext): Promise<PixiExtensionApi> {
+    const log = window.createOutputChannel('Pixi', { log: true });
     context.subscriptions.push(log, registerLogger(log));
 
-    // Setup the persistent state for the extension.
+    // Setup persistent state for workspace
     setPersistentState(context);
 
-    const manager = new PixiEnvManager(api, log);
-    context.subscriptions.push(manager, api.registerEnvironmentManager(manager));
+    // 1. Initialize Pixi Core
+    const projectManager = new PixiProjectManager(log);
+    context.subscriptions.push(projectManager);
 
-    const packageManager = new PixiPackageManager(api, log, manager);
-    context.subscriptions.push(packageManager, api.registerPackageManager(packageManager));
-
-    const taskProvider = new PixiTaskProvider(manager, log);
+    const taskProvider = new PixiTaskProvider(projectManager, log);
     context.subscriptions.push(taskProvider, taskProvider.registerCommands());
 
-    const terminalProvider = new PixiTerminalProvider(manager, log);
+    const terminalProvider = new PixiTerminalProvider(projectManager, log);
     context.subscriptions.push(terminalProvider);
 
-    context.subscriptions.push(registerWorkspaceCommands(manager, packageManager));
+    const workspaceCommands = registerWorkspaceCommands(projectManager);
+    context.subscriptions.push(workspaceCommands);
 
-    // Re-validate and refresh when pixiExecutable setting changes
+    // 2. Conditionally activate Python support (if ms-python.vscode-python-envs is available)
+    const pythonSupport = await activatePythonSupport(projectManager, log);
+    if (pythonSupport) {
+        context.subscriptions.push(...pythonSupport.disposables);
+    }
+
+    // 3. React to configuration changes
     context.subscriptions.push(
         workspace.onDidChangeConfiguration(async (e) => {
-            if (e.affectsConfiguration('pixi-python.pixiExecutable')) {
+            if (e.affectsConfiguration('pixi.executablePath')) {
                 clearPixiCache();
-                if (await validatePixi()) {
-                    await manager.refresh(undefined);
+                if (await validatePixiCli()) {
+                    await projectManager.refresh(undefined);
                 }
             }
         }),
     );
 
-    // Initial validation only if workspace has Pixi projects
-    await manager.initialize();
-    if (manager.getProjectPaths().length > 0) {
-        await validatePixi();
+    // 4. Initial validation if workspace has Pixi projects
+    await projectManager.initialize();
+    if (projectManager.getProjectPaths().length > 0) {
+        await validatePixiCli();
     }
+
+    // 5. Return public Extension API
+    return createPixiApi(projectManager);
 }

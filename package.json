@@ -1,10 +1,10 @@
 {
-    "name": "pixi-python",
-    "displayName": "Pixi Python",
-    "description": "Pixi Python environment manager for Visual Studio Code",
+    "name": "pixi",
+    "displayName": "Pixi",
+    "description": "Pixi package manager and polyglot workspace integration for Visual Studio Code",
     "icon": "assets/icon.png",
     "license": "MIT",
-    "version": "0.3.0",
+    "version": "1.0.0",
     "homepage": "https://github.com/SheepTAO/pixi-python",
     "repository": {
         "type": "git",
@@ -15,9 +15,11 @@
     },
     "keywords": [
         "pixi",
-        "vscode",
+        "conda",
+        "pypi",
         "python",
-        "conda"
+        "package-manager",
+        "workspace"
     ],
     "engines": {
         "vscode": "^1.118.0"
@@ -32,82 +34,79 @@
         "workspaceContains:**/pyproject.toml"
     ],
     "publisher": "sheeptao",
-    "extensionDependencies": [
-        "ms-python.vscode-python-envs"
-    ],
     "main": "./dist/extension.js",
     "contributes": {
         "commands": [
             {
-                "command": "pixi-python.install",
+                "command": "pixi.install",
                 "title": "Install (Sync Environments)",
                 "category": "Pixi",
                 "icon": "$(cloud-download)"
             },
             {
-                "command": "pixi-python.update",
+                "command": "pixi.update",
                 "title": "Update Dependencies",
                 "category": "Pixi",
                 "icon": "$(sync)"
             },
             {
-                "command": "pixi-python.addPackage",
+                "command": "pixi.addPackage",
                 "title": "Add Package...",
                 "category": "Pixi",
                 "icon": "$(add)"
             },
             {
-                "command": "pixi-python.removePackage",
+                "command": "pixi.removePackage",
                 "title": "Remove Package...",
                 "category": "Pixi",
                 "icon": "$(trash)"
             },
             {
-                "command": "pixi-python.runTask",
+                "command": "pixi.runTask",
                 "title": "Run Task",
                 "category": "Pixi"
             },
             {
-                "command": "pixi-python.runTaskInEnvironment",
+                "command": "pixi.runTaskInEnvironment",
                 "title": "Run Task in Environment...",
                 "category": "Pixi"
             },
             {
-                "command": "pixi-python.openTerminal",
+                "command": "pixi.openTerminal",
                 "title": "Open Terminal in Environment...",
                 "category": "Pixi"
             },
             {
-                "command": "pixi-python.init",
+                "command": "pixi.init",
                 "title": "Initialize Project...",
                 "category": "Pixi"
             },
             {
-                "command": "pixi-python.createEnvironment",
+                "command": "pixi.createEnvironment",
                 "title": "Create Environment...",
                 "category": "Pixi",
                 "icon": "$(plus)"
             },
             {
-                "command": "pixi-python.deleteEnvironment",
+                "command": "pixi.deleteEnvironment",
                 "title": "Delete Environment...",
                 "category": "Pixi",
                 "icon": "$(trash)"
             },
             {
-                "command": "pixi-python.clean",
+                "command": "pixi.clean",
                 "title": "Clean...",
                 "category": "Pixi",
                 "icon": "$(clear-all)"
             },
             {
-                "command": "pixi-python.lock",
+                "command": "pixi.lock",
                 "title": "Lock Dependencies",
                 "category": "Pixi",
                 "icon": "$(lock)"
             },
             {
-                "command": "pixi-python.reinstall",
+                "command": "pixi.reinstall",
                 "title": "Reinstall Environment...",
                 "category": "Pixi",
                 "icon": "$(debug-restart)"
@@ -116,76 +115,76 @@
         "menus": {
             "commandPalette": [
                 {
-                    "command": "pixi-python.init",
-                    "when": "!pixi-python.hasPixiProject"
+                    "command": "pixi.init",
+                    "when": "!pixi.hasPixiProject"
                 },
                 {
-                    "command": "pixi-python.createEnvironment"
+                    "command": "pixi.createEnvironment"
                 },
                 {
-                    "command": "pixi-python.deleteEnvironment",
-                    "when": "pixi-python.hasPixiProject"
+                    "command": "pixi.deleteEnvironment",
+                    "when": "pixi.hasPixiProject"
                 },
                 {
-                    "command": "pixi-python.clean",
-                    "when": "pixi-python.hasPixiProject"
+                    "command": "pixi.clean",
+                    "when": "pixi.hasPixiProject"
                 },
                 {
-                    "command": "pixi-python.lock",
-                    "when": "pixi-python.hasPixiProject"
+                    "command": "pixi.lock",
+                    "when": "pixi.hasPixiProject"
                 },
                 {
-                    "command": "pixi-python.install",
-                    "when": "pixi-python.hasPixiProject"
+                    "command": "pixi.install",
+                    "when": "pixi.hasPixiProject"
                 },
                 {
-                    "command": "pixi-python.update",
-                    "when": "pixi-python.hasPixiProject"
+                    "command": "pixi.update",
+                    "when": "pixi.hasPixiProject"
                 },
                 {
-                    "command": "pixi-python.reinstall",
-                    "when": "pixi-python.hasPixiProject"
+                    "command": "pixi.reinstall",
+                    "when": "pixi.hasPixiProject"
                 },
                 {
-                    "command": "pixi-python.addPackage",
-                    "when": "pixi-python.hasPixiProject"
+                    "command": "pixi.addPackage",
+                    "when": "pixi.hasPixiProject"
                 },
                 {
-                    "command": "pixi-python.removePackage",
-                    "when": "pixi-python.hasPixiProject"
+                    "command": "pixi.removePackage",
+                    "when": "pixi.hasPixiProject"
                 },
                 {
-                    "command": "pixi-python.runTask",
-                    "when": "pixi-python.hasPixiProject"
+                    "command": "pixi.runTask",
+                    "when": "pixi.hasPixiProject"
                 },
                 {
-                    "command": "pixi-python.runTaskInEnvironment",
-                    "when": "pixi-python.hasPixiProject"
+                    "command": "pixi.runTaskInEnvironment",
+                    "when": "pixi.hasPixiProject"
                 },
                 {
-                    "command": "pixi-python.openTerminal",
-                    "when": "pixi-python.hasPixiProject"
+                    "command": "pixi.openTerminal",
+                    "when": "pixi.hasPixiProject"
                 }
             ],
             "editor/title": [
                 {
-                    "command": "pixi-python.lock",
-                    "when": "resourceExtname == .toml && (resourceFilename == pixi.toml || resourceFilename == pyproject.toml) && pixi-python.hasPixiProject",
+                    "command": "pixi.lock",
+                    "when": "resourceExtname == .toml && (resourceFilename == pixi.toml || resourceFilename == pyproject.toml) && pixi.hasPixiProject",
                     "group": "navigation@1"
                 },
                 {
-                    "command": "pixi-python.install",
-                    "when": "resourceExtname == .toml && (resourceFilename == pixi.toml || resourceFilename == pyproject.toml) && pixi-python.hasPixiProject",
+                    "command": "pixi.install",
+                    "when": "resourceExtname == .toml && (resourceFilename == pixi.toml || resourceFilename == pyproject.toml) && pixi.hasPixiProject",
                     "group": "navigation@2"
                 },
                 {
-                    "command": "pixi-python.update",
-                    "when": "resourceExtname == .toml && (resourceFilename == pixi.toml || resourceFilename == pyproject.toml) && pixi-python.hasPixiProject",
+                    "command": "pixi.update",
+                    "when": "resourceExtname == .toml && (resourceFilename == pixi.toml || resourceFilename == pyproject.toml) && pixi.hasPixiProject",
                     "group": "navigation@3"
                 },
                 {
-                    "command": "pixi-python.reinstall",
-                    "when": "resourceExtname == .toml && (resourceFilename == pixi.toml || resourceFilename == pyproject.toml) && pixi-python.hasPixiProject",
+                    "command": "pixi.reinstall",
+                    "when": "resourceExtname == .toml && (resourceFilename == pixi.toml || resourceFilename == pyproject.toml) && pixi.hasPixiProject",
                     "group": "navigation@4"
                 }
             ]
@@ -193,7 +192,7 @@
         "terminal": {
             "profiles": [
                 {
-                    "id": "pixi-python.terminal",
+                    "id": "pixi.terminal",
                     "title": "Pixi",
                     "icon": "prefix-dev"
                 }
@@ -226,15 +225,15 @@
             ]
         },
         "configuration": {
-            "title": "Pixi Python",
+            "title": "Pixi",
             "properties": {
-                "pixi-python.pixiExecutable": {
+                "pixi.executablePath": {
                     "type": "string",
                     "default": "",
                     "description": "Path to the Pixi executable (supports relative paths and ${workspaceFolder}). Leave empty to use auto-discovery.",
                     "scope": "machine-overridable"
                 },
-                "pixi-python.searchIgnorePatterns": {
+                "pixi.searchIgnorePatterns": {
                     "type": "array",
                     "items": {
                         "type": "string"
@@ -250,7 +249,7 @@
                     "description": "Glob patterns to exclude when searching for Pixi projects in the workspace.",
                     "scope": "resource"
                 },
-                "pixi-python.environmentRules": {
+                "pixi.environmentRules": {
                     "type": "array",
                     "items": {
                         "type": "string"
@@ -259,7 +258,7 @@
                     "description": "Rules to map glob patterns to Pixi environment names (format: 'pattern=env' or 'pattern:env', e.g. 'tests/**=dev', 'train/**=train'). Click 'Add Item' to add rules.",
                     "scope": "resource"
                 },
-                "pixi-python.displayNameFormat": {
+                "pixi.displayNameFormat": {
                     "type": "string",
                     "default": "${project}:${env}",
                     "description": "Format template for environment display names. Supported placeholders: ${project} (or {{project}}), ${env}, ${python} (or ${version}).",
@@ -282,6 +281,7 @@
         "compile": "webpack",
         "watch": "webpack --watch",
         "package": "webpack --mode production --devtool hidden-source-map",
+        "package-vsix": "npx @vscode/vsce package -o dist/",
         "compile-tests": "tsc -p . --outDir out",
         "watch-tests": "tsc -p . -w --outDir out",
         "pretest": "npm run compile-tests && npm run compile && npm run lint",

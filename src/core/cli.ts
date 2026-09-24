@@ -1,13 +1,13 @@
 import * as ch from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
-import { CancellationError, CancellationToken, workspace } from 'vscode';
+import semver from 'semver';
+import { CancellationError, CancellationToken, commands, window, workspace } from 'vscode';
 import which from 'which';
 
 import { createDeferred } from '../common/deferred';
-import { quoteArgs } from '../common/execUtils';
+import { quoteArgs, untildify } from '../common/execUtils';
 import { traceError, traceVerbose } from '../common/logging';
-import { untildify } from '../common/utils';
 
 let _cachedPixi: string | undefined;
 
@@ -28,8 +28,8 @@ export async function getPixi(): Promise<string> {
         return _cachedPixi;
     }
 
-    const config = workspace.getConfiguration('pixi-python');
-    const value = config.get<string>('pixiExecutable');
+    const config = workspace.getConfiguration('pixi');
+    const value = config.get<string>('executablePath');
 
     if (value) {
         let resolved = untildify(value);
@@ -53,14 +53,14 @@ export async function getPixi(): Promise<string> {
     const pixiPath = await findPixi();
     if (!pixiPath) {
         throw new Error(
-            'Pixi executable not found. Please install Pixi or set "pixi-python.pixiExecutable" in your settings.',
+            'Pixi executable not found. Please install Pixi or set "pixi.executablePath" in your settings.',
         );
     }
     _cachedPixi = pixiPath;
     return pixiPath;
 }
 
-export async function _runPixi(
+async function _runPixi(
     pixi: string,
     args: string[],
     options?: ch.SpawnOptions,
@@ -122,4 +122,36 @@ export async function runPixi(args: string[], options?: ch.SpawnOptions, token?:
         ...options,
     };
     return _runPixi(pixi, args, spawnOptions, token);
+}
+
+export const MINIMUM_PIXI_VERSION = '0.53.0';
+
+export async function validatePixiCli(): Promise<boolean> {
+    try {
+        const stdout = await runPixi(['--version']);
+        const versionMatch = stdout.trim().match(/^pixi (\d+\.\d+\.\d+)/);
+        if (!versionMatch) {
+            window.showErrorMessage(`Found invalid Pixi binary at "${await getPixi()}".`);
+            return false;
+        }
+
+        const currentVersion = versionMatch[1];
+        if (!semver.gte(currentVersion, MINIMUM_PIXI_VERSION)) {
+            window.showErrorMessage(
+                `Pixi version ${currentVersion} is too old. Requires >= ${MINIMUM_PIXI_VERSION}. Run: pixi self-update`,
+            );
+            return false;
+        }
+        return true;
+    } catch (err) {
+        traceError('Pixi validation failed:', err);
+        const choice = await window.showErrorMessage(
+            'Pixi executable not found. Please install Pixi or set "pixi.executablePath" in settings.',
+            'Open Settings',
+        );
+        if (choice === 'Open Settings') {
+            commands.executeCommand('workbench.action.openSettings', 'pixi.executablePath');
+        }
+        return false;
+    }
 }

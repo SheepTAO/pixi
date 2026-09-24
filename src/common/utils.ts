@@ -1,8 +1,0 @@
-import * as os from 'os';
-
-export const EXTENSION_ID = 'sheeptao.pixi-python';
-export const PIXI_MANAGER_ID = `${EXTENSION_ID}:pixi`;
-
-export function untildify(path: string): string {
-    return path.replace(/^~($|\/|\\)/, `${os.homedir()}$1`);
-}

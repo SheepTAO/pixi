@@ -1,4 +1,3 @@
-import * as path from 'path';
 import {
     CancellationToken,
     commands,
@@ -14,24 +13,23 @@ import {
 
 import { traceError, traceVerbose } from '../common/logging';
 import { getPixi } from './cli';
-import { getEnvironmentQuickPickInfo, isEnvironmentInvalid, promptToInstallEnvironment } from './discovery';
-import { PixiEnvManager } from './envManager';
-import { PixiEnvironment } from './types';
+import { PixiProjectManager } from './projectManager';
+import { PixiEnvironmentInfo } from './types';
 
 interface EnvQuickPickItem extends QuickPickItem {
-    env: PixiEnvironment;
+    env: PixiEnvironmentInfo;
 }
 
 export class PixiTerminalProvider implements TerminalProfileProvider, Disposable {
     private readonly disposables: Disposable[] = [];
 
     constructor(
-        private readonly envManager: PixiEnvManager,
-        private readonly log: LogOutputChannel,
+        private readonly projectManager: PixiProjectManager,
+        public readonly log?: LogOutputChannel,
     ) {
-        this.disposables.push(window.registerTerminalProfileProvider('pixi-python.terminal', this));
+        this.disposables.push(window.registerTerminalProfileProvider('pixi.terminal', this));
         this.disposables.push(
-            commands.registerCommand('pixi-python.openTerminal', async () => {
+            commands.registerCommand('pixi.openTerminal', async () => {
                 await this.openTerminal();
             }),
         );
@@ -43,45 +41,59 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
         }
     }
 
-    private async pickEnvironment(token?: CancellationToken): Promise<PixiEnvironment | undefined> {
-        const envs = (await this.envManager.getEnvironments('all')) as PixiEnvironment[];
+    private async pickEnvironment(token?: CancellationToken): Promise<PixiEnvironmentInfo | undefined> {
+        const envs = this.projectManager.getAllEnvironments();
         if (!envs || envs.length === 0) {
             const choice = await window.showWarningMessage(
                 'No Pixi environments found in current workspace. Would you like to initialize a Pixi project?',
                 'Initialize Project',
             );
             if (choice === 'Initialize Project') {
-                await commands.executeCommand('pixi-python.init');
+                await commands.executeCommand('pixi.init');
             }
             return undefined;
         }
 
-        const handleUninstalledOrError = (env: PixiEnvironment): boolean => {
-            if (env.pixiStatus === 'cache' || (!env.pixiStatus && env.error?.includes('not installed'))) {
-                void promptToInstallEnvironment(env);
+        const handleUninstalledOrError = async (env: PixiEnvironmentInfo): Promise<boolean> => {
+            if (env.pixiStatus === 'uninstalled') {
+                const action = await window.showWarningMessage(
+                    `Environment '${env.pixiEnvName}' is not installed yet on disk. Would you like to install it now?`,
+                    'Install Environment',
+                );
+                if (action === 'Install Environment') {
+                    await commands.executeCommand('pixi.install', env.projectPath, env.pixiEnvName);
+                }
                 return true;
             }
-            if (isEnvironmentInvalid(env)) {
-                const reason = env.statusReason || env.error || 'The environment is incompatible or broken.';
-                window.showErrorMessage(`Cannot open terminal for environment '${env.displayName}': ${reason}`);
+            if (env.pixiStatus === 'incompatible') {
+                const reason = env.statusReason || 'The environment is incompatible with the current platform.';
+                window.showErrorMessage(`Cannot open terminal for environment '${env.pixiEnvName}': ${reason}`);
                 return true;
             }
             return false;
         };
 
         if (envs.length === 1) {
-            if (handleUninstalledOrError(envs[0])) {
+            if (await handleUninstalledOrError(envs[0])) {
                 return undefined;
             }
             return envs[0];
         }
 
         const items: EnvQuickPickItem[] = envs.map((env) => {
-            const info = getEnvironmentQuickPickInfo(env);
+            let icon = '$(layers)';
+            let statusText = '';
+            if (env.pixiStatus === 'uninstalled') {
+                icon = '$(cloud-download)';
+                statusText = '(not installed)';
+            } else if (env.pixiStatus === 'incompatible') {
+                icon = '$(circle-slash)';
+                statusText = '(incompatible)';
+            }
             return {
-                label: `${info.icon} ${env.pixiEnvName}`,
-                description: info.statusText ? `${env.displayName} ${info.statusText}` : env.displayName,
-                detail: env.statusReason || env.error || env.displayPath,
+                label: `${icon} ${env.pixiEnvName}`,
+                description: statusText ? `${env.projectName} ${statusText}` : env.projectName,
+                detail: env.statusReason || env.prefix,
                 env,
             };
         });
@@ -99,20 +111,19 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
             return undefined;
         }
 
-        if (handleUninstalledOrError(selected.env)) {
+        if (await handleUninstalledOrError(selected.env)) {
             return undefined;
         }
 
         return selected.env;
     }
 
-    private async createTerminalOptions(env: PixiEnvironment): Promise<TerminalOptions> {
+    private async createTerminalOptions(env: PixiEnvironmentInfo): Promise<TerminalOptions> {
         const pixi = await getPixi();
-        const manifestPath = env.pixiInfo.project_info?.manifest_path;
-        const cwd = manifestPath ? path.dirname(manifestPath) : undefined;
+        const cwd = env.projectPath;
         const args = ['shell'];
-        if (manifestPath) {
-            args.push('--manifest-path', manifestPath);
+        if (env.manifestPath) {
+            args.push('--manifest-path', env.manifestPath);
         }
         args.push('-e', env.pixiEnvName);
 

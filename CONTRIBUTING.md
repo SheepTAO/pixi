@@ -1,75 +1,60 @@
-# Contributing to Pixi Python
+# Contributing to Pixi for Visual Studio Code
 
-Thank you for your interest in contributing to Pixi Python! This document provides guidelines for contributing to this VS
-Code extension that integrates Pixi environments with the Python Environments extension.
+Thank you for your interest in contributing to Pixi! This document provides guidelines for contributing to this VS Code extension that integrates the Pixi package manager and polyglot workspaces into Visual Studio Code.
 
-## Development setup
+## Development Setup
 
-1. **Prerequisites**
-    - Node.js 20+
-    - VS Code with the Python Environments extension installed
-    - Pixi installed on your system
+### 1. Prerequisites
 
-2. **Clone and setup**
+- **Node.js** 20+
+- **Pixi** installed on your system ([Installation Guide](https://pixi.sh))
+- **Visual Studio Code** (optionally with the official [Python Environments](https://marketplace.visualstudio.com/items?itemName=ms-python.vscode-python-envs) extension for Python integration testing)
 
-    ```bash
-    git clone https://github.com/SheepTAO/pixi-python.git
-    cd pixi-python
-    npm install
-    ```
-
-3. **Development workflow**
-    ```bash
-    npm run compile    # Build the extension
-    npm run watch      # Watch for changes during development
-    ```
-
-## Code style and quality
-
-This project maintains strict code quality standards using TypeScript, ESLint, and Prettier. All code must pass these
-quality checks before being merged.
+### 2. Clone and Install
 
 ```bash
-npm run lint            # Check for linting issues
-npm run format:check    # Check code formatting
-npm run compile         # Build and verify compilation
+git clone https://github.com/SheepTAO/pixi-python.git
+cd pixi-python
+npm install
 ```
 
-Fixing issues:
+### 3. Development Workflow
 
 ```bash
-npm run format          # Auto-fix formatting issues
-npm run lint -- --fix   # Auto-fix linting issues where possible
+npm run compile    # Build the extension with Webpack
+npm run watch      # Watch for changes during local development
+npm test           # Run TypeScript compilation, Webpack build, and ESLint checks
 ```
 
-## Making a contribution
+## Code Style & Standards
 
-### 1. Fork and branch
-
-Fork the repository and create a feature branch:
+This project enforces strict code quality and formatting using TypeScript, ESLint, and Prettier:
 
 ```bash
-git checkout -b feature/your-feature-name
+npm run format:check   # Verify code formatting
+npm run format         # Auto-format all files with Prettier
+npm run lint           # Check for linting issues
+npm run lint -- --fix  # Auto-fix linting issues
 ```
 
-### 2. Development guidelines
+## Architectural Guidelines
 
-- **Follow existing patterns**: Study the codebase structure and maintain consistency
-- **TypeScript strict mode**: Leverage strong typing throughout
-- **Import organization**: ESLint automatically sorts and organizes imports
-- **Code formatting**: Use Prettier to format your code
-- **Logging**: Use the provided logging utilities in `src/common/logging.ts`
+- **Decoupled Core (`src/core/`)**: Keep core workspace operations (projects, environments, tasks, terminals, CLI detection, package queries) completely language-agnostic.
+- **Language Adapters (`src/languages/`)**: Language-specific integrations (e.g. `src/languages/python/`) extend core capabilities without polluting core types or commands.
+- **Pure Common Utilities (`src/common/`)**: Keep common helpers (exec, deferred promises, logging, persistent state) free of domain-specific Pixi assumptions.
+- **Public Extension API (`src/api/`)**: Maintain backward compatibility and clear typing for `PixiExtensionApi`.
 
-### 3. Extension testing
+## Running & Debugging Locally
 
-Test the extension functionality:
+1. Open the project folder in VS Code.
+2. Press `F5` to start debugging with the **Run Extension** launch configuration.
+3. In the new Extension Development Host window:
+    - Open any folder with a `pixi.toml` or `pyproject.toml`.
+    - Verify environment discovery, task execution, terminal profiles, and language toolchain detection.
 
-1. Press `F5` in launch VS Code in debug mode
-2. Open a project containing `pixi.toml` or `pyproject.toml`
-3. Verify Pixi environments are discovered and functional
-4. Test environment switching and terminal activation
+## Submitting Pull Requests
 
-### 4. Commit and submit
-
-- Reference any related issues
-- Submit a pull request with detailed description
+1. Create a feature branch (`git checkout -b feat/your-feature-name`).
+2. Follow Conventional Commits formatting for commit messages (`feat: ...`, `fix: ...`, `refactor: ...`).
+3. Ensure all tests and lint checks pass (`npm test`).
+4. Submit a Pull Request with a clear description of the problem and the proposed solution.
