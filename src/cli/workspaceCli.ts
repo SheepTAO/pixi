@@ -8,7 +8,7 @@ export async function runPixiWithProgress(
     commandsToRun: string[] | string[][],
     cwd: string,
     manager: PixiProjectManager,
-    successMsg: string,
+    successMsg: string | ((output: string) => string),
 ): Promise<boolean> {
     const cmdList: string[][] = Array.isArray(commandsToRun[0])
         ? (commandsToRun as string[][])
@@ -21,12 +21,15 @@ export async function runPixiWithProgress(
                 cancellable: true,
             },
             async (_progress, token) => {
+                let combinedOutput = '';
                 for (const args of cmdList) {
-                    await runPixi(args, { cwd }, token);
+                    const out = await runPixi(args, { cwd, includeStderr: true }, token);
+                    combinedOutput += (combinedOutput ? '\n' : '') + out;
                 }
                 await manager.refresh(Uri.file(cwd));
                 manager.clearPackagesCache(cwd);
-                window.showInformationMessage(successMsg);
+                const finalSuccessMsg = typeof successMsg === 'function' ? successMsg(combinedOutput) : successMsg;
+                window.showInformationMessage(finalSuccessMsg);
             },
         );
         return true;

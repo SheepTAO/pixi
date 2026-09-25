@@ -105,6 +105,11 @@ export class PixiStatusBarController implements Disposable {
                 command: 'pixi.lock',
             },
             {
+                label: '$(search) Search Packages...',
+                description: 'Search Conda & PyPI packages to inspect or install',
+                command: 'pixi.searchPackages',
+            },
+            {
                 label: '$(plus) Add Package...',
                 description: 'Add a dependency to current environment',
                 command: 'pixi.addPackage',

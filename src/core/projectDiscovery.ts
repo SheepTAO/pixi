@@ -26,6 +26,33 @@ export function isPixiProject(folderPath: string): boolean {
 }
 
 /**
+ * Reads configured Conda channels from pixi.toml or pyproject.toml in a project directory.
+ */
+export function getProjectConfiguredChannels(projectPath: string): string[] {
+    for (const manifestName of ['pixi.toml', 'pyproject.toml']) {
+        const manifestFile = path.join(projectPath, manifestName);
+        if (fs.existsSync(manifestFile)) {
+            try {
+                const content = fs.readFileSync(manifestFile, 'utf8');
+                const match = content.match(/channels\s*=\s*\[([^\]]*)\]/);
+                if (match && match[1]) {
+                    const parsed = match[1]
+                        .split(',')
+                        .map((s) => s.trim().replace(/^['"]|['"]$/g, ''))
+                        .filter(Boolean);
+                    if (parsed.length > 0) {
+                        return parsed;
+                    }
+                }
+            } catch {
+                // ignore
+            }
+        }
+    }
+    return [];
+}
+
+/**
  * Reads search paths and workspace folders, resolves glob patterns,
  * and returns deduplicated pixi project root paths.
  */

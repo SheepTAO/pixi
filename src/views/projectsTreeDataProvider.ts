@@ -8,6 +8,7 @@ import {
     TreeDataProvider,
     TreeItem,
     TreeItemCollapsibleState,
+    TreeView,
     Uri,
 } from 'vscode';
 
@@ -91,6 +92,8 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
         this._onDidChangeTreeData.event;
     private readonly disposables: Disposable[] = [];
 
+    private treeView?: TreeView<PixiProjectsTreeItem>;
+
     constructor(private readonly projectManager: PixiProjectManager) {
         this.disposables.push(
             this.projectManager.onDidProjectsChanged(() => this.refresh()),
@@ -98,7 +101,26 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
         );
     }
 
+    public bindView(treeView: TreeView<PixiProjectsTreeItem>): void {
+        this.treeView = treeView;
+        this.updateViewDescription();
+    }
+
+    private updateViewDescription(): void {
+        if (!this.treeView) {
+            return;
+        }
+        const projects = this.projectManager.getProjects();
+        if (projects.length === 1) {
+            const manifestName = path.basename(projects[0].manifestPath);
+            this.treeView.description = `${projects[0].name} (${manifestName})`;
+        } else {
+            this.treeView.description = undefined;
+        }
+    }
+
     public refresh(): void {
+        this.updateViewDescription();
         this._onDidChangeTreeData.fire();
     }
 
@@ -114,8 +136,17 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
     }
 
     public async getChildren(element?: PixiProjectsTreeItem): Promise<PixiProjectsTreeItem[]> {
+        const projects = this.projectManager.getProjects();
+
         if (!element) {
-            const projects = this.projectManager.getProjects();
+            if (projects.length === 0) {
+                return [];
+            }
+            if (projects.length === 1) {
+                const singleProject = projects[0];
+                const envs = this.projectManager.getEnvironmentsForProject(singleProject.projectPath);
+                return envs.map((e) => new PixiEnvironmentTreeItem(e, singleProject));
+            }
             return projects.map((p) => new PixiProjectTreeItem(p));
         }
 

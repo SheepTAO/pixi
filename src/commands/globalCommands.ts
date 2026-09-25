@@ -84,9 +84,9 @@ export async function executeGlobalUninstall(toolName: string): Promise<boolean>
     }
 
     return runWithProgressNotification(
-        `Pixi Global: Uninstalling ${toolName}...`,
+        `Pixi Global: Uninstalling tool '${toolName}'...`,
         () => uninstallGlobalTool(toolName),
-        `Pixi Global: Successfully uninstalled ${toolName}.`,
+        `Pixi Global: Successfully uninstalled tool '${toolName}'.`,
     );
 }
 
@@ -98,19 +98,24 @@ export async function executeGlobalSync(): Promise<boolean> {
     );
 }
 
-export async function handleGlobalInstall(): Promise<void> {
-    const toolInput = await window.showInputBox({
-        title: 'Pixi Global: Install Tool',
-        prompt: 'Enter tool or package name (supports multiple tools separated by space)',
-        placeHolder: 'e.g. ruff ripgrep uv jupyter bat',
-        ignoreFocusOut: true,
-    });
-    if (!toolInput || !toolInput.trim()) {
-        return;
-    }
-    const tools = toolInput.trim().split(/\s+/).filter(Boolean);
-    if (tools.length === 0) {
-        return;
+export async function handleGlobalInstall(initialTool?: string): Promise<void> {
+    let tools: string[] = [];
+    if (initialTool && typeof initialTool === 'string' && initialTool.trim()) {
+        tools = [initialTool.trim()];
+    } else {
+        const toolInput = await window.showInputBox({
+            title: 'Pixi Global: Install Tool',
+            prompt: 'Enter tool or package name (supports multiple tools separated by space)',
+            placeHolder: 'e.g. ruff ripgrep uv jupyter bat',
+            ignoreFocusOut: true,
+        });
+        if (!toolInput || !toolInput.trim()) {
+            return;
+        }
+        tools = toolInput.trim().split(/\s+/).filter(Boolean);
+        if (tools.length === 0) {
+            return;
+        }
     }
 
     const channelPick = await window.showQuickPick(
@@ -164,10 +169,11 @@ export async function handleGlobalInstall(): Promise<void> {
         targetChannel = input.trim();
     }
 
+    const channelLabel = targetChannel ? `channel: ${targetChannel}` : 'channel: conda-forge';
     await runWithProgressNotification(
-        `Pixi Global: Installing ${tools.join(', ')}...`,
+        `Pixi Global: Installing '${tools.join(', ')}' (${channelLabel})...`,
         () => installGlobalTools(tools, targetChannel),
-        `Pixi Global: Successfully installed ${tools.join(', ')}.`,
+        `Pixi Global: Successfully installed '${tools.join(', ')}' (${channelLabel}).`,
     );
 }
 
@@ -313,8 +319,9 @@ export function registerGlobalCommands(): Disposable {
         commands.registerCommand('pixi.refreshGlobal', () => {
             fireGlobalEnvironmentsChanged();
         }),
-        commands.registerCommand('pixi.global.install', async () => {
-            await handleGlobalInstall();
+        commands.registerCommand('pixi.global.install', async (target?: any) => {
+            const initialTool = typeof target === 'string' ? target : undefined;
+            await handleGlobalInstall(initialTool);
         }),
         commands.registerCommand('pixi.global.sync', async () => {
             await executeGlobalSync();
