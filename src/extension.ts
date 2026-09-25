@@ -13,7 +13,6 @@ import { PixiTaskProvider } from './providers/taskProvider';
 import { PixiTerminalProvider } from './providers/terminalProvider';
 import { PixiGlobalTreeDataProvider } from './views/globalTreeDataProvider';
 import { PixiProjectsTreeDataProvider } from './views/projectsTreeDataProvider';
-import { PixiStatusBarController } from './views/statusBar';
 
 export async function activate(context: ExtensionContext): Promise<PixiExtensionApi> {
     const log = window.createOutputChannel('Pixi', { log: true });
@@ -38,7 +37,7 @@ export async function activate(context: ExtensionContext): Promise<PixiExtension
     const globalCommands = registerGlobalCommands();
     context.subscriptions.push(globalCommands);
 
-    // 2. Register Tree Views & Status Bar
+    // 2. Register Tree Views
     const projectsTreeDataProvider = new PixiProjectsTreeDataProvider(projectManager);
     const projectsTreeView = window.createTreeView('pixi.views.projects', {
         treeDataProvider: projectsTreeDataProvider,
@@ -53,16 +52,17 @@ export async function activate(context: ExtensionContext): Promise<PixiExtension
         window.registerTreeDataProvider('pixi.views.global', globalTreeDataProvider),
     );
 
-    const statusBarController = new PixiStatusBarController(projectManager);
-    context.subscriptions.push(statusBarController);
+    // 3. Initialize Public Extension API
+    const pixiApi = createPixiApi(projectManager);
+    context.subscriptions.push(pixiApi);
 
-    // 3. Conditionally activate Python support (if ms-python.vscode-python-envs is available)
-    const pythonSupport = await activatePythonSupport(projectManager, log);
+    // 4. Conditionally activate Python support (if ms-python.vscode-python-envs is available)
+    const pythonSupport = await activatePythonSupport(projectManager, pixiApi, log);
     if (pythonSupport) {
         context.subscriptions.push(...pythonSupport.disposables);
     }
 
-    // 3. React to configuration changes
+    // 5. React to configuration changes
     context.subscriptions.push(
         workspace.onDidChangeConfiguration(async (e) => {
             if (e.affectsConfiguration('pixi.executablePath')) {
@@ -75,12 +75,12 @@ export async function activate(context: ExtensionContext): Promise<PixiExtension
         }),
     );
 
-    // 4. Initial validation if workspace has Pixi projects
+    // 6. Initial validation if workspace has Pixi projects
     await projectManager.initialize();
     if (projectManager.getProjectPaths().length > 0) {
         await validatePixiCli();
     }
 
-    // 5. Return public Extension API
-    return createPixiApi(projectManager);
+    // 7. Return public Extension API
+    return pixiApi;
 }

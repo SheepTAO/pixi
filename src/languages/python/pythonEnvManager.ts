@@ -16,6 +16,7 @@ import {
 import * as path from 'path';
 import { Disposable, EventEmitter, LogOutputChannel, ThemeIcon, Uri, window, workspace } from 'vscode';
 
+import { PixiExtensionApi } from '../../api';
 import { getPixi } from '../../cli/pixiCli';
 import { createDeferred, Deferred } from '../../common/deferred';
 import { traceVerbose } from '../../common/logging';
@@ -54,6 +55,7 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
     constructor(
         private readonly api: PythonEnvironmentApi,
         private readonly projectManager: PixiProjectManager,
+        private readonly pixiApi?: PixiExtensionApi,
         public readonly log?: LogOutputChannel,
     ) {
         // When PixiProjectManager refreshes or projects change, refresh Python environments
@@ -62,6 +64,29 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
                 await this.refreshFromCore();
             }),
         );
+
+        if (this.pixiApi) {
+            this.disposables.push(
+                this.pixiApi.onDidChangeActiveEnvironment(async (e) => {
+                    if (e.environment) {
+                        const project = e.scope ? this.api.getPythonProject(e.scope) : undefined;
+                        const projectPath = project?.uri.fsPath || e.environment.projectPath;
+                        const envs = this.projectToEnvs.get(projectPath) || [];
+                        const pyEnv = envs.find((p) => p.pixiEnvName === e.environment?.pixiEnvName);
+                        if (pyEnv && this.activeEnv.get(projectPath)?.envId.id !== pyEnv.envId.id) {
+                            const oldEnv = this.activeEnv.get(projectPath);
+                            this.activeEnv.set(projectPath, pyEnv);
+                            this.triggerDidChangeEnvironment(Uri.file(projectPath), oldEnv, pyEnv);
+                        }
+                        if (e.scope === undefined && pyEnv && this.globalEnv?.envId.id !== pyEnv.envId.id) {
+                            const oldGlobal = this.globalEnv;
+                            this.globalEnv = pyEnv;
+                            this.triggerDidChangeEnvironment(undefined, oldGlobal, pyEnv);
+                        }
+                    }
+                }),
+            );
+        }
 
         // Listen for configuration changes
         this.disposables.push(
@@ -318,6 +343,9 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
             await storage.set('globalEnvId', environment?.envId.id);
             this.triggerDidChangeEnvironment(undefined, this.globalEnv, environment);
             this.globalEnv = environment as PixiPythonEnvironment | undefined;
+            if (this.pixiApi && environment) {
+                await this.pixiApi.setActiveEnvironment(undefined, (environment as PixiPythonEnvironment).pixiEnvName);
+            }
             return;
         }
 
@@ -333,8 +361,12 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
             const oldEnv = this.activeEnv.get(projectPath);
 
             if (environment) {
-                this.activeEnv.set(projectPath, environment as PixiPythonEnvironment);
+                const pyEnv = environment as PixiPythonEnvironment;
+                this.activeEnv.set(projectPath, pyEnv);
                 await storage.set(`projectEnvId:${projectPath}`, environment.envId.id);
+                if (this.pixiApi) {
+                    await this.pixiApi.setActiveEnvironment(project.uri, pyEnv.pixiEnvName);
+                }
             } else {
                 this.activeEnv.delete(projectPath);
                 await storage.set(`projectEnvId:${projectPath}`, undefined);

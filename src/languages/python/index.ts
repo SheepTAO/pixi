@@ -1,6 +1,7 @@
 import { PythonEnvironmentApi } from '@vscode/python-environments';
 import { Disposable, extensions, LogOutputChannel } from 'vscode';
 
+import { PixiExtensionApi } from '../../api';
 import { traceError, traceInfo } from '../../common/logging';
 import { PixiProjectManager } from '../../core/projectManager';
 import { PixiPythonEnvManager } from './pythonEnvManager';
@@ -8,6 +9,7 @@ import { PixiPythonPackageManager } from './pythonPackageManager';
 
 export async function activatePythonSupport(
     projectManager: PixiProjectManager,
+    pixiApi?: PixiExtensionApi,
     log?: LogOutputChannel,
 ): Promise<{ disposables: Disposable[]; envManager: PixiPythonEnvManager } | undefined> {
     const pythonEnvsExt = extensions.getExtension('ms-python.vscode-python-envs');
@@ -24,7 +26,7 @@ export async function activatePythonSupport(
             api = (await pythonEnvsExt.activate()) as PythonEnvironmentApi;
         }
 
-        const envManager = new PixiPythonEnvManager(api, projectManager, log);
+        const envManager = new PixiPythonEnvManager(api, projectManager, pixiApi, log);
         const packageManager = new PixiPythonPackageManager(api, log, envManager, projectManager);
 
         const disposables: Disposable[] = [

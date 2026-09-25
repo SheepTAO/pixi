@@ -28,7 +28,7 @@
 ## ✨ Features
 
 - **Language-Agnostic Core Architecture**: Cleanly decouples Pixi core workspace operations (manifest lifecycle, environments, dependencies, tasks, terminals) from specific language adapters.
-- **First-Class Python Integration**: Seamlessly integrates with `@vscode/python-environments`, providing interpreter switching, status bar indicators, and package inspection.
+- **First-Class Python Integration**: Seamlessly integrates with `@vscode/python-environments`, providing interpreter switching, native status bar indicators, and package inspection.
 - **Polyglot Toolchain Detection**: Automatically scans installed environments for multi-language toolchains (Python, C/C++ compilers and header paths, R, Rust) to power language tooling and extension workflows.
 - **Automatic Workspace Discovery**: Instantly detects Pixi projects with `pixi.toml` or `pyproject.toml`, discovering and diagnosing all declared environments.
 - **Manifest Lifecycle & Editor Actions**: One-click action buttons in the editor title bar for `pixi.toml` and `pyproject.toml` (Lock 🔒, Install ⬇️, Update 🔄, Reinstall 🔁).
@@ -37,9 +37,8 @@
 - **Native Pixi Tasks Integration**: Auto-discovers Pixi tasks as native VS Code Tasks (`Terminal: Run Task...`) and provides a QuickPick runner (`Pixi: Run Task`).
 - **Unified Terminal Profiles**: Launch interactive terminals pre-activated in any Pixi environment directly from the terminal profile menu or Command Palette.
 - **Dedicated Activity Bar & Tree Views**: Built-in `Pixi Explorer` side panel with `Projects & Environments` (diagnose environment status, 1-click terminal/sync/reinstall/clean) and `Global Tools` (inspect installed global CLI apps, versions, and exposed binaries with inline update/uninstall).
-- **Workspace Status Bar Indicator**: Persistent status bar item displaying the active Pixi environment for the current file with 1-click management actions.
 - **Global Tools Management**: Integrated secondary QuickPick router (`Pixi: Global Tools ...`) to install, list, sync, update, and uninstall user-level CLI packages into `~/.pixi/bin`.
-- **Extensible Public Extension API**: Exports `PixiExtensionApi` for third-party extensions to query Pixi projects, environments, toolchains, packages, and subscribe to change events.
+- **Extensible Public Extension API**: Exports `PixiExtensionApi` for third-party extensions to query Pixi projects, environments, active environment state, toolchains, and packages, with bi-directional environment switching and change event subscriptions.
 - **Lifecycle Status Diagnostics**: Categorizes environments into Installed (ready & executable), Uninstalled (declared in manifest, 1-click installable), and Incompatible (platform mismatch).
 
 ---
@@ -102,6 +101,14 @@ if (pixi) {
     const projectPaths = pixi.getProjectPaths();
     const envs = pixi.getAllEnvironments();
     const packages = await pixi.getPackages('default', projectPaths[0]);
+
+    // Active environment management
+    const activeEnv = await pixi.getActiveEnvironment();
+    await pixi.setActiveEnvironment(undefined, 'default');
+
+    pixi.onDidChangeActiveEnvironment((e) => {
+        console.log('Active environment changed:', e.environment?.pixiEnvName);
+    });
 
     pixi.onDidChangeEnvironments(() => {
         console.log('Pixi environments changed');
