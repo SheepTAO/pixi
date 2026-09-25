@@ -40,9 +40,9 @@ export interface PixiExtensionApi {
     readonly onDidChangeEnvironments: Event<void>;
 }
 
-export function createPixiApi(projectManager: PixiProjectManager): PixiExtensionApi {
+export function createPixiApi(projectManager: PixiProjectManager, version = '1.0.1'): PixiExtensionApi {
     return {
-        version: '1.0.0',
+        version,
         getProjectPaths: () => projectManager.getProjectPaths(),
         getProjects: () => projectManager.getProjects(),
         getEnvironments: (projectPath: string) => projectManager.getEnvironmentsForProject(projectPath),

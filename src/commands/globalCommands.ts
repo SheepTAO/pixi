@@ -1,4 +1,3 @@
-import * as os from 'os';
 import * as path from 'path';
 import {
     CancellationError,
@@ -11,55 +10,36 @@ import {
     workspace,
 } from 'vscode';
 
-import { traceError } from '../common/logging';
-import { runPixi } from './cli';
+import {
+    clearGlobalManifestCache,
+    fireGlobalEnvironmentsChanged,
+    getGlobalManifestPath,
+    installGlobalTools,
+    listGlobalEnvironments,
+    onDidChangeGlobalEnvironments,
+    PixiGlobalEnvironment,
+    syncGlobalEnvironments,
+    uninstallGlobalTool,
+    updateGlobalTool,
+} from '../cli/globalCli';
 
-export interface PixiGlobalDependency {
-    name: string;
-    version: string;
-}
-
-export interface PixiGlobalExposed {
-    exposed_name: string;
-    executable: string;
-}
-
-export interface PixiGlobalEnvironment {
-    name: string;
-    dependencies?: PixiGlobalDependency[];
-    exposed?: PixiGlobalExposed[];
-}
+export {
+    clearGlobalManifestCache,
+    getGlobalManifestPath,
+    listGlobalEnvironments,
+    onDidChangeGlobalEnvironments,
+    PixiGlobalEnvironment,
+};
 
 interface GlobalActionQuickPickItem extends QuickPickItem {
     action: 'install' | 'list' | 'sync' | 'update' | 'uninstall' | 'edit';
 }
 
-let _cachedGlobalManifestPath: string | undefined;
-
-export function clearGlobalManifestCache(): void {
-    _cachedGlobalManifestPath = undefined;
-}
-
-export async function getGlobalManifestPath(): Promise<string> {
-    if (_cachedGlobalManifestPath) {
-        return _cachedGlobalManifestPath;
-    }
-    try {
-        const stdout = await runPixi(['info', '--json']);
-        const info = JSON.parse(stdout);
-        const manifest = info.global_info?.manifest;
-        if (typeof manifest === 'string' && manifest.trim()) {
-            _cachedGlobalManifestPath = manifest;
-            return manifest;
-        }
-    } catch {
-        // Fallback to default path if pixi info fails
-    }
-    const pixiHome = process.env.PIXI_HOME || path.join(os.homedir(), '.pixi');
-    return path.join(pixiHome, 'manifests', 'pixi-global.toml');
-}
-
-async function runPixiWithNotification(title: string, args: string[], successMsg: string): Promise<boolean> {
+async function runWithProgressNotification(
+    title: string,
+    action: () => Promise<unknown>,
+    successMsg: string,
+): Promise<boolean> {
     try {
         await window.withProgress(
             {
@@ -67,8 +47,8 @@ async function runPixiWithNotification(title: string, args: string[], successMsg
                 title,
                 cancellable: true,
             },
-            async (_progress, token) => {
-                await runPixi(args, undefined, token);
+            async (_progress) => {
+                await action();
                 window.showInformationMessage(successMsg);
             },
         );
@@ -82,35 +62,18 @@ async function runPixiWithNotification(title: string, args: string[], successMsg
     }
 }
 
-async function listGlobalEnvironments(): Promise<PixiGlobalEnvironment[] | undefined> {
-    try {
-        const stdout = await runPixi(['global', 'list', '--json']);
-        const parsed = JSON.parse(stdout);
-        if (Array.isArray(parsed)) {
-            return parsed as PixiGlobalEnvironment[];
-        }
-        return [];
-    } catch (error) {
-        traceError('Failed to list pixi global environments:', error);
-        window.showErrorMessage(
-            `Failed to list global tools: ${error instanceof Error ? error.message : String(error)}`,
-        );
-        return undefined;
-    }
+export async function executeGlobalUpdate(toolName?: string): Promise<boolean> {
+    const title = toolName
+        ? `Pixi Global: Updating tool '${toolName}'...`
+        : 'Pixi Global: Updating all global tools...';
+    const successMsg = toolName
+        ? `Pixi Global: Successfully updated '${toolName}'.`
+        : 'Pixi Global: Successfully updated all global tools.';
+
+    return runWithProgressNotification(title, () => updateGlobalTool(toolName), successMsg);
 }
 
-async function executeGlobalUpdate(toolName?: string): Promise<boolean> {
-    const args = ['global', 'update'];
-    if (toolName) {
-        args.push(toolName);
-    }
-    const title = toolName ? `Updating global tool '${toolName}'...` : 'Updating all global tools...';
-    const successMsg = toolName ? `Successfully updated '${toolName}'.` : 'Successfully updated all global tools.';
-
-    return runPixiWithNotification(`Pixi Global: ${title}`, args, `Pixi Global: ${successMsg}`);
-}
-
-async function executeGlobalUninstall(toolName: string): Promise<boolean> {
+export async function executeGlobalUninstall(toolName: string): Promise<boolean> {
     const confirm = await window.showWarningMessage(
         `Are you sure you want to uninstall global tool '${toolName}'?`,
         { modal: true },
@@ -120,22 +83,22 @@ async function executeGlobalUninstall(toolName: string): Promise<boolean> {
         return false;
     }
 
-    return runPixiWithNotification(
+    return runWithProgressNotification(
         `Pixi Global: Uninstalling ${toolName}...`,
-        ['global', 'uninstall', toolName],
+        () => uninstallGlobalTool(toolName),
         `Pixi Global: Successfully uninstalled ${toolName}.`,
     );
 }
 
-async function executeGlobalSync(): Promise<boolean> {
-    return runPixiWithNotification(
+export async function executeGlobalSync(): Promise<boolean> {
+    return runWithProgressNotification(
         'Pixi Global: Syncing global environments...',
-        ['global', 'sync'],
+        () => syncGlobalEnvironments(),
         'Pixi Global: Successfully synced global environments.',
     );
 }
 
-async function handleGlobalInstall(): Promise<void> {
+export async function handleGlobalInstall(): Promise<void> {
     const toolInput = await window.showInputBox({
         title: 'Pixi Global: Install Tool',
         prompt: 'Enter tool or package name (supports multiple tools separated by space)',
@@ -201,20 +164,14 @@ async function handleGlobalInstall(): Promise<void> {
         targetChannel = input.trim();
     }
 
-    const args = ['global', 'install'];
-    if (targetChannel) {
-        args.push('-c', targetChannel);
-    }
-    args.push(...tools);
-
-    await runPixiWithNotification(
+    await runWithProgressNotification(
         `Pixi Global: Installing ${tools.join(', ')}...`,
-        args,
+        () => installGlobalTools(tools, targetChannel),
         `Pixi Global: Successfully installed ${tools.join(', ')}.`,
     );
 }
 
-async function handleGlobalList(): Promise<void> {
+export async function handleGlobalList(): Promise<void> {
     const tools = await listGlobalEnvironments();
     if (!tools) {
         return;
@@ -273,7 +230,7 @@ async function handleGlobalList(): Promise<void> {
     }
 }
 
-async function handleGlobalUpdate(): Promise<void> {
+export async function handleGlobalUpdate(): Promise<void> {
     const tools = await listGlobalEnvironments();
     if (!tools) {
         return;
@@ -307,7 +264,7 @@ async function handleGlobalUpdate(): Promise<void> {
     await executeGlobalUpdate(picked.target);
 }
 
-async function handleGlobalUninstall(): Promise<void> {
+export async function handleGlobalUninstall(): Promise<void> {
     const tools = await listGlobalEnvironments();
     if (!tools) {
         return;
@@ -334,7 +291,7 @@ async function handleGlobalUninstall(): Promise<void> {
     await executeGlobalUninstall(picked.toolName);
 }
 
-async function handleOpenGlobalManifest(): Promise<void> {
+export async function handleOpenGlobalManifest(): Promise<void> {
     const manifestPath = await getGlobalManifestPath();
     const manifestUri = Uri.file(manifestPath);
     try {
@@ -351,6 +308,33 @@ async function handleOpenGlobalManifest(): Promise<void> {
 
 export function registerGlobalCommands(): Disposable {
     const disposables: Disposable[] = [];
+
+    disposables.push(
+        commands.registerCommand('pixi.refreshGlobal', () => {
+            fireGlobalEnvironmentsChanged();
+        }),
+        commands.registerCommand('pixi.global.install', async () => {
+            await handleGlobalInstall();
+        }),
+        commands.registerCommand('pixi.global.sync', async () => {
+            await executeGlobalSync();
+        }),
+        commands.registerCommand('pixi.global.updateTool', async (item?: any) => {
+            const toolName = typeof item === 'string' ? item : item?.tool?.name;
+            await executeGlobalUpdate(toolName);
+        }),
+        commands.registerCommand('pixi.global.uninstallTool', async (item?: any) => {
+            const toolName = typeof item === 'string' ? item : item?.tool?.name;
+            if (toolName) {
+                await executeGlobalUninstall(toolName);
+            } else {
+                await handleGlobalUninstall();
+            }
+        }),
+        commands.registerCommand('pixi.global.openManifest', async () => {
+            await handleOpenGlobalManifest();
+        }),
+    );
 
     // Main Submenu Entry Point: Pixi: Global Tools...
     disposables.push(

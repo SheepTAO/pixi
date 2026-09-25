@@ -1,5 +1,5 @@
+import { runPixi } from '../cli/pixiCli';
 import { traceError } from '../common/logging';
-import { runPixi } from './cli';
 import { PixiPackage } from './types';
 
 export { PixiPackage };

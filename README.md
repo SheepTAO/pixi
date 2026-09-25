@@ -35,7 +35,9 @@
 - **Environment & Dependency Management**: Create and delete environments (`pixi workspace environment add/remove`, `pixi clean`), sync environments (`pixi install`), solve dependencies (`pixi lock`), and add/remove packages with full Conda and PyPI channel support.
 - **Native Pixi Tasks Integration**: Auto-discovers Pixi tasks as native VS Code Tasks (`Terminal: Run Task...`) and provides a QuickPick runner (`Pixi: Run Task`).
 - **Unified Terminal Profiles**: Launch interactive terminals pre-activated in any Pixi environment directly from the terminal profile menu or Command Palette.
-- **Dynamic Per-File Environment Rules**: Map file and directory patterns (e.g. `tests/**` → `dev`, `train/**` → `train`) to automatically switch active environments and interpreters.
+- **Dedicated Activity Bar & Tree Views**: Built-in `Pixi Explorer` side panel with `Projects & Environments` (diagnose environment status, 1-click terminal/sync/reinstall/clean) and `Global Tools` (inspect installed global CLI apps, versions, and exposed binaries with inline update/uninstall).
+- **Workspace Status Bar Indicator**: Persistent status bar item displaying the active Pixi environment for the current file with 1-click management actions.
+- **Global Tools Management**: Integrated secondary QuickPick router (`Pixi: Global Tools ...`) to install, list, sync, update, and uninstall user-level CLI packages into `~/.pixi/bin`.
 - **Extensible Public Extension API**: Exports `PixiExtensionApi` for third-party extensions to query Pixi projects, environments, toolchains, packages, and subscribe to change events.
 - **Lifecycle Status Diagnostics**: Categorizes environments into Installed (ready & executable), Uninstalled (declared in manifest, 1-click installable), and Incompatible (platform mismatch).
 

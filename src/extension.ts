@@ -1,15 +1,19 @@
 import { ExtensionContext, window, workspace } from 'vscode';
 
 import { createPixiApi, PixiExtensionApi } from './api';
+import { clearGlobalManifestCache } from './cli/globalCli';
+import { clearPixiCache, validatePixiCli } from './cli/pixiCli';
+import { registerGlobalCommands } from './commands/globalCommands';
+import { registerWorkspaceCommands } from './commands/workspaceCommands';
 import { registerLogger } from './common/logging';
 import { setPersistentState } from './common/persistentState';
-import { clearPixiCache, validatePixiCli } from './core/cli';
-import { clearGlobalManifestCache, registerGlobalCommands } from './core/globalCommands';
 import { PixiProjectManager } from './core/projectManager';
-import { PixiTaskProvider } from './core/taskProvider';
-import { PixiTerminalProvider } from './core/terminalProvider';
-import { registerWorkspaceCommands } from './core/workspaceCommands';
 import { activatePythonSupport } from './languages/python';
+import { PixiTaskProvider } from './providers/taskProvider';
+import { PixiTerminalProvider } from './providers/terminalProvider';
+import { PixiGlobalTreeDataProvider } from './views/globalTreeDataProvider';
+import { PixiProjectsTreeDataProvider } from './views/projectsTreeDataProvider';
+import { PixiStatusBarController } from './views/statusBar';
 
 export async function activate(context: ExtensionContext): Promise<PixiExtensionApi> {
     const log = window.createOutputChannel('Pixi', { log: true });
@@ -34,7 +38,17 @@ export async function activate(context: ExtensionContext): Promise<PixiExtension
     const globalCommands = registerGlobalCommands();
     context.subscriptions.push(globalCommands);
 
-    // 2. Conditionally activate Python support (if ms-python.vscode-python-envs is available)
+    // 2. Register Tree Views & Status Bar
+    const projectsTreeDataProvider = new PixiProjectsTreeDataProvider(projectManager);
+    context.subscriptions.push(window.registerTreeDataProvider('pixi.views.projects', projectsTreeDataProvider));
+
+    const globalTreeDataProvider = new PixiGlobalTreeDataProvider();
+    context.subscriptions.push(window.registerTreeDataProvider('pixi.views.global', globalTreeDataProvider));
+
+    const statusBarController = new PixiStatusBarController(projectManager);
+    context.subscriptions.push(statusBarController);
+
+    // 3. Conditionally activate Python support (if ms-python.vscode-python-envs is available)
     const pythonSupport = await activatePythonSupport(projectManager, log);
     if (pythonSupport) {
         context.subscriptions.push(...pythonSupport.disposables);

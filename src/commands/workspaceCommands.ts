@@ -1,20 +1,12 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import {
-    CancellationError,
-    commands,
-    Disposable,
-    ProgressLocation,
-    QuickPickItem,
-    Uri,
-    window,
-    workspace,
-} from 'vscode';
+import { commands, Disposable, QuickPickItem, Uri, window, workspace } from 'vscode';
 
-import { runPixi } from './cli';
-import { isPixiProject } from './projectDiscovery';
-import { PixiProjectManager } from './projectManager';
-import { PixiEnvironmentInfo, PixiPackage } from './types';
+import { runPixi } from '../cli/pixiCli';
+import { runPixiWithProgress } from '../cli/workspaceCli';
+import { isPixiProject } from '../core/projectDiscovery';
+import { PixiProjectManager } from '../core/projectManager';
+import { PixiEnvironmentInfo, PixiPackage } from '../core/types';
 
 interface ProjectQuickPickItem extends QuickPickItem {
     projectPath: string;
@@ -98,15 +90,24 @@ async function pickTargetEnvironment(
     return selected.envName;
 }
 
-function normalizeFolderPath(folderUri?: Uri): string | undefined {
-    if (!folderUri?.fsPath) {
+function normalizeFolderPath(folderUri?: Uri | any): string | undefined {
+    if (!folderUri) {
         return undefined;
     }
-    let p = folderUri.fsPath;
-    if (fs.existsSync(p) && !fs.statSync(p).isDirectory()) {
-        p = path.dirname(p);
+    if (folderUri.project?.projectPath) {
+        return folderUri.project.projectPath;
     }
-    return p;
+    if (folderUri.env?.projectPath) {
+        return folderUri.env.projectPath;
+    }
+    if (folderUri.fsPath) {
+        let p = folderUri.fsPath;
+        if (fs.existsSync(p) && !fs.statSync(p).isDirectory()) {
+            p = path.dirname(p);
+        }
+        return p;
+    }
+    return undefined;
 }
 
 async function resolveTargetFolder(folderUri?: Uri, placeHolder?: string): Promise<string | undefined> {
@@ -175,40 +176,6 @@ async function openDocumentIfExists(filePath: string): Promise<void> {
     if (fs.existsSync(filePath)) {
         const doc = await workspace.openTextDocument(Uri.file(filePath));
         await window.showTextDocument(doc);
-    }
-}
-
-async function runPixiWithProgress(
-    title: string,
-    commandsToRun: string[] | string[][],
-    cwd: string,
-    manager: PixiProjectManager,
-    successMsg: string,
-): Promise<void> {
-    const cmdList: string[][] = Array.isArray(commandsToRun[0])
-        ? (commandsToRun as string[][])
-        : [commandsToRun as string[]];
-    try {
-        await window.withProgress(
-            {
-                location: ProgressLocation.Notification,
-                title,
-                cancellable: true,
-            },
-            async (_progress, token) => {
-                for (const args of cmdList) {
-                    await runPixi(args, { cwd }, token);
-                }
-                await manager.refresh(Uri.file(cwd));
-                manager.clearPackagesCache(cwd);
-                window.showInformationMessage(successMsg);
-            },
-        );
-    } catch (error) {
-        if (error instanceof CancellationError) {
-            return;
-        }
-        window.showErrorMessage(error instanceof Error ? error.message : String(error));
     }
 }
 
@@ -557,7 +524,8 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
             }
 
             const projectName = path.basename(projectPath);
-            const validEnvName = typeof envName === 'string' && envName.trim() ? envName.trim() : undefined;
+            const resolvedEnv = (typeof envName === 'string' && envName.trim()) || (folderUri as any)?.env?.pixiEnvName;
+            const validEnvName = resolvedEnv ? resolvedEnv.trim() : undefined;
             const args = ['install'];
             if (validEnvName) {
                 args.push('-e', validEnvName);
@@ -589,7 +557,8 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
             }
 
             const projectName = path.basename(projectPath);
-            const validEnvName = typeof envName === 'string' && envName.trim() ? envName.trim() : undefined;
+            const resolvedEnv = (typeof envName === 'string' && envName.trim()) || (folderUri as any)?.env?.pixiEnvName;
+            const validEnvName = resolvedEnv ? resolvedEnv.trim() : undefined;
 
             const runReinstall = async (target?: string, isAll?: boolean) => {
                 const title = target
@@ -1089,6 +1058,12 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                 manager,
                 `Pixi: Channel '${selected.channel}' removed successfully.`,
             );
+        }),
+    );
+
+    disposables.push(
+        commands.registerCommand('pixi.refreshProjects', async () => {
+            await manager.refresh(undefined);
         }),
     );
 

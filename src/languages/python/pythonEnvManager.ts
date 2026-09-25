@@ -16,10 +16,10 @@ import {
 import * as path from 'path';
 import { Disposable, EventEmitter, LogOutputChannel, ThemeIcon, Uri, window, workspace } from 'vscode';
 
+import { getPixi } from '../../cli/pixiCli';
 import { createDeferred, Deferred } from '../../common/deferred';
 import { traceVerbose } from '../../common/logging';
 import { getWorkspacePersistentState } from '../../common/persistentState';
-import { getPixi } from '../../core/cli';
 import { matchEnvironmentRule } from '../../core/environmentRules';
 import { PixiProjectManager } from '../../core/projectManager';
 import { PIXI_MANAGER_ID } from './constants';

@@ -2,8 +2,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { commands, Disposable, EventEmitter, LogOutputChannel, ProgressLocation, Uri, window, workspace } from 'vscode';
 
+import { runPixi } from '../cli/pixiCli';
 import { traceError, traceVerbose } from '../common/logging';
-import { runPixi } from './cli';
 import { matchEnvironmentRule } from './environmentRules';
 import { listPixiPackages, PixiPackage } from './packageManager';
 import { isPixiProject, resolvePixiProjectPaths } from './projectDiscovery';

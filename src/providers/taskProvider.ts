@@ -16,10 +16,10 @@ import {
     workspace,
 } from 'vscode';
 
+import { getPixi, runPixi } from '../cli/pixiCli';
 import { traceError, traceVerbose } from '../common/logging';
-import { getPixi, runPixi } from './cli';
-import { PixiProjectManager } from './projectManager';
-import { PixiEnvironmentInfo } from './types';
+import { PixiProjectManager } from '../core/projectManager';
+import { PixiEnvironmentInfo } from '../core/types';
 
 export interface PixiTaskDefinition extends TaskDefinition {
     type: 'pixi';

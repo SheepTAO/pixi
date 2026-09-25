@@ -4,7 +4,7 @@
     "description": "Pixi package manager and polyglot workspace integration for Visual Studio Code",
     "icon": "assets/icon.png",
     "license": "MIT",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "homepage": "https://github.com/SheepTAO/pixi#readme",
     "repository": {
         "type": "git",
@@ -86,12 +86,14 @@
             {
                 "command": "pixi.openTerminal",
                 "title": "Open Terminal in Environment ...",
-                "category": "Pixi"
+                "category": "Pixi",
+                "icon": "$(terminal)"
             },
             {
                 "command": "pixi.init",
                 "title": "Initialize Project ...",
-                "category": "Pixi"
+                "category": "Pixi",
+                "icon": "$(plus)"
             },
             {
                 "command": "pixi.createEnvironment",
@@ -128,6 +130,48 @@
                 "title": "Global Tools ...",
                 "category": "Pixi",
                 "icon": "$(tools)"
+            },
+            {
+                "command": "pixi.refreshProjects",
+                "title": "Refresh Projects",
+                "category": "Pixi",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "pixi.refreshGlobal",
+                "title": "Refresh Global Tools",
+                "category": "Pixi",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "pixi.global.install",
+                "title": "Install Global Tool ...",
+                "category": "Pixi",
+                "icon": "$(plus)"
+            },
+            {
+                "command": "pixi.global.sync",
+                "title": "Sync Global Environments",
+                "category": "Pixi",
+                "icon": "$(repo-sync)"
+            },
+            {
+                "command": "pixi.global.updateTool",
+                "title": "Update Global Tool",
+                "category": "Pixi",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "pixi.global.uninstallTool",
+                "title": "Uninstall Global Tool",
+                "category": "Pixi",
+                "icon": "$(trash)"
+            },
+            {
+                "command": "pixi.global.openManifest",
+                "title": "Open Global Manifest",
+                "category": "Pixi",
+                "icon": "$(edit)"
             }
         ],
         "menus": {
@@ -216,8 +260,112 @@
                     "when": "resourceExtname == .toml && (resourceFilename == pixi.toml || resourceFilename == pyproject.toml) && pixi.hasPixiProject",
                     "group": "navigation@4"
                 }
+            ],
+            "view/title": [
+                {
+                    "command": "pixi.refreshProjects",
+                    "when": "view == pixi.views.projects",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "pixi.install",
+                    "when": "view == pixi.views.projects && pixi.hasPixiProject",
+                    "group": "navigation@2"
+                },
+                {
+                    "command": "pixi.lock",
+                    "when": "view == pixi.views.projects && pixi.hasPixiProject",
+                    "group": "1_manage@1"
+                },
+                {
+                    "command": "pixi.init",
+                    "when": "view == pixi.views.projects && !pixi.hasPixiProject",
+                    "group": "1_manage@2"
+                },
+                {
+                    "command": "pixi.refreshGlobal",
+                    "when": "view == pixi.views.global",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "pixi.global.install",
+                    "when": "view == pixi.views.global",
+                    "group": "navigation@2"
+                },
+                {
+                    "command": "pixi.global.sync",
+                    "when": "view == pixi.views.global",
+                    "group": "1_tools@1"
+                },
+                {
+                    "command": "pixi.global.openManifest",
+                    "when": "view == pixi.views.global",
+                    "group": "1_tools@2"
+                }
+            ],
+            "view/item/context": [
+                {
+                    "command": "pixi.openTerminal",
+                    "when": "view == pixi.views.projects && viewItem == pixiEnvInstalled",
+                    "group": "inline@1"
+                },
+                {
+                    "command": "pixi.reinstall",
+                    "when": "view == pixi.views.projects && viewItem == pixiEnvInstalled",
+                    "group": "inline@2"
+                },
+                {
+                    "command": "pixi.clean",
+                    "when": "view == pixi.views.projects && viewItem == pixiEnvInstalled",
+                    "group": "inline@3"
+                },
+                {
+                    "command": "pixi.install",
+                    "when": "view == pixi.views.projects && viewItem == pixiEnvUninstalled",
+                    "group": "inline@1"
+                },
+                {
+                    "command": "pixi.global.updateTool",
+                    "when": "view == pixi.views.global && viewItem == pixiGlobalTool",
+                    "group": "inline@1"
+                },
+                {
+                    "command": "pixi.global.uninstallTool",
+                    "when": "view == pixi.views.global && viewItem == pixiGlobalTool",
+                    "group": "inline@2"
+                }
             ]
         },
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "pixi-view",
+                    "title": "Pixi",
+                    "icon": "assets/pixi-activity.svg"
+                }
+            ]
+        },
+        "views": {
+            "pixi-view": [
+                {
+                    "id": "pixi.views.projects",
+                    "name": "Projects & Environments",
+                    "icon": "assets/pixi-activity.svg"
+                },
+                {
+                    "id": "pixi.views.global",
+                    "name": "Global Tools",
+                    "icon": "assets/pixi-activity.svg"
+                }
+            ]
+        },
+        "viewsWelcome": [
+            {
+                "view": "pixi.views.projects",
+                "contents": "No Pixi projects found in current workspace.\n[Initialize Pixi Project](command:pixi.init)",
+                "when": "!pixi.hasPixiProject"
+            }
+        ],
         "terminal": {
             "profiles": [
                 {

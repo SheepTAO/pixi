@@ -11,10 +11,10 @@ import {
     window,
 } from 'vscode';
 
+import { getPixi } from '../cli/pixiCli';
 import { traceError, traceVerbose } from '../common/logging';
-import { getPixi } from './cli';
-import { PixiProjectManager } from './projectManager';
-import { PixiEnvironmentInfo } from './types';
+import { PixiProjectManager } from '../core/projectManager';
+import { PixiEnvironmentInfo } from '../core/types';
 
 interface EnvQuickPickItem extends QuickPickItem {
     env: PixiEnvironmentInfo;
@@ -29,8 +29,8 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
     ) {
         this.disposables.push(window.registerTerminalProfileProvider('pixi.terminal', this));
         this.disposables.push(
-            commands.registerCommand('pixi.openTerminal', async () => {
-                await this.openTerminal();
+            commands.registerCommand('pixi.openTerminal', async (target?: any) => {
+                await this.openTerminal(target);
             }),
         );
     }
@@ -152,9 +152,16 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
         }
     }
 
-    async openTerminal(): Promise<void> {
+    async openTerminal(target?: PixiEnvironmentInfo | { env?: PixiEnvironmentInfo }): Promise<void> {
         try {
-            const env = await this.pickEnvironment();
+            let env: PixiEnvironmentInfo | undefined;
+            if (target && 'pixiEnvName' in target) {
+                env = target as PixiEnvironmentInfo;
+            } else if (target && 'env' in target && target.env) {
+                env = target.env;
+            } else {
+                env = await this.pickEnvironment();
+            }
             if (!env) {
                 return;
             }

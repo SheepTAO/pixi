@@ -35,7 +35,9 @@
 - **环境与依赖全生命周期管理**：新建与删除环境（`pixi workspace environment add/remove`、`pixi clean`）、同步安装（`pixi install`）、依赖求解（`pixi lock`）、交互式添加/移除 Conda 及 PyPI 依赖包。
 - **原生 Pixi Task 集成**：自动将 Pixi tasks 注册为 VS Code 原生任务（可通过 `Terminal: Run Task...` 调用），并提供专用的快速搜索启动菜单（`Pixi: Run Task`）。
 - **统一终端 Profiles**：直接从终端配置菜单或命令面板打开已预激活指定 Pixi 环境的集成终端。
-- **动态按文件自动切换环境**：通过 Glob 规则将文件/目录路径与环境绑定（例如 `tests/**` → `dev`，`train/**` → `train`），在打开对应代码时自动切换活动环境与解释器。
+- **原生侧边栏与活动栏面板（Activity Bar & TreeView）**：内置专用的 Pixi Explorer 侧边面板，包含 `Projects & Environments`（实时诊断环境安装状态、一键启动预激活终端、安装、重装与清理环境）与 `Global Tools`（清晰展示全局安装的 CLI 工具、版本与暴露命令，支持一键更新/卸载）。
+- **工作区常驻状态栏指示器**：在底部状态栏动态显示当前文件对应的 Pixi 活动环境与项目名，点击即可唤出常用环境快捷操作菜单。
+- **全局工具全流程管理**：支持通过 `Pixi: Global Tools ...` 二级菜单管理 `~/.pixi/bin` 下的全局命令行工具（安装、列表查看、同步、更新、卸载与编辑清单）。
 - **公开的扩展 Extension API**：导出 `PixiExtensionApi`，供第三方扩展轻松获取 Pixi 工程、环境列表、工具链及包信息，并监听变更事件。
 - **生命周期状态诊断**：环境分为已安装（Installed）、未安装（Uninstalled，清单已声明，支持一键点击安装）以及不兼容（Incompatible，与当前系统平台不匹配）。
 

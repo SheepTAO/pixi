@@ -11,8 +11,8 @@ import {
 import * as path from 'path';
 import { Disposable, Event, EventEmitter, LogOutputChannel, ProgressLocation, ThemeIcon, window } from 'vscode';
 
+import { runPixi } from '../../cli/pixiCli';
 import { traceError, traceInfo, traceVerbose } from '../../common/logging';
-import { runPixi } from '../../core/cli';
 import { listPixiPackages } from '../../core/packageManager';
 import { PixiProjectManager } from '../../core/projectManager';
 import { PixiPackage } from '../../core/types';
