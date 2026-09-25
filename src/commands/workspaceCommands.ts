@@ -413,8 +413,28 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
 
     // Pixi: Clean...
     disposables.push(
-        commands.registerCommand('pixi.clean', async (folderUri?: Uri) => {
-            const projectPath = await pickPixiProject(manager, 'Select Pixi project to clean', folderUri);
+        commands.registerCommand('pixi.clean', async (target?: Uri | any) => {
+            if (target && target.env && target.env.pixiEnvName && target.env.projectPath) {
+                const envName = target.env.pixiEnvName;
+                const projectPath = target.env.projectPath;
+                const confirmed = await window.showWarningMessage(
+                    `Are you sure you want to clean installed environment '${envName}' on disk?`,
+                    { modal: true },
+                    'Clean Environment',
+                );
+                if (confirmed === 'Clean Environment') {
+                    await runPixiWithProgress(
+                        `Pixi: Cleaning environment '${envName}'...`,
+                        [['clean', '-e', envName]],
+                        projectPath,
+                        manager,
+                        `Pixi: Environment '${envName}' cleaned.`,
+                    );
+                }
+                return;
+            }
+
+            const projectPath = await pickPixiProject(manager, 'Select Pixi project to clean', target);
             if (!projectPath) {
                 return;
             }

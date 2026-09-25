@@ -129,16 +129,16 @@ export const MINIMUM_PIXI_VERSION = '0.53.0';
 export async function validatePixiCli(): Promise<boolean> {
     try {
         const stdout = await runPixi(['--version']);
-        const versionMatch = stdout.trim().match(/^pixi (\d+\.\d+\.\d+)/);
-        if (!versionMatch) {
+        const versionMatch = stdout.trim().match(/pixi\s+([0-9]+\.[0-9]+\.[0-9]+[a-zA-Z0-9\-\.]*)/);
+        const parsedVersion = semver.coerce(versionMatch ? versionMatch[1] : stdout.trim());
+        if (!parsedVersion) {
             window.showErrorMessage(`Found invalid Pixi binary at "${await getPixi()}".`);
             return false;
         }
 
-        const currentVersion = versionMatch[1];
-        if (!semver.gte(currentVersion, MINIMUM_PIXI_VERSION)) {
+        if (!semver.gte(parsedVersion, MINIMUM_PIXI_VERSION)) {
             window.showErrorMessage(
-                `Pixi version ${currentVersion} is too old. Requires >= ${MINIMUM_PIXI_VERSION}. Run: pixi self-update`,
+                `Pixi version ${parsedVersion.version} is too old. Requires >= ${MINIMUM_PIXI_VERSION}. Run: pixi self-update`,
             );
             return false;
         }

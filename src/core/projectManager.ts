@@ -21,20 +21,20 @@ export class PixiProjectManager implements Disposable {
 
     private readonly _onDidChangeEnvironments = new EventEmitter<void>();
     readonly onDidChangeEnvironments = this._onDidChangeEnvironments.event;
+    private refreshTimer: NodeJS.Timeout | undefined;
 
     constructor(public readonly log?: LogOutputChannel) {
         // Watch manifest and lock files for changes (debounced by 500ms with project targeting)
-        let refreshTimer: NodeJS.Timeout | undefined;
         let pendingChangedUris: Uri[] = [];
 
         const scheduleRefresh = (uri?: Uri) => {
             if (uri) {
                 pendingChangedUris.push(uri);
             }
-            if (refreshTimer) {
-                clearTimeout(refreshTimer);
+            if (this.refreshTimer) {
+                clearTimeout(this.refreshTimer);
             }
-            refreshTimer = setTimeout(async () => {
+            this.refreshTimer = setTimeout(async () => {
                 const uris = pendingChangedUris;
                 pendingChangedUris = [];
 
@@ -333,6 +333,10 @@ export class PixiProjectManager implements Disposable {
     }
 
     public dispose(): void {
+        if (this.refreshTimer) {
+            clearTimeout(this.refreshTimer);
+            this.refreshTimer = undefined;
+        }
         this._onDidProjectsChanged.dispose();
         this._onDidChangeEnvironments.dispose();
         Disposable.from(...this.disposables).dispose();

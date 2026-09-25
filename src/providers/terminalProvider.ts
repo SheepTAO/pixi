@@ -41,6 +41,25 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
         }
     }
 
+    private async handleUninstalledOrError(env: PixiEnvironmentInfo): Promise<boolean> {
+        if (env.pixiStatus === 'uninstalled') {
+            const action = await window.showWarningMessage(
+                `Environment '${env.pixiEnvName}' is not installed yet on disk. Would you like to install it now?`,
+                'Install Environment',
+            );
+            if (action === 'Install Environment') {
+                await commands.executeCommand('pixi.install', env.projectPath, env.pixiEnvName);
+            }
+            return true;
+        }
+        if (env.pixiStatus === 'incompatible') {
+            const reason = env.statusReason || 'The environment is incompatible with the current platform.';
+            window.showErrorMessage(`Cannot open terminal for environment '${env.pixiEnvName}': ${reason}`);
+            return true;
+        }
+        return false;
+    }
+
     private async pickEnvironment(token?: CancellationToken): Promise<PixiEnvironmentInfo | undefined> {
         const envs = this.projectManager.getAllEnvironments();
         if (!envs || envs.length === 0) {
@@ -54,27 +73,8 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
             return undefined;
         }
 
-        const handleUninstalledOrError = async (env: PixiEnvironmentInfo): Promise<boolean> => {
-            if (env.pixiStatus === 'uninstalled') {
-                const action = await window.showWarningMessage(
-                    `Environment '${env.pixiEnvName}' is not installed yet on disk. Would you like to install it now?`,
-                    'Install Environment',
-                );
-                if (action === 'Install Environment') {
-                    await commands.executeCommand('pixi.install', env.projectPath, env.pixiEnvName);
-                }
-                return true;
-            }
-            if (env.pixiStatus === 'incompatible') {
-                const reason = env.statusReason || 'The environment is incompatible with the current platform.';
-                window.showErrorMessage(`Cannot open terminal for environment '${env.pixiEnvName}': ${reason}`);
-                return true;
-            }
-            return false;
-        };
-
         if (envs.length === 1) {
-            if (await handleUninstalledOrError(envs[0])) {
+            if (await this.handleUninstalledOrError(envs[0])) {
                 return undefined;
             }
             return envs[0];
@@ -111,7 +111,7 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
             return undefined;
         }
 
-        if (await handleUninstalledOrError(selected.env)) {
+        if (await this.handleUninstalledOrError(selected.env)) {
             return undefined;
         }
 
@@ -163,6 +163,10 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
                 env = await this.pickEnvironment();
             }
             if (!env) {
+                return;
+            }
+
+            if (await this.handleUninstalledOrError(env)) {
                 return;
             }
 

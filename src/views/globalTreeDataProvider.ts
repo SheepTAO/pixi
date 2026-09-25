@@ -1,4 +1,12 @@
-import { Event, EventEmitter, ThemeIcon, TreeDataProvider, TreeItem, TreeItemCollapsibleState } from 'vscode';
+import {
+    Disposable,
+    Event,
+    EventEmitter,
+    ThemeIcon,
+    TreeDataProvider,
+    TreeItem,
+    TreeItemCollapsibleState,
+} from 'vscode';
 
 import {
     listGlobalEnvironments,
@@ -50,16 +58,24 @@ export class PixiGlobalBinaryTreeItem extends TreeItem {
 
 export type PixiGlobalTreeItem = PixiGlobalToolTreeItem | PixiGlobalBinaryTreeItem;
 
-export class PixiGlobalTreeDataProvider implements TreeDataProvider<PixiGlobalTreeItem> {
+export class PixiGlobalTreeDataProvider implements TreeDataProvider<PixiGlobalTreeItem>, Disposable {
     private readonly _onDidChangeTreeData = new EventEmitter<PixiGlobalTreeItem | undefined | null | void>();
     readonly onDidChangeTreeData: Event<PixiGlobalTreeItem | undefined | null | void> = this._onDidChangeTreeData.event;
+    private readonly disposables: Disposable[] = [];
 
     constructor() {
-        onDidChangeGlobalEnvironments(() => this.refresh());
+        this.disposables.push(onDidChangeGlobalEnvironments(() => this.refresh()));
     }
 
     public refresh(): void {
         this._onDidChangeTreeData.fire();
+    }
+
+    public dispose(): void {
+        this._onDidChangeTreeData.dispose();
+        for (const d of this.disposables) {
+            d.dispose();
+        }
     }
 
     public getTreeItem(element: PixiGlobalTreeItem): TreeItem {

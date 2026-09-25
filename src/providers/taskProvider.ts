@@ -228,6 +228,28 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
         });
 
         if (selected) {
+            const envName = selected.pixiTask.default_environment;
+            if (envName) {
+                const envs = this.projectManager.getEnvironmentsForProject(selected.pixiTask.projectPath);
+                const env = envs.find((e) => e.pixiEnvName === envName);
+                if (env?.pixiStatus === 'incompatible') {
+                    const reason = env.statusReason || 'The environment is incompatible with the platform.';
+                    window.showErrorMessage(
+                        `Cannot run task '${selected.pixiTask.name}' in environment '${envName}': ${reason}`,
+                    );
+                    return;
+                }
+                if (env?.pixiStatus === 'uninstalled') {
+                    const action = await window.showWarningMessage(
+                        `Environment '${envName}' required by task '${selected.pixiTask.name}' is not installed yet on disk. Would you like to install it now?`,
+                        'Install Environment',
+                    );
+                    if (action === 'Install Environment') {
+                        await commands.executeCommand('pixi.install', env.projectPath, envName);
+                    }
+                    return;
+                }
+            }
             const vsTask = await this.createVsCodeTask(selected.pixiTask);
             await tasks.executeTask(vsTask);
         }
@@ -310,6 +332,21 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
             window.showErrorMessage(
                 `Cannot run task in environment '${selectedEnvItem.pixiEnv.pixiEnvName}': ${reason}`,
             );
+            return;
+        }
+
+        if (selectedEnvItem.pixiEnv?.pixiStatus === 'uninstalled') {
+            const action = await window.showWarningMessage(
+                `Environment '${selectedEnvItem.pixiEnv.pixiEnvName}' is not installed yet on disk. Would you like to install it before running this task?`,
+                'Install Environment',
+            );
+            if (action === 'Install Environment') {
+                await commands.executeCommand(
+                    'pixi.install',
+                    selectedEnvItem.pixiEnv.projectPath,
+                    selectedEnvItem.pixiEnv.pixiEnvName,
+                );
+            }
             return;
         }
 

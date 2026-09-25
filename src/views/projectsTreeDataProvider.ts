@@ -1,5 +1,6 @@
 import * as path from 'path';
 import {
+    Disposable,
     Event,
     EventEmitter,
     ThemeColor,
@@ -84,18 +85,28 @@ export class PixiEnvironmentTreeItem extends TreeItem {
 
 export type PixiProjectsTreeItem = PixiProjectTreeItem | PixiEnvironmentTreeItem;
 
-export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjectsTreeItem> {
+export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjectsTreeItem>, Disposable {
     private readonly _onDidChangeTreeData = new EventEmitter<PixiProjectsTreeItem | undefined | null | void>();
     readonly onDidChangeTreeData: Event<PixiProjectsTreeItem | undefined | null | void> =
         this._onDidChangeTreeData.event;
+    private readonly disposables: Disposable[] = [];
 
     constructor(private readonly projectManager: PixiProjectManager) {
-        this.projectManager.onDidProjectsChanged(() => this.refresh());
-        this.projectManager.onDidChangeEnvironments(() => this.refresh());
+        this.disposables.push(
+            this.projectManager.onDidProjectsChanged(() => this.refresh()),
+            this.projectManager.onDidChangeEnvironments(() => this.refresh()),
+        );
     }
 
     public refresh(): void {
         this._onDidChangeTreeData.fire();
+    }
+
+    public dispose(): void {
+        this._onDidChangeTreeData.dispose();
+        for (const d of this.disposables) {
+            d.dispose();
+        }
     }
 
     public getTreeItem(element: PixiProjectsTreeItem): TreeItem {

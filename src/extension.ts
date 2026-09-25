@@ -40,10 +40,16 @@ export async function activate(context: ExtensionContext): Promise<PixiExtension
 
     // 2. Register Tree Views & Status Bar
     const projectsTreeDataProvider = new PixiProjectsTreeDataProvider(projectManager);
-    context.subscriptions.push(window.registerTreeDataProvider('pixi.views.projects', projectsTreeDataProvider));
+    context.subscriptions.push(
+        projectsTreeDataProvider,
+        window.registerTreeDataProvider('pixi.views.projects', projectsTreeDataProvider),
+    );
 
     const globalTreeDataProvider = new PixiGlobalTreeDataProvider();
-    context.subscriptions.push(window.registerTreeDataProvider('pixi.views.global', globalTreeDataProvider));
+    context.subscriptions.push(
+        globalTreeDataProvider,
+        window.registerTreeDataProvider('pixi.views.global', globalTreeDataProvider),
+    );
 
     const statusBarController = new PixiStatusBarController(projectManager);
     context.subscriptions.push(statusBarController);

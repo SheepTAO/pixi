@@ -36,33 +36,55 @@ export interface EnvironmentToolchains {
 }
 
 /**
- * Reads a package version from conda-meta/ directory.
- * e.g. python-3.11.8-h123_0.json -> "3.11.8"
+ * Reads all files from conda-meta/ directory once.
  */
-async function findPackageVersionFromMeta(envPath: string, pkgPrefix: string): Promise<string | undefined> {
+async function readCondaMetaFiles(envPath: string): Promise<string[]> {
     try {
         const metaDir = path.join(envPath, 'conda-meta');
         const stats = await fs.promises.stat(metaDir).catch(() => null);
         if (stats?.isDirectory()) {
-            const files = await fs.promises.readdir(metaDir);
-            const regex = new RegExp(`^${pkgPrefix}-(\\d[^-]*)-.*\\.json$`);
-            for (const file of files) {
-                const match = file.match(regex);
-                if (match) {
-                    return match[1];
-                }
-            }
+            return await fs.promises.readdir(metaDir);
         }
     } catch {
         // ignore
+    }
+    return [];
+}
+
+/**
+ * Extracts a package version from a list of conda-meta filenames.
+ * e.g. python-3.11.8-h123_0.json -> "3.11.8"
+ */
+function findPackageVersionFromFiles(files: string[], pkgPrefix: string): string | undefined {
+    const regex = new RegExp(`^${pkgPrefix}-(\\d[^-]*)-.*\\.json$`);
+    for (const file of files) {
+        const match = file.match(regex);
+        if (match) {
+            return match[1];
+        }
     }
     return undefined;
 }
 
 /**
+ * Reads a package version from conda-meta/ directory.
+ */
+async function findPackageVersionFromMeta(
+    envPath: string,
+    pkgPrefix: string,
+    metaFiles?: string[],
+): Promise<string | undefined> {
+    const files = metaFiles ?? (await readCondaMetaFiles(envPath));
+    return findPackageVersionFromFiles(files, pkgPrefix);
+}
+
+/**
  * Scans an environment prefix for Python toolchains.
  */
-export async function scanPythonToolchain(envPath: string): Promise<PythonToolchainInfo | undefined> {
+export async function scanPythonToolchain(
+    envPath: string,
+    metaFiles?: string[],
+): Promise<PythonToolchainInfo | undefined> {
     const executable = await findExecutable(envPath, {
         posix: ['bin/python', 'bin/python3', 'python', 'python3'],
         win32: [
@@ -79,7 +101,7 @@ export async function scanPythonToolchain(envPath: string): Promise<PythonToolch
         return undefined;
     }
 
-    const version = await findPackageVersionFromMeta(envPath, 'python');
+    const version = await findPackageVersionFromMeta(envPath, 'python', metaFiles);
     return {
         executable,
         version,
@@ -154,7 +176,7 @@ export async function scanCppToolchain(envPath: string): Promise<CppToolchainInf
 /**
  * Scans an environment prefix for R toolchains (R, Rscript).
  */
-export async function scanRToolchain(envPath: string): Promise<RToolchainInfo | undefined> {
+export async function scanRToolchain(envPath: string, metaFiles?: string[]): Promise<RToolchainInfo | undefined> {
     const executable = await findExecutable(envPath, {
         posix: ['bin/R', 'bin/Rscript'],
         win32: ['bin/R.exe', 'bin/x64/R.exe', 'bin/Rscript.exe'],
@@ -169,7 +191,7 @@ export async function scanRToolchain(envPath: string): Promise<RToolchainInfo | 
         win32: ['bin/Rscript.exe', 'bin/x64/Rscript.exe'],
     });
 
-    const version = await findPackageVersionFromMeta(envPath, 'r-base');
+    const version = await findPackageVersionFromMeta(envPath, 'r-base', metaFiles);
 
     return {
         executable,
@@ -181,7 +203,7 @@ export async function scanRToolchain(envPath: string): Promise<RToolchainInfo | 
 /**
  * Scans an environment prefix for Rust toolchains (rustc, cargo).
  */
-export async function scanRustToolchain(envPath: string): Promise<RustToolchainInfo | undefined> {
+export async function scanRustToolchain(envPath: string, metaFiles?: string[]): Promise<RustToolchainInfo | undefined> {
     const rustc = await findExecutable(envPath, {
         posix: ['bin/rustc'],
         win32: ['bin/rustc.exe', 'Library/bin/rustc.exe'],
@@ -196,7 +218,7 @@ export async function scanRustToolchain(envPath: string): Promise<RustToolchainI
         return undefined;
     }
 
-    const version = await findPackageVersionFromMeta(envPath, 'rust');
+    const version = await findPackageVersionFromMeta(envPath, 'rust', metaFiles);
 
     return {
         rustc: rustc ?? undefined,
@@ -209,11 +231,12 @@ export async function scanRustToolchain(envPath: string): Promise<RustToolchainI
  * Scans an installed Pixi environment prefix for all supported language toolchains.
  */
 export async function scanEnvironmentToolchains(envPath: string): Promise<EnvironmentToolchains> {
+    const metaFiles = await readCondaMetaFiles(envPath);
     const [python, cpp, r, rust] = await Promise.all([
-        scanPythonToolchain(envPath),
+        scanPythonToolchain(envPath, metaFiles),
         scanCppToolchain(envPath),
-        scanRToolchain(envPath),
-        scanRustToolchain(envPath),
+        scanRToolchain(envPath, metaFiles),
+        scanRustToolchain(envPath, metaFiles),
     ]);
 
     const result: EnvironmentToolchains = {};
