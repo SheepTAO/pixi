@@ -24,6 +24,8 @@ export interface PixiPackage {
     is_explicit: boolean;
     kind?: 'conda' | 'pypi' | string;
     build?: string;
+    license?: string;
+    source?: string;
 }
 
 export type PixiEnvironmentStatus = 'installed' | 'uninstalled' | 'incompatible';

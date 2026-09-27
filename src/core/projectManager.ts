@@ -3,6 +3,7 @@ import * as path from 'path';
 import { commands, Disposable, EventEmitter, LogOutputChannel, ProgressLocation, Uri, window, workspace } from 'vscode';
 
 import { runPixi } from '../cli/pixiCli';
+import { safeJsonParse } from '../common/execUtils';
 import { traceError, traceVerbose } from '../common/logging';
 import { matchEnvironmentRule } from './environmentRules';
 import { listPixiPackages, PixiPackage } from './packageManager';
@@ -14,6 +15,7 @@ export class PixiProjectManager implements Disposable {
     private projectPaths: string[] = [];
     private projectToEnvs = new Map<string, PixiEnvironmentInfo[]>();
     private packagesCache = new Map<string, PixiPackage[]>();
+    private packagesInFlight = new Map<string, Promise<PixiPackage[]>>();
     private readonly disposables: Disposable[] = [];
 
     private readonly _onDidProjectsChanged = new EventEmitter<string[]>();
@@ -133,13 +135,24 @@ export class PixiProjectManager implements Disposable {
     public clearPackagesCache(projectPath?: string): void {
         if (projectPath) {
             const normalized = path.normalize(projectPath);
+            const isWindows = process.platform === 'win32';
+            const targetPrefix = isWindows ? (normalized + ':').toLowerCase() : normalized + ':';
+
             for (const key of this.packagesCache.keys()) {
-                if (key.startsWith(normalized + ':')) {
+                const compKey = isWindows ? key.toLowerCase() : key;
+                if (compKey.startsWith(targetPrefix)) {
                     this.packagesCache.delete(key);
+                }
+            }
+            for (const key of this.packagesInFlight.keys()) {
+                const compKey = isWindows ? key.toLowerCase() : key;
+                if (compKey.startsWith(targetPrefix)) {
+                    this.packagesInFlight.delete(key);
                 }
             }
         } else {
             this.packagesCache.clear();
+            this.packagesInFlight.clear();
         }
     }
 
@@ -149,15 +162,25 @@ export class PixiProjectManager implements Disposable {
             return this.packagesCache.get(cacheKey)!;
         }
 
-        try {
-            const pkgs = await listPixiPackages(envName, projectPath);
-            this.packagesCache.set(cacheKey, pkgs);
-            traceVerbose(`Loaded ${pkgs.length} packages for environment '${envName}' in ${projectPath}`);
-            return pkgs;
-        } catch (error) {
-            traceError(`Failed to fetch packages for environment '${envName}':`, error);
-            return [];
+        let inFlight = this.packagesInFlight.get(cacheKey);
+        if (!inFlight) {
+            inFlight = listPixiPackages(envName, projectPath)
+                .then((pkgs) => {
+                    this.packagesCache.set(cacheKey, pkgs);
+                    traceVerbose(`Loaded ${pkgs.length} packages for environment '${envName}' in ${projectPath}`);
+                    return pkgs;
+                })
+                .catch((error) => {
+                    traceError(`Failed to fetch packages for environment '${envName}':`, error);
+                    return [];
+                })
+                .finally(() => {
+                    this.packagesInFlight.delete(cacheKey);
+                });
+            this.packagesInFlight.set(cacheKey, inFlight);
         }
+
+        return inFlight;
     }
 
     public findProjectForUri(uri: Uri): string | undefined {
@@ -268,14 +291,15 @@ export class PixiProjectManager implements Disposable {
     }
 
     private async refreshProject(projectPath: string): Promise<void> {
-        this.clearPackagesCache(projectPath);
+        const normalized = path.normalize(projectPath);
+        this.clearPackagesCache(normalized);
         try {
-            const stdout = await runPixi(['info', '--json'], { cwd: projectPath });
-            const pixiInfo: PixiInfo = JSON.parse(stdout);
+            const stdout = await runPixi(['info', '--json'], { cwd: normalized });
+            const pixiInfo: PixiInfo = safeJsonParse<PixiInfo>(stdout, {} as PixiInfo);
 
             if (!pixiInfo.project_info) {
-                traceVerbose(`No project_info returned from pixi info for ${projectPath}`);
-                this.projectToEnvs.set(projectPath, []);
+                traceVerbose(`No project_info returned from pixi info for ${normalized}`);
+                this.projectToEnvs.set(normalized, []);
                 return;
             }
 
@@ -284,7 +308,7 @@ export class PixiProjectManager implements Disposable {
             const currentPlatform = pixiInfo.platform;
 
             const envs: PixiEnvironmentInfo[] = await Promise.all(
-                pixiInfo.environments_info.map(async (rawEnv) => {
+                (pixiInfo.environments_info || []).map(async (rawEnv) => {
                     const platformNames = (rawEnv.platforms || []).map((p) => (typeof p === 'string' ? p : p.name));
                     const isPlatformSupported =
                         !currentPlatform || platformNames.length === 0 || platformNames.includes(currentPlatform);
@@ -303,7 +327,7 @@ export class PixiProjectManager implements Disposable {
                     const envInfo: PixiEnvironmentInfo = {
                         pixiEnvName: rawEnv.name,
                         prefix: rawEnv.prefix,
-                        projectPath,
+                        projectPath: normalized,
                         projectName,
                         manifestPath,
                         pixiStatus: status,
@@ -320,10 +344,10 @@ export class PixiProjectManager implements Disposable {
                 }),
             );
 
-            this.projectToEnvs.set(projectPath, envs);
+            this.projectToEnvs.set(normalized, envs);
         } catch (error) {
-            traceError(`Failed to refresh Pixi project at ${projectPath}:`, error);
-            this.projectToEnvs.set(projectPath, []);
+            traceError(`Failed to refresh Pixi project at ${normalized}:`, error);
+            this.projectToEnvs.set(normalized, []);
         }
     }
 
@@ -339,6 +363,9 @@ export class PixiProjectManager implements Disposable {
         }
         this._onDidProjectsChanged.dispose();
         this._onDidChangeEnvironments.dispose();
+        this.packagesCache.clear();
+        this.packagesInFlight.clear();
+        this.projectToEnvs.clear();
         Disposable.from(...this.disposables).dispose();
     }
 }

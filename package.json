@@ -165,7 +165,7 @@
                 "command": "pixi.global.updateTool",
                 "title": "Update Global Tool",
                 "category": "Pixi",
-                "icon": "$(refresh)"
+                "icon": "$(arrow-up)"
             },
             {
                 "command": "pixi.global.uninstallTool",
@@ -190,6 +190,17 @@
                 "title": "Refresh Pixi Info",
                 "category": "Pixi",
                 "icon": "$(refresh)"
+            },
+            {
+                "command": "pixi.cleanCache",
+                "title": "Clean Package Cache ...",
+                "category": "Pixi",
+                "icon": "$(trash)"
+            },
+            {
+                "command": "pixi.openLocation",
+                "title": "Open Location ...",
+                "category": "Pixi"
             }
         ],
         "menus": {
@@ -202,6 +213,13 @@
                 },
                 {
                     "command": "pixi.refreshInfo"
+                },
+                {
+                    "command": "pixi.cleanCache"
+                },
+                {
+                    "command": "pixi.openLocation",
+                    "when": "false"
                 },
                 {
                     "command": "pixi.global"
@@ -352,6 +370,26 @@
                     "group": "inline@1"
                 },
                 {
+                    "command": "pixi.createEnvironment",
+                    "when": "view == pixi.views.projects && viewItem == pixiProject",
+                    "group": "1_manage@1"
+                },
+                {
+                    "command": "pixi.lock",
+                    "when": "view == pixi.views.projects && viewItem == pixiProject",
+                    "group": "1_manage@2"
+                },
+                {
+                    "command": "pixi.addChannel",
+                    "when": "view == pixi.views.projects && viewItem == pixiProject",
+                    "group": "2_channel@1"
+                },
+                {
+                    "command": "pixi.removeChannel",
+                    "when": "view == pixi.views.projects && viewItem == pixiProject",
+                    "group": "2_channel@2"
+                },
+                {
                     "command": "pixi.addPackage",
                     "when": "view == pixi.views.projects && (viewItem == pixiEnvInstalled || viewItem == pixiEnvUninstalled)",
                     "group": "inline@0"
@@ -372,6 +410,31 @@
                     "group": "inline@3"
                 },
                 {
+                    "command": "pixi.addPackage",
+                    "when": "view == pixi.views.projects && (viewItem == pixiEnvInstalled || viewItem == pixiEnvUninstalled || viewItem == pixiPackageExplicit || viewItem == pixiPackageTransitive || viewItem == pixiEmpty)",
+                    "group": "1_package@1"
+                },
+                {
+                    "command": "pixi.removePackage",
+                    "when": "view == pixi.views.projects && viewItem == pixiPackageExplicit",
+                    "group": "inline@1"
+                },
+                {
+                    "command": "pixi.removePackage",
+                    "when": "view == pixi.views.projects && (viewItem == pixiEnvInstalled || viewItem == pixiPackageExplicit || viewItem == pixiPackageTransitive)",
+                    "group": "1_package@2"
+                },
+                {
+                    "command": "pixi.update",
+                    "when": "view == pixi.views.projects && (viewItem == pixiEnvInstalled || viewItem == pixiPackageExplicit || viewItem == pixiPackageTransitive || viewItem == pixiEmpty)",
+                    "group": "1_package@3"
+                },
+                {
+                    "command": "pixi.deleteEnvironment",
+                    "when": "view == pixi.views.projects && (viewItem == pixiEnvInstalled || viewItem == pixiEnvUninstalled)",
+                    "group": "2_manage@1"
+                },
+                {
                     "command": "pixi.install",
                     "when": "view == pixi.views.projects && viewItem == pixiEnvUninstalled",
                     "group": "inline@1"
@@ -385,6 +448,11 @@
                     "command": "pixi.global.uninstallTool",
                     "when": "view == pixi.views.global && viewItem == pixiGlobalTool",
                     "group": "inline@2"
+                },
+                {
+                    "command": "pixi.cleanCache",
+                    "when": "view == pixi.views.info && viewItem == pixiInfoCache",
+                    "group": "inline@1"
                 }
             ]
         },

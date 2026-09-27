@@ -253,13 +253,12 @@ export class PixiPythonPackageManager implements PackageManager, Disposable {
         const envId = environment.envId.id;
         traceVerbose(`Called getPackages for environment: ${envId}`);
 
-        const cached = this.packagesCache.get(envId);
-        if (cached && cached.length > 0) {
-            return cached;
+        if (this.packagesCache.has(envId)) {
+            return this.packagesCache.get(envId);
         }
 
         const pixiEnv = this.envManager?.getPixiEnvironment(envId);
-        if (pixiEnv?.packages && pixiEnv.packages.length > 0) {
+        if (pixiEnv?.packages) {
             this.packagesCache.set(envId, pixiEnv.packages);
             return pixiEnv.packages;
         }

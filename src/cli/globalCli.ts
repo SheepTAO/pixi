@@ -2,6 +2,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { CancellationToken, EventEmitter } from 'vscode';
 
+import { safeJsonParse } from '../common/execUtils';
 import { traceError } from '../common/logging';
 import { runPixi } from './pixiCli';
 
@@ -40,7 +41,7 @@ export async function getGlobalManifestPath(): Promise<string> {
     }
     try {
         const stdout = await runPixi(['info', '--json']);
-        const info = JSON.parse(stdout);
+        const info = safeJsonParse<{ global_info?: { manifest?: string } }>(stdout, {});
         const manifest = info.global_info?.manifest;
         if (typeof manifest === 'string' && manifest.trim()) {
             _cachedGlobalManifestPath = manifest;
@@ -56,9 +57,9 @@ export async function getGlobalManifestPath(): Promise<string> {
 export async function listGlobalEnvironments(): Promise<PixiGlobalEnvironment[] | undefined> {
     try {
         const stdout = await runPixi(['global', 'list', '--json']);
-        const parsed = JSON.parse(stdout);
+        const parsed = safeJsonParse<PixiGlobalEnvironment[]>(stdout, []);
         if (Array.isArray(parsed)) {
-            return parsed as PixiGlobalEnvironment[];
+            return parsed;
         }
         return [];
     } catch (error) {

@@ -13,7 +13,7 @@ import {
 } from 'vscode';
 
 import { PixiProjectManager } from '../core/projectManager';
-import { PixiEnvironmentInfo, PixiProject } from '../core/types';
+import { PixiEnvironmentInfo, PixiPackage, PixiProject } from '../core/types';
 
 export class PixiProjectTreeItem extends TreeItem {
     constructor(public readonly project: PixiProject) {
@@ -25,27 +25,74 @@ export class PixiProjectTreeItem extends TreeItem {
     }
 }
 
+export class PixiPackageTreeItem extends TreeItem {
+    constructor(
+        public readonly pkg: PixiPackage,
+        public readonly env: PixiEnvironmentInfo,
+        public readonly project?: PixiProject,
+    ) {
+        super(pkg.name, TreeItemCollapsibleState.None);
+        const versionStr = pkg.version ? ` v${pkg.version}` : '';
+        this.description = pkg.version ? (pkg.kind === 'pypi' ? `${pkg.version} (pypi)` : pkg.version) : undefined;
+        this.iconPath = pkg.is_explicit
+            ? new ThemeIcon('package')
+            : new ThemeIcon('symbol-field', new ThemeColor('descriptionForeground'));
+
+        const lines = [
+            `${pkg.name}${versionStr}`,
+            `Kind: ${pkg.kind ? pkg.kind.toUpperCase() : 'Conda'}${pkg.is_explicit ? ' (explicit dependency)' : ' (transitive dependency)'}`,
+        ];
+        if (pkg.build) {
+            lines.push(`Build: ${pkg.build}`);
+        }
+        if (pkg.license) {
+            lines.push(`License: ${pkg.license}`);
+        }
+        if (pkg.source) {
+            lines.push(`Source: ${pkg.source}`);
+        }
+        this.tooltip = lines.join('\n');
+        this.contextValue = pkg.is_explicit ? 'pixiPackageExplicit' : 'pixiPackageTransitive';
+    }
+}
+
+export class PixiEmptyTreeItem extends TreeItem {
+    constructor(
+        message: string,
+        public readonly project?: PixiProject,
+        public readonly env?: PixiEnvironmentInfo,
+    ) {
+        super(message, TreeItemCollapsibleState.None);
+        this.iconPath = new ThemeIcon('info', new ThemeColor('descriptionForeground'));
+        this.contextValue = 'pixiEmpty';
+        if (env && project) {
+            this.tooltip = `No packages found in '${env.pixiEnvName}'. Click to add a package.`;
+            this.command = {
+                command: 'pixi.addPackage',
+                title: 'Add Package',
+                arguments: [{ env, project }],
+            };
+        }
+    }
+}
+
 export class PixiEnvironmentTreeItem extends TreeItem {
     constructor(
         public readonly env: PixiEnvironmentInfo,
         public readonly project: PixiProject,
     ) {
-        super(env.pixiEnvName, TreeItemCollapsibleState.None);
+        const isInstalled = env.pixiStatus === 'installed';
+        super(env.pixiEnvName, isInstalled ? TreeItemCollapsibleState.Collapsed : TreeItemCollapsibleState.None);
 
         const details: string[] = [];
         if (env.toolchains?.python) {
             details.push(`Python ${env.toolchains.python.version || ''}`.trim());
         }
 
-        if (env.pixiStatus === 'installed') {
+        if (isInstalled) {
             this.iconPath = new ThemeIcon('pass-filled', new ThemeColor('testing.iconPassed'));
             this.description = details.length > 0 ? details.join(', ') : undefined;
             this.contextValue = 'pixiEnvInstalled';
-            this.command = {
-                command: 'pixi.openTerminal',
-                title: 'Open Terminal',
-                arguments: [env],
-            };
         } else if (env.pixiStatus === 'uninstalled') {
             this.iconPath = new ThemeIcon('circle-outline', new ThemeColor('disabledForeground'));
             this.description = '(not installed)';
@@ -84,7 +131,11 @@ export class PixiEnvironmentTreeItem extends TreeItem {
     }
 }
 
-export type PixiProjectsTreeItem = PixiProjectTreeItem | PixiEnvironmentTreeItem;
+export type PixiProjectsTreeItem =
+    | PixiProjectTreeItem
+    | PixiEnvironmentTreeItem
+    | PixiPackageTreeItem
+    | PixiEmptyTreeItem;
 
 export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjectsTreeItem>, Disposable {
     private readonly _onDidChangeTreeData = new EventEmitter<PixiProjectsTreeItem | undefined | null | void>();
@@ -120,6 +171,7 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
     }
 
     public refresh(): void {
+        this.projectManager.clearPackagesCache();
         this.updateViewDescription();
         this._onDidChangeTreeData.fire();
     }
@@ -153,6 +205,29 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
         if (element instanceof PixiProjectTreeItem) {
             const envs = this.projectManager.getEnvironmentsForProject(element.project.projectPath);
             return envs.map((e) => new PixiEnvironmentTreeItem(e, element.project));
+        }
+
+        if (element instanceof PixiEnvironmentTreeItem) {
+            if (element.env.pixiStatus !== 'installed') {
+                return [];
+            }
+            const packages = await this.projectManager.getPackagesForEnvironment(
+                element.env.pixiEnvName,
+                element.project.projectPath,
+            );
+
+            if (packages.length === 0) {
+                return [new PixiEmptyTreeItem('No packages found', element.project, element.env)];
+            }
+
+            const sorted = [...packages].sort((a, b) => {
+                if (a.is_explicit !== b.is_explicit) {
+                    return a.is_explicit ? -1 : 1;
+                }
+                return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+            });
+
+            return sorted.map((pkg) => new PixiPackageTreeItem(pkg, element.env, element.project));
         }
 
         return [];

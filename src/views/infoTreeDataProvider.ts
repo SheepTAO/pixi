@@ -1,20 +1,79 @@
+import * as ch from 'child_process';
+import * as fs from 'fs';
 import * as path from 'path';
 import {
     commands,
     Disposable,
+    env as vscodeEnv,
     Event,
     EventEmitter,
     ProgressLocation,
+    QuickPickItem,
     ThemeIcon,
     TreeDataProvider,
     TreeItem,
     TreeItemCollapsibleState,
     Uri,
     window,
+    workspace,
 } from 'vscode';
 
 import { clearPixiCache, runPixi } from '../cli/pixiCli';
+import { safeJsonParse } from '../common/execUtils';
 import { traceError, traceVerbose } from '../common/logging';
+
+export function formatBytes(bytes: number): string {
+    if (bytes < 1024) {
+        return `${bytes} B`;
+    }
+    const units = ['KB', 'MB', 'GB', 'TB'];
+    let u = -1;
+    let size = bytes;
+    do {
+        size /= 1024;
+        u++;
+    } while (size >= 1024 && u < units.length - 1);
+    return `${size.toFixed(1)} ${units[u]}`;
+}
+
+export async function computeDirectorySize(dirPath: string): Promise<number | null> {
+    try {
+        if (!fs.existsSync(dirPath)) {
+            return null;
+        }
+        if (process.platform !== 'win32') {
+            return await new Promise<number | null>((resolve) => {
+                ch.exec(`du -sk "${dirPath}"`, { timeout: 15000 }, (err, stdout) => {
+                    if (err || !stdout) {
+                        return resolve(null);
+                    }
+                    const match = stdout.trim().match(/^(\d+)/);
+                    if (match) {
+                        resolve(parseInt(match[1], 10) * 1024);
+                    } else {
+                        resolve(null);
+                    }
+                });
+            });
+        }
+
+        // Windows support via PowerShell
+        return await new Promise<number | null>((resolve) => {
+            const escaped = dirPath.replace(/'/g, "''");
+            const psCmd = `(Get-ChildItem -LiteralPath '${escaped}' -Recurse -File -Force -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum`;
+            ch.exec(`powershell -NoProfile -NonInteractive -Command "${psCmd}"`, { timeout: 10000 }, (err, stdout) => {
+                if (err || !stdout) {
+                    return resolve(null);
+                }
+                const bytes = parseInt(stdout.trim(), 10);
+                resolve(isNaN(bytes) ? null : bytes);
+            });
+        });
+    } catch {
+        // Fall back
+    }
+    return null;
+}
 
 export interface PixiSystemInfo {
     platform?: string;
@@ -46,10 +105,16 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
     private readonly _onDidChangeTreeData = new EventEmitter<PixiInfoItem | undefined | null | void>();
     readonly onDidChangeTreeData: Event<PixiInfoItem | undefined | null | void> = this._onDidChangeTreeData.event;
     private readonly disposables: Disposable[] = [];
-    private cachedInfoItems: PixiInfoItem[] | null = null;
+    private cachedSystemInfo: PixiSystemInfo | null = null;
+    private cachedCacheSize: string | null = null;
+    private isCalculatingCacheSize = false;
+    private cacheCalculationEpoch = 0;
 
     public refresh(): void {
-        this.cachedInfoItems = null;
+        this.cacheCalculationEpoch++;
+        this.cachedSystemInfo = null;
+        this.cachedCacheSize = null;
+        this.isCalculatingCacheSize = false;
         this._onDidChangeTreeData.fire();
     }
 
@@ -63,7 +128,9 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
     public registerCommands(): Disposable {
         const d1 = commands.registerCommand('pixi.selfUpdate', () => this.selfUpdate());
         const d2 = commands.registerCommand('pixi.refreshInfo', () => this.refresh());
-        return Disposable.from(d1, d2);
+        const d3 = commands.registerCommand('pixi.cleanCache', () => this.cleanCache());
+        const d4 = commands.registerCommand('pixi.openLocation', (targetPath: string) => this.openLocation(targetPath));
+        return Disposable.from(d1, d2, d3, d4);
     }
 
     public getTreeItem(element: PixiInfoItem): TreeItem {
@@ -75,16 +142,12 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
             return element.children || [];
         }
 
-        if (this.cachedInfoItems) {
-            return this.cachedInfoItems;
-        }
-
         try {
-            const rawJson = await runPixi(['info', '--json']);
-            const info = JSON.parse(rawJson) as PixiSystemInfo;
-            const items = this.buildInfoTree(info);
-            this.cachedInfoItems = items;
-            return items;
+            if (!this.cachedSystemInfo) {
+                const rawJson = await runPixi(['info', '--json']);
+                this.cachedSystemInfo = safeJsonParse<PixiSystemInfo>(rawJson);
+            }
+            return this.buildInfoTree(this.cachedSystemInfo);
         } catch (err: unknown) {
             traceError('Failed to fetch Pixi info:', err);
             const errorItem = new PixiInfoItem('Pixi CLI Unavailable', TreeItemCollapsibleState.None);
@@ -112,11 +175,7 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
         const versionItem = new PixiInfoItem('Version', TreeItemCollapsibleState.None);
         versionItem.description = `v${cleanVersion}`;
         versionItem.iconPath = new ThemeIcon('tag');
-        versionItem.tooltip = `Pixi CLI version: ${cleanVersion}\nClick to check for updates or update Pixi CLI`;
-        versionItem.command = {
-            command: 'pixi.selfUpdate',
-            title: 'Update Pixi CLI',
-        };
+        versionItem.tooltip = `Pixi CLI version: ${cleanVersion}`;
         items.push(versionItem);
 
         // 2. Platform & TLS Backend
@@ -130,20 +189,47 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
         // 3. Cache Directory
         if (info.cache_dir) {
             const cacheItem = new PixiInfoItem('Cache Directory', TreeItemCollapsibleState.None);
-            cacheItem.description = info.cache_dir;
+            const sizeStr =
+                this.cachedCacheSize ||
+                (this.isCalculatingCacheSize ? 'Calculating...' : info.cache_size ? String(info.cache_size) : null);
+            cacheItem.description = sizeStr ? `${sizeStr} (${info.cache_dir})` : info.cache_dir;
             cacheItem.iconPath = new ThemeIcon('database');
+            cacheItem.contextValue = 'pixiInfoCache';
             let tooltip = `Cache Directory: ${info.cache_dir}`;
-            if (info.cache_size) {
-                tooltip += `\nSize: ${info.cache_size}`;
+            if (this.cachedCacheSize) {
+                tooltip += `\nTotal Size: ${this.cachedCacheSize}`;
+            } else if (this.isCalculatingCacheSize) {
+                tooltip += '\nCalculating cache size...';
             }
-            tooltip += '\nClick to reveal in file manager';
+            tooltip += '\nClick to open in terminal or copy path';
             cacheItem.tooltip = tooltip;
             cacheItem.command = {
-                command: 'revealFileInOS',
+                command: 'pixi.openLocation',
                 title: 'Open Cache Directory',
-                arguments: [Uri.file(info.cache_dir)],
+                arguments: [info.cache_dir],
             };
             items.push(cacheItem);
+
+            if (!this.cachedCacheSize && !this.isCalculatingCacheSize) {
+                this.isCalculatingCacheSize = true;
+                const currentEpoch = this.cacheCalculationEpoch;
+                computeDirectorySize(info.cache_dir)
+                    .then((bytes) => {
+                        if (this.cacheCalculationEpoch !== currentEpoch) {
+                            return;
+                        }
+                        this.isCalculatingCacheSize = false;
+                        if (bytes !== null) {
+                            this.cachedCacheSize = formatBytes(bytes);
+                            this._onDidChangeTreeData.fire();
+                        }
+                    })
+                    .catch(() => {
+                        if (this.cacheCalculationEpoch === currentEpoch) {
+                            this.isCalculatingCacheSize = false;
+                        }
+                    });
+            }
         }
 
         // 4. Auth Storage
@@ -151,11 +237,11 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
             const authItem = new PixiInfoItem('Auth Storage', TreeItemCollapsibleState.None);
             authItem.description = info.auth_dir;
             authItem.iconPath = new ThemeIcon('key');
-            authItem.tooltip = `Credentials File: ${info.auth_dir}\nClick to reveal in file manager`;
+            authItem.tooltip = `Credentials File: ${info.auth_dir}\nClick to open or copy path`;
             authItem.command = {
-                command: 'revealFileInOS',
+                command: 'pixi.openLocation',
                 title: 'Open Credentials Location',
-                arguments: [Uri.file(info.auth_dir)],
+                arguments: [info.auth_dir],
             };
             items.push(authItem);
         }
@@ -168,11 +254,11 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
                 const binItem = new PixiInfoItem('Bin Directory', TreeItemCollapsibleState.None);
                 binItem.description = info.global_info.bin_dir;
                 binItem.iconPath = new ThemeIcon('folder');
-                binItem.tooltip = `Global Binaries: ${info.global_info.bin_dir}\nClick to reveal in file manager`;
+                binItem.tooltip = `Global Binaries: ${info.global_info.bin_dir}\nClick to open in terminal or copy path`;
                 binItem.command = {
-                    command: 'revealFileInOS',
+                    command: 'pixi.openLocation',
                     title: 'Open Bin Directory',
-                    arguments: [Uri.file(info.global_info.bin_dir)],
+                    arguments: [info.global_info.bin_dir],
                 };
                 globalChildren.push(binItem);
             }
@@ -181,11 +267,11 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
                 const envItem = new PixiInfoItem('Environments Directory', TreeItemCollapsibleState.None);
                 envItem.description = info.global_info.env_dir;
                 envItem.iconPath = new ThemeIcon('folder');
-                envItem.tooltip = `Global Environments: ${info.global_info.env_dir}\nClick to reveal in file manager`;
+                envItem.tooltip = `Global Environments: ${info.global_info.env_dir}\nClick to open in terminal or copy path`;
                 envItem.command = {
-                    command: 'revealFileInOS',
+                    command: 'pixi.openLocation',
                     title: 'Open Environments Directory',
-                    arguments: [Uri.file(info.global_info.env_dir)],
+                    arguments: [info.global_info.env_dir],
                 };
                 globalChildren.push(envItem);
             }
@@ -196,9 +282,9 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
                 manifestItem.iconPath = new ThemeIcon('file-code');
                 manifestItem.tooltip = `Global Manifest: ${info.global_info.manifest}\nClick to open in editor`;
                 manifestItem.command = {
-                    command: 'vscode.open',
+                    command: 'pixi.openLocation',
                     title: 'Open Global Manifest',
-                    arguments: [Uri.file(info.global_info.manifest)],
+                    arguments: [info.global_info.manifest],
                 };
                 globalChildren.push(manifestItem);
             }
@@ -249,9 +335,9 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
                 cfgItem.iconPath = new ThemeIcon('file-code');
                 cfgItem.tooltip = `Configuration File: ${cfg}\nClick to open in editor`;
                 cfgItem.command = {
-                    command: 'vscode.open',
+                    command: 'pixi.openLocation',
                     title: 'Open Configuration File',
-                    arguments: [Uri.file(cfg)],
+                    arguments: [cfg],
                 };
                 return cfgItem;
             });
@@ -273,6 +359,15 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
     }
 
     public async selfUpdate(): Promise<void> {
+        const confirm = await window.showInformationMessage(
+            'Check for updates and update Pixi CLI to the latest version?',
+            { modal: true },
+            'Update Pixi CLI',
+        );
+        if (confirm !== 'Update Pixi CLI') {
+            return;
+        }
+
         await window.withProgress(
             {
                 location: ProgressLocation.Notification,
@@ -304,5 +399,116 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
                 }
             },
         );
+    }
+
+    public async cleanCache(): Promise<void> {
+        const confirm = await window.showWarningMessage(
+            'Are you sure you want to clean the global Pixi package cache? Subsequent installations will re-download packages from the network.',
+            { modal: true },
+            'Clean Global Cache',
+        );
+        if (confirm !== 'Clean Global Cache') {
+            return;
+        }
+
+        await window.withProgress(
+            {
+                location: ProgressLocation.Notification,
+                title: 'Pixi: Cleaning global package cache...',
+                cancellable: false,
+            },
+            async () => {
+                try {
+                    await runPixi(['clean', 'cache', '-y']);
+                    clearPixiCache();
+                    this.refresh();
+                    window.showInformationMessage('Pixi: Global package cache cleaned.');
+                } catch (err: unknown) {
+                    traceError('Failed to clean package cache:', err);
+                    window.showErrorMessage(
+                        `Failed to clean cache: ${err instanceof Error ? err.message : String(err)}`,
+                    );
+                }
+            },
+        );
+    }
+
+    public async openLocation(targetPath: string): Promise<void> {
+        if (!targetPath) {
+            return;
+        }
+        if (!fs.existsSync(targetPath)) {
+            window.showWarningMessage(`Path does not exist: ${targetPath}`);
+            return;
+        }
+
+        try {
+            const stat = fs.statSync(targetPath);
+            if (!stat.isDirectory()) {
+                const doc = await workspace.openTextDocument(Uri.file(targetPath));
+                await window.showTextDocument(doc);
+                return;
+            }
+        } catch {
+            // Ignore stat error and continue
+        }
+
+        const isRemote = !!vscodeEnv.remoteName;
+        if (isRemote) {
+            const items: (QuickPickItem & { action: string })[] = [
+                {
+                    label: '$(terminal) Open in Integrated Terminal',
+                    description: targetPath,
+                    action: 'terminal',
+                },
+                {
+                    label: '$(copy) Copy Path to Clipboard',
+                    description: targetPath,
+                    action: 'copy',
+                },
+                {
+                    label: '$(folder) Reveal in File Manager (Client OS)',
+                    description: 'Attempt to open client OS file manager',
+                    action: 'reveal',
+                },
+            ];
+
+            const choice = await window.showQuickPick(items, {
+                title: `Pixi Directory: ${path.basename(targetPath)}`,
+                placeHolder: 'Select an action for this directory',
+            });
+
+            if (!choice) {
+                return;
+            }
+
+            if (choice.action === 'terminal') {
+                const terminal = window.createTerminal({
+                    name: `Pixi: ${path.basename(targetPath)}`,
+                    cwd: targetPath,
+                });
+                terminal.show();
+            } else if (choice.action === 'copy') {
+                await vscodeEnv.clipboard.writeText(targetPath);
+                window.showInformationMessage(`Copied path to clipboard: ${targetPath}`);
+            } else if (choice.action === 'reveal') {
+                try {
+                    await commands.executeCommand('revealFileInOS', Uri.file(targetPath));
+                } catch {
+                    window.showWarningMessage('Unable to reveal remote path in client OS file manager.');
+                }
+            }
+            return;
+        }
+
+        try {
+            await commands.executeCommand('revealFileInOS', Uri.file(targetPath));
+        } catch {
+            const terminal = window.createTerminal({
+                name: `Pixi: ${path.basename(targetPath)}`,
+                cwd: targetPath,
+            });
+            terminal.show();
+        }
     }
 }

@@ -17,6 +17,7 @@ import {
 } from 'vscode';
 
 import { getPixi, runPixi } from '../cli/pixiCli';
+import { safeJsonParse } from '../common/execUtils';
 import { traceError, traceVerbose } from '../common/logging';
 import { PixiProjectManager } from '../core/projectManager';
 import { PixiEnvironmentInfo } from '../core/types';
@@ -131,7 +132,7 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
     private parsePixiTasksJson(jsonStr: string, projectPath: string): PixiTask[] {
         const taskMap = new Map<string, PixiTask>();
         try {
-            const raw = JSON.parse(jsonStr);
+            const raw = safeJsonParse<any[]>(jsonStr, []);
             if (Array.isArray(raw)) {
                 for (const envObj of raw) {
                     const all = [...(envObj.tasks || [])];

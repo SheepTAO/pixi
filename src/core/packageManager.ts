@@ -1,4 +1,5 @@
 import { runPixi } from '../cli/pixiCli';
+import { safeJsonParse } from '../common/execUtils';
 import { traceError } from '../common/logging';
 import { PixiPackage } from './types';
 
@@ -12,9 +13,16 @@ export async function listPixiPackages(envName: string, projectPath: string): Pr
         const stdout = await runPixi(['list', '--no-install', '--frozen', '--json', '--environment', envName], {
             cwd: projectPath,
         });
-        return JSON.parse(stdout);
-    } catch (error) {
-        traceError(`Failed to list packages for environment '${envName}' in ${projectPath}:`, error);
-        return [];
+        return safeJsonParse<PixiPackage[]>(stdout, []);
+    } catch {
+        try {
+            const stdout = await runPixi(['list', '--no-install', '--json', '--environment', envName], {
+                cwd: projectPath,
+            });
+            return safeJsonParse<PixiPackage[]>(stdout, []);
+        } catch (error) {
+            traceError(`Failed to list packages for environment '${envName}' in ${projectPath}:`, error);
+            return [];
+        }
     }
 }

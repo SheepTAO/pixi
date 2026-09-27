@@ -50,3 +50,41 @@ export async function findExecutable(baseDir: string, candidates: ExecutableCand
 export function untildify(p: string): string {
     return p.replace(/^~($|\/|\\)/, `${os.homedir()}$1`);
 }
+
+/**
+ * Safely parses JSON from CLI output that may contain extraneous leading/trailing logs or warnings.
+ * Automatically slices between the outermost JSON brackets ({...} or [...]).
+ */
+export function safeJsonParse<T>(text: string, fallback?: T): T {
+    const trimmed = text.trim();
+    const firstBrace = trimmed.indexOf('{');
+    const firstBracket = trimmed.indexOf('[');
+
+    let start = -1;
+    let end = -1;
+
+    if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) {
+        start = firstBrace;
+        end = trimmed.lastIndexOf('}');
+    } else if (firstBracket !== -1) {
+        start = firstBracket;
+        end = trimmed.lastIndexOf(']');
+    }
+
+    if (start !== -1 && end !== -1 && end > start) {
+        try {
+            return JSON.parse(trimmed.slice(start, end + 1));
+        } catch {
+            // Fall through to parse trimmed
+        }
+    }
+
+    try {
+        return JSON.parse(trimmed);
+    } catch (e) {
+        if (fallback !== undefined) {
+            return fallback;
+        }
+        throw e;
+    }
+}
