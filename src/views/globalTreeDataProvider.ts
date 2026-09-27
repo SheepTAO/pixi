@@ -8,17 +8,11 @@ import {
     TreeItemCollapsibleState,
 } from 'vscode';
 
-import {
-    listGlobalEnvironments,
-    onDidChangeGlobalEnvironments,
-    PixiGlobalEnvironment,
-    PixiGlobalExposed,
-} from '../cli/globalCli';
+import { listGlobalEnvironments, onDidChangeGlobalEnvironments, PixiGlobalEnvironment } from '../cli/globalCli';
 
 export class PixiGlobalToolTreeItem extends TreeItem {
     constructor(public readonly tool: PixiGlobalEnvironment) {
-        const hasExposed = tool.exposed && tool.exposed.length > 0;
-        super(tool.name, hasExposed ? TreeItemCollapsibleState.Collapsed : TreeItemCollapsibleState.None);
+        super(tool.name, TreeItemCollapsibleState.None);
 
         const version = tool.dependencies?.[0]?.version;
         this.description = version ? `v${version}` : '';
@@ -36,27 +30,14 @@ export class PixiGlobalToolTreeItem extends TreeItem {
                 .join(', ');
             lines.push(`Extra dependencies: ${extraDeps}`);
         }
-        if (hasExposed) {
-            lines.push(`Exposed commands: ${tool.exposed!.map((e) => e.exposed_name).join(', ')}`);
+        if (tool.exposed && tool.exposed.length > 0) {
+            lines.push(`Exposed commands: ${tool.exposed.map((e) => e.exposed_name).join(', ')}`);
         }
         this.tooltip = lines.join('\n');
     }
 }
 
-export class PixiGlobalBinaryTreeItem extends TreeItem {
-    constructor(
-        public readonly exposed: PixiGlobalExposed,
-        public readonly tool: PixiGlobalEnvironment,
-    ) {
-        super(exposed.exposed_name, TreeItemCollapsibleState.None);
-        this.description = `-> ${exposed.executable}`;
-        this.iconPath = new ThemeIcon('terminal');
-        this.contextValue = 'pixiGlobalBinary';
-        this.tooltip = `Command: ${exposed.exposed_name}\nTarget: ${exposed.executable}\nProvided by tool: ${tool.name}`;
-    }
-}
-
-export type PixiGlobalTreeItem = PixiGlobalToolTreeItem | PixiGlobalBinaryTreeItem;
+export type PixiGlobalTreeItem = PixiGlobalToolTreeItem;
 
 export class PixiGlobalTreeDataProvider implements TreeDataProvider<PixiGlobalTreeItem>, Disposable {
     private readonly _onDidChangeTreeData = new EventEmitter<PixiGlobalTreeItem | undefined | null | void>();
@@ -89,14 +70,6 @@ export class PixiGlobalTreeDataProvider implements TreeDataProvider<PixiGlobalTr
                 return [];
             }
             return tools.map((tool) => new PixiGlobalToolTreeItem(tool));
-        }
-
-        if (element instanceof PixiGlobalToolTreeItem) {
-            const exposed = element.tool.exposed;
-            if (!exposed || exposed.length === 0) {
-                return [];
-            }
-            return exposed.map((e) => new PixiGlobalBinaryTreeItem(e, element.tool));
         }
 
         return [];

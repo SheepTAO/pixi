@@ -32,11 +32,11 @@
 - **多语言工具链自动检测**：自动扫描环境中安装的多语言工具链（Python 解释器、C/C++ 编译器/头文件/CMake/Ninja、R 解释器、Rust 编译器与 Cargo），为多语言工作流赋能。
 - **全自动工作区工程发现**：即时识别工作区内的 `pixi.toml` 或 `pyproject.toml`，自动发现并诊断所有声明的环境。
 - **清单快捷操作栏**：在 `pixi.toml` 和 `pyproject.toml` 编辑器右上角提供一键快捷操作按钮（锁定依赖 🔒、同步安装 ⬇️、更新依赖 🔄、重装环境 🔁）。
-- **聚合式包搜索与智能发现**：支持在 `Projects & Environments` 视图标题栏按钮（`$(search)`）、命令面板或快捷菜单中一键唤出高性能包搜索调色板。实时检索 Conda 仓库（如 conda-forge 等），即时查看最新版本、跨平台架构支持、开源许可与描述，并支持直接跳转 prefix.dev 或一键添加到工程。
+- **聚合式包搜索与智能发现**：支持在 `Environments` 视图标题栏按钮（`$(search)`）、命令面板或快捷菜单中一键唤出高性能包搜索调色板。实时检索 Conda 仓库（如 conda-forge 等），即时查看最新版本、跨平台架构支持、开源许可与描述，并支持直接跳转 prefix.dev 或一键添加到工程。
 - **环境与依赖全生命周期管理**：新建与删除环境（`pixi workspace environment add/remove`、`pixi clean`）、同步安装（`pixi install`）、依赖求解（`pixi lock`）、具备输入联想搜索与版本约束建议的交互式添加依赖（支持 Conda、PyPI、自定义镜像源、本地/可编辑路径依赖及 Git仓库）与智能依赖移除。
 - **原生 Pixi Task 集成**：自动将 Pixi tasks 注册为 VS Code 原生任务（可通过 `Terminal: Run Task...` 调用），并提供专用的快速搜索启动菜单（`Pixi: Run Task`）。
 - **统一终端 Profiles**：直接从终端配置菜单或命令面板打开已预激活指定 Pixi 环境的集成终端。
-- **原生侧边栏与活动栏面板（Activity Bar & TreeView）**：内置专用的 Pixi Explorer 侧边面板，包含 `Projects & Environments`（实时诊断环境安装状态、一键启动预激活终端、安装、重装与清理环境）与 `Global Tools`（清晰展示全局安装的 CLI 工具、版本与暴露命令，支持一键更新/卸载）。
+- **原生侧边栏与活动栏面板（Activity Bar & TreeView）**：内置专用的 Pixi Explorer 侧边面板，包含 `Environments`（实时诊断环境安装状态、一键启动预激活终端、安装、重装与清理环境）、`Global Tools`（清晰扁平展示全局安装的 CLI 工具、版本与暴露命令，支持一键更新/卸载）以及 `Pixi Info`（格式化展示 Pixi CLI 版本、系统平台、缓存与凭据路径、全局安装目录、系统虚拟包、配置文件并支持一键升级 CLI）。
 - **全局工具全流程管理**：支持通过 `Pixi: Global Tools ...` 二级菜单管理 `~/.pixi/bin` 下的全局命令行工具（安装、列表查看、同步、更新、卸载与编辑清单）。
 - **公开的扩展 Extension API**：导出 `PixiExtensionApi`，供第三方扩展轻松获取 Pixi 工程、环境列表、活动环境状态、工具链及包信息，支持双向活动环境切换与生命周期变更事件监听。
 - **生命周期状态诊断**：环境分为已安装（Installed）、未安装（Uninstalled，清单已声明，支持一键点击安装）以及不兼容（Incompatible，与当前系统平台不匹配）。
@@ -85,6 +85,8 @@
 | **Pixi: Run Task in Environment...**      | `pixi.runTaskInEnvironment` | 选择一个 task 并指定在特定 Pixi 环境中运行。                                                                       |
 | **Pixi: Open Terminal in Environment...** | `pixi.openTerminal`         | 在指定的 Pixi 环境中打开一个预激活终端。                                                                           |
 | **Pixi: Global Tools ...**                | `pixi.global`               | 交互式管理全局 CLI 工具（安装、列表查看、同步、更新、卸载及编辑全局清单配置）。                                    |
+| **Pixi: Update Pixi CLI ...**             | `pixi.selfUpdate`           | 检查更新并自动升级系统上的 Pixi CLI 命令行工具至最新版本。                                                         |
+| **Pixi: Refresh Pixi Info**               | `pixi.refreshInfo`          | 刷新 Pixi Info 视图中的系统环境与版本信息。                                                                        |
 
 ---
 

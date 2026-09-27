@@ -178,12 +178,30 @@
                 "title": "Open Global Manifest",
                 "category": "Pixi",
                 "icon": "$(edit)"
+            },
+            {
+                "command": "pixi.selfUpdate",
+                "title": "Update Pixi CLI ...",
+                "category": "Pixi",
+                "icon": "$(arrow-up)"
+            },
+            {
+                "command": "pixi.refreshInfo",
+                "title": "Refresh Pixi Info",
+                "category": "Pixi",
+                "icon": "$(refresh)"
             }
         ],
         "menus": {
             "commandPalette": [
                 {
                     "command": "pixi.searchPackages"
+                },
+                {
+                    "command": "pixi.selfUpdate"
+                },
+                {
+                    "command": "pixi.refreshInfo"
                 },
                 {
                     "command": "pixi.global"
@@ -315,6 +333,16 @@
                     "command": "pixi.global.openManifest",
                     "when": "view == pixi.views.global",
                     "group": "1_tools@2"
+                },
+                {
+                    "command": "pixi.selfUpdate",
+                    "when": "view == pixi.views.info",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "pixi.refreshInfo",
+                    "when": "view == pixi.views.info",
+                    "group": "navigation@2"
                 }
             ],
             "view/item/context": [
@@ -373,12 +401,17 @@
             "pixi-view": [
                 {
                     "id": "pixi.views.projects",
-                    "name": "Projects & Environments",
+                    "name": "Environments",
                     "icon": "assets/pixi-activity.svg"
                 },
                 {
                     "id": "pixi.views.global",
                     "name": "Global Tools",
+                    "icon": "assets/pixi-activity.svg"
+                },
+                {
+                    "id": "pixi.views.info",
+                    "name": "Pixi Info",
                     "icon": "assets/pixi-activity.svg"
                 }
             ]
@@ -388,6 +421,10 @@
                 "view": "pixi.views.projects",
                 "contents": "No Pixi projects found in current workspace.\n[Initialize Pixi Project](command:pixi.init)",
                 "when": "!pixi.hasPixiProject"
+            },
+            {
+                "view": "pixi.views.global",
+                "contents": "No global tools installed.\n[Install Global Tool](command:pixi.global.install)"
             }
         ],
         "terminal": {

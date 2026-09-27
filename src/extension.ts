@@ -12,6 +12,7 @@ import { activatePythonSupport } from './languages/python';
 import { PixiTaskProvider } from './providers/taskProvider';
 import { PixiTerminalProvider } from './providers/terminalProvider';
 import { PixiGlobalTreeDataProvider } from './views/globalTreeDataProvider';
+import { PixiInfoTreeDataProvider } from './views/infoTreeDataProvider';
 import { PixiProjectsTreeDataProvider } from './views/projectsTreeDataProvider';
 
 export async function activate(context: ExtensionContext): Promise<PixiExtensionApi> {
@@ -52,6 +53,13 @@ export async function activate(context: ExtensionContext): Promise<PixiExtension
         window.registerTreeDataProvider('pixi.views.global', globalTreeDataProvider),
     );
 
+    const infoTreeDataProvider = new PixiInfoTreeDataProvider();
+    context.subscriptions.push(
+        infoTreeDataProvider,
+        window.registerTreeDataProvider('pixi.views.info', infoTreeDataProvider),
+        infoTreeDataProvider.registerCommands(),
+    );
+
     // 3. Initialize Public Extension API
     const pixiApi = createPixiApi(projectManager);
     context.subscriptions.push(pixiApi);
@@ -68,6 +76,7 @@ export async function activate(context: ExtensionContext): Promise<PixiExtension
             if (e.affectsConfiguration('pixi.executablePath')) {
                 clearPixiCache();
                 clearGlobalManifestCache();
+                infoTreeDataProvider.refresh();
                 if (await validatePixiCli()) {
                     await projectManager.refresh(undefined);
                 }
