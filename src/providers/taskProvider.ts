@@ -37,6 +37,9 @@ export interface PixiTask {
     description?: string;
     default_environment?: string;
     depends_on?: Array<{ task_name: string }>;
+    inputs?: string[];
+    outputs?: string[];
+    clean_env?: boolean;
     projectPath: string;
 }
 
@@ -67,6 +70,9 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
 
     public refresh(projectPath?: string): void {
         if (projectPath) {
+            const normalized = path.normalize(projectPath);
+            this.taskCache.delete(normalized);
+            this.taskPromises.delete(normalized);
             this.taskCache.delete(projectPath);
             this.taskPromises.delete(projectPath);
         } else {
@@ -86,16 +92,23 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
     }
 
     registerCommands(): Disposable {
-        const d1 = commands.registerCommand('pixi.runTask', (task?: any) => {
-            const targetTask = task?.task || (task?.name && task?.projectPath ? task : undefined);
+        const d1 = commands.registerCommand('pixi.runTask', (arg?: any) => {
+            const targetTask = arg?.task || (arg?.name && arg?.projectPath ? arg : undefined);
             if (targetTask) {
                 return this.executePixiTask(targetTask);
             }
-            return this.promptAndRunTask();
+            const projectPath =
+                typeof arg === 'string' ? arg : arg?.project?.projectPath || arg?.projectPath || undefined;
+            return this.promptAndRunTask(projectPath);
         });
-        const d2 = commands.registerCommand('pixi.runTaskInEnvironment', (task?: any) => {
-            const targetTask = task?.task || (task?.name && task?.projectPath ? task : undefined);
-            return this.promptAndRunTaskInEnvironment(targetTask);
+        const d2 = commands.registerCommand('pixi.runTaskInEnvironment', (arg?: any) => {
+            const targetTask = arg?.task || (arg?.name && arg?.projectPath ? arg : undefined);
+            const projectPath = !targetTask
+                ? typeof arg === 'string'
+                    ? arg
+                    : arg?.project?.projectPath || arg?.projectPath || undefined
+                : undefined;
+            return this.promptAndRunTaskInEnvironment(targetTask, projectPath);
         });
         return Disposable.from(d1, d2);
     }
@@ -141,28 +154,29 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
     }
 
     async getTasksForProject(projectPath: string): Promise<PixiTask[]> {
-        if (this.taskCache.has(projectPath)) {
-            return this.taskCache.get(projectPath)!;
+        const normalized = path.normalize(projectPath);
+        if (this.taskCache.has(normalized)) {
+            return this.taskCache.get(normalized)!;
         }
-        if (this.taskPromises.has(projectPath)) {
-            return this.taskPromises.get(projectPath)!;
+        if (this.taskPromises.has(normalized)) {
+            return this.taskPromises.get(normalized)!;
         }
 
         const promise = (async () => {
             try {
-                const stdout = await runPixi(['task', 'list', '--json'], { cwd: projectPath });
-                const tasks = this.parsePixiTasksJson(stdout, projectPath);
-                this.taskCache.set(projectPath, tasks);
+                const stdout = await runPixi(['task', 'list', '--json'], { cwd: normalized });
+                const tasks = this.parsePixiTasksJson(stdout, normalized);
+                this.taskCache.set(normalized, tasks);
                 return tasks;
             } catch (err) {
-                traceVerbose(`Could not load tasks for ${projectPath}:`, err);
+                traceVerbose(`Could not load tasks for ${normalized}:`, err);
                 return [];
             } finally {
-                this.taskPromises.delete(projectPath);
+                this.taskPromises.delete(normalized);
             }
         })();
 
-        this.taskPromises.set(projectPath, promise);
+        this.taskPromises.set(normalized, promise);
         return promise;
     }
 
@@ -187,6 +201,9 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
                         const cmdStr =
                             typeof t.cmd === 'string' ? t.cmd : Array.isArray(t.cmd) ? t.cmd.join(' ') : undefined;
                         const dependsOn = Array.isArray(t.depends_on) ? t.depends_on : undefined;
+                        const inputs = Array.isArray(t.inputs) && t.inputs.length > 0 ? t.inputs : undefined;
+                        const outputs = Array.isArray(t.outputs) && t.outputs.length > 0 ? t.outputs : undefined;
+                        const cleanEnv = typeof t.clean_env === 'boolean' ? t.clean_env : undefined;
 
                         const existing = taskMap.get(t.name);
                         if (existing) {
@@ -206,6 +223,15 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
                             ) {
                                 existing.depends_on = dependsOn;
                             }
+                            if (!existing.inputs && inputs) {
+                                existing.inputs = inputs;
+                            }
+                            if (!existing.outputs && outputs) {
+                                existing.outputs = outputs;
+                            }
+                            if (existing.clean_env === undefined && cleanEnv !== undefined) {
+                                existing.clean_env = cleanEnv;
+                            }
                         } else {
                             taskMap.set(t.name, {
                                 name: t.name,
@@ -213,6 +239,9 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
                                 description: t.description || undefined,
                                 default_environment: t.default_environment || undefined,
                                 depends_on: dependsOn,
+                                inputs,
+                                outputs,
+                                clean_env: cleanEnv,
                                 projectPath,
                             });
                         }
@@ -255,8 +284,12 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
         return task;
     }
 
-    private async promptAndRunTask() {
-        const projectPaths = this.projectManager.getProjectPaths();
+    private async promptAndRunTask(targetProjectPath?: string) {
+        let projectPaths = this.projectManager.getProjectPaths();
+        if (targetProjectPath) {
+            const normalized = path.normalize(targetProjectPath);
+            projectPaths = projectPaths.filter((p) => path.normalize(p) === normalized);
+        }
         if (projectPaths.length === 0) {
             window.showWarningMessage('No Pixi projects found in the workspace.');
             return;
@@ -272,7 +305,7 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
             return;
         }
 
-        const isMultiProject = projectPaths.length > 1;
+        const isMultiProject = !targetProjectPath && this.projectManager.getProjectPaths().length > 1;
         const items: TaskQuickPickItem[] = allTasks.map((t) => {
             const envTag = t.default_environment ? `[${t.default_environment}]` : '';
             const projTag = isMultiProject ? `(${path.basename(t.projectPath)})` : '';
@@ -327,11 +360,15 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
         await tasks.executeTask(vsTask);
     }
 
-    public async promptAndRunTaskInEnvironment(presetTask?: PixiTask): Promise<void> {
+    public async promptAndRunTaskInEnvironment(presetTask?: PixiTask, targetProjectPath?: string): Promise<void> {
         let selectedTask: PixiTask | undefined = presetTask;
 
         if (!selectedTask) {
-            const projectPaths = this.projectManager.getProjectPaths();
+            let projectPaths = this.projectManager.getProjectPaths();
+            if (targetProjectPath) {
+                const normalized = path.normalize(targetProjectPath);
+                projectPaths = projectPaths.filter((p) => path.normalize(p) === normalized);
+            }
             if (projectPaths.length === 0) {
                 window.showWarningMessage('No Pixi projects found in the workspace.');
                 return;
@@ -347,7 +384,7 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
                 return;
             }
 
-            const isMultiProject = projectPaths.length > 1;
+            const isMultiProject = !targetProjectPath && this.projectManager.getProjectPaths().length > 1;
             const picked = await window.showQuickPick(
                 allTasks.map((t) => {
                     const envTag = t.default_environment ? `[default: ${t.default_environment}]` : '';

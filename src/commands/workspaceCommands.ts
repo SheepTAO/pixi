@@ -2202,6 +2202,66 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
         }),
     );
 
+    // Pixi: Open Manifest (pixi.toml / pyproject.toml)
+    disposables.push(
+        commands.registerCommand('pixi.openManifest', async (targetItem?: any) => {
+            let manifestPath: string | undefined =
+                targetItem?.manifestPath || targetItem?.project?.manifestPath || targetItem?.env?.manifestPath;
+
+            if (!manifestPath) {
+                const projectPath =
+                    targetItem?.projectPath ||
+                    targetItem?.project?.projectPath ||
+                    targetItem?.env?.projectPath ||
+                    (typeof targetItem === 'string' ? targetItem : undefined);
+
+                if (projectPath) {
+                    const p = manager.getProjects().find((proj) => proj.projectPath === projectPath);
+                    manifestPath = p?.manifestPath;
+                    if (!manifestPath) {
+                        const pixiToml = path.join(projectPath, 'pixi.toml');
+                        const pyprojectToml = path.join(projectPath, 'pyproject.toml');
+                        manifestPath = fs.existsSync(pixiToml)
+                            ? pixiToml
+                            : fs.existsSync(pyprojectToml)
+                              ? pyprojectToml
+                              : undefined;
+                    }
+                }
+            }
+
+            if (!manifestPath) {
+                const projectPath = await pickPixiProject(manager, 'Select Pixi project to open manifest');
+                if (!projectPath) {
+                    return;
+                }
+                const p = manager.getProjects().find((proj) => proj.projectPath === projectPath);
+                manifestPath = p?.manifestPath;
+                if (!manifestPath) {
+                    const pixiToml = path.join(projectPath, 'pixi.toml');
+                    const pyprojectToml = path.join(projectPath, 'pyproject.toml');
+                    manifestPath = fs.existsSync(pixiToml)
+                        ? pixiToml
+                        : fs.existsSync(pyprojectToml)
+                          ? pyprojectToml
+                          : undefined;
+                }
+            }
+
+            if (!manifestPath || !fs.existsSync(manifestPath)) {
+                window.showWarningMessage('Could not find manifest file for this project.');
+                return;
+            }
+
+            try {
+                const doc = await workspace.openTextDocument(Uri.file(manifestPath));
+                await window.showTextDocument(doc);
+            } catch (err) {
+                window.showErrorMessage(`Failed to open manifest: ${err instanceof Error ? err.message : String(err)}`);
+            }
+        }),
+    );
+
     // Pixi: Reveal Package in Manifest (pixi.toml / pyproject.toml)
     disposables.push(
         commands.registerCommand('pixi.revealPackageInManifest', async (targetItem?: any) => {
@@ -2292,10 +2352,32 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                 const pyprojectDepRegex = new RegExp(`["']${namePattern}(?:\\s*[\\[><=~!^;@]|["'])`, 'i');
 
                 let targetLine = -1;
+                let currentSection = '';
+                // Pass 1: search inside recognized dependency tables
                 for (let i = 0; i < lines.length; i++) {
-                    if (exactKeyRegex.test(lines[i]) || pyprojectDepRegex.test(lines[i])) {
+                    const line = lines[i];
+                    const sectionMatch = line.match(/^\s*\[+([^\]]+)\]+/);
+                    if (sectionMatch) {
+                        currentSection = sectionMatch[1].trim();
+                    }
+
+                    const isDepSection =
+                        /(^|\.)(?:dependencies|pypi-dependencies|build-dependencies|host-dependencies|optional-dependencies)(\.|$)/i.test(
+                            currentSection,
+                        );
+                    if (isDepSection && (exactKeyRegex.test(line) || pyprojectDepRegex.test(line))) {
                         targetLine = i;
                         break;
+                    }
+                }
+
+                // Pass 2: fallback search across entire file
+                if (targetLine < 0) {
+                    for (let i = 0; i < lines.length; i++) {
+                        if (exactKeyRegex.test(lines[i]) || pyprojectDepRegex.test(lines[i])) {
+                            targetLine = i;
+                            break;
+                        }
                     }
                 }
 

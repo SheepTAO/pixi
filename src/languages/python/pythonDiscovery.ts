@@ -62,7 +62,13 @@ export function sortEnvironments(envs: PixiPythonEnvironment[]): PixiPythonEnvir
         if (pA !== pB) {
             return pA - pB;
         }
-        return a.displayName.localeCompare(b.displayName);
+        if (a.shortDisplayName === 'default') {
+            return -1;
+        }
+        if (b.shortDisplayName === 'default') {
+            return 1;
+        }
+        return a.displayName.localeCompare(b.displayName, undefined, { sensitivity: 'base' });
     });
 }
 

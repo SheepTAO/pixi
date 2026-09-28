@@ -93,6 +93,15 @@ export class PixiTaskTreeItem extends TreeItem {
             const deps = task.depends_on.map((d) => d.task_name).join(', ');
             lines.push(`Depends on: ${deps}`);
         }
+        if (task.inputs && task.inputs.length > 0) {
+            lines.push(`Inputs: ${task.inputs.join(', ')}`);
+        }
+        if (task.outputs && task.outputs.length > 0) {
+            lines.push(`Outputs: ${task.outputs.join(', ')}`);
+        }
+        if (task.clean_env) {
+            lines.push('Clean environment: yes');
+        }
         lines.push('\nClick to run task');
         this.tooltip = lines.join('\n');
 
@@ -220,14 +229,16 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
             if (task) {
                 await this.taskProvider.executePixiTask(task);
             } else {
-                await commands.executeCommand('pixi.runTask');
+                const projectPath = targetItem?.project?.projectPath || targetItem?.projectPath;
+                await commands.executeCommand('pixi.runTask', projectPath);
             }
         });
 
         const d3 = commands.registerCommand('pixi.tasks.runInEnvironment', async (targetItem?: any) => {
             const task: PixiTask | undefined =
                 targetItem?.task || (targetItem?.name && targetItem?.projectPath ? targetItem : undefined);
-            await this.taskProvider.promptAndRunTaskInEnvironment(task);
+            const projectPath = targetItem?.project?.projectPath || targetItem?.projectPath;
+            await this.taskProvider.promptAndRunTaskInEnvironment(task, projectPath);
         });
 
         const d4 = commands.registerCommand('pixi.tasks.revealInManifest', async (targetItem?: any) => {
@@ -235,7 +246,12 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
                 targetItem?.task || (targetItem?.name && targetItem?.projectPath ? targetItem : undefined);
 
             if (!task) {
-                const projectPaths = this.projectManager.getProjectPaths();
+                let projectPaths = this.projectManager.getProjectPaths();
+                const targetProjectPath = targetItem?.project?.projectPath || targetItem?.projectPath;
+                if (targetProjectPath) {
+                    const normalized = path.normalize(targetProjectPath);
+                    projectPaths = projectPaths.filter((p) => path.normalize(p) === normalized);
+                }
                 if (projectPaths.length === 0) {
                     window.showWarningMessage('No Pixi projects found in the workspace.');
                     return;
@@ -248,7 +264,7 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
                     window.showInformationMessage('No Pixi tasks found.');
                     return;
                 }
-                const isMulti = projectPaths.length > 1;
+                const isMulti = !targetProjectPath && this.projectManager.getProjectPaths().length > 1;
                 const picked = await window.showQuickPick(
                     allTasks.map((t) => {
                         let detail = t.description || t.cmd;
@@ -309,10 +325,11 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
                 const escapedName = task.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
                 const keyRegex = new RegExp(`^\\s*["']?${escapedName}["']?\\s*=`, 'i');
-                const sectionRegex = new RegExp(`^\\[+.*tasks\\.${escapedName}\\]+`, 'i');
+                const sectionRegex = new RegExp(`^\\s*\\[+.*tasks\\.(["']?)${escapedName}\\1\\]`, 'i');
 
                 let targetLine = -1;
                 let currentSection = '';
+                let matchedViaSection = false;
                 // First pass: locate within a tasks table or section header
                 for (let i = 0; i < lines.length; i++) {
                     const line = lines[i];
@@ -323,6 +340,7 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
 
                     if (sectionRegex.test(line)) {
                         targetLine = i;
+                        matchedViaSection = true;
                         break;
                     }
 
@@ -345,14 +363,29 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
 
                 if (targetLine >= 0) {
                     const lineText = lines[targetLine];
-                    const nameMatch = lineText.match(new RegExp(`(["']?)(${escapedName})\\1`, 'i'));
                     let startCol = 0;
                     let endCol = lineText.length;
-                    if (nameMatch && nameMatch.index !== undefined) {
-                        const quoteOffset = nameMatch[1] ? nameMatch[1].length : 0;
-                        startCol = nameMatch.index + quoteOffset;
-                        endCol = startCol + task.name.length;
+
+                    if (matchedViaSection) {
+                        const lastTasksIdx = lineText.toLowerCase().lastIndexOf('tasks.');
+                        const searchPart = lastTasksIdx >= 0 ? lineText.slice(lastTasksIdx) : lineText;
+                        const m = searchPart.match(new RegExp(`(["']?)(${escapedName})\\1`, 'i'));
+                        if (m && m.index !== undefined) {
+                            const quoteOffset = m[1] ? m[1].length : 0;
+                            startCol = (lastTasksIdx >= 0 ? lastTasksIdx : 0) + m.index + quoteOffset;
+                            endCol = startCol + task.name.length;
+                        }
+                    } else {
+                        const eqIdx = lineText.indexOf('=');
+                        const searchPart = eqIdx >= 0 ? lineText.slice(0, eqIdx) : lineText;
+                        const m = searchPart.match(new RegExp(`(["']?)(${escapedName})\\1`, 'i'));
+                        if (m && m.index !== undefined) {
+                            const quoteOffset = m[1] ? m[1].length : 0;
+                            startCol = m.index + quoteOffset;
+                            endCol = startCol + task.name.length;
+                        }
                     }
+
                     const startPos = new Position(targetLine, startCol);
                     const endPos = new Position(targetLine, endCol);
                     editor.selection = new Selection(startPos, endPos);

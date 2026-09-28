@@ -80,14 +80,22 @@
                 "icon": "$(trash)"
             },
             {
+                "command": "pixi.openManifest",
+                "title": "Open Manifest",
+                "category": "Pixi",
+                "icon": "$(file-code)"
+            },
+            {
                 "command": "pixi.runTask",
                 "title": "Run Task",
-                "category": "Pixi"
+                "category": "Pixi",
+                "icon": "$(play)"
             },
             {
                 "command": "pixi.runTaskInEnvironment",
                 "title": "Run Task in Environment ...",
-                "category": "Pixi"
+                "category": "Pixi",
+                "icon": "$(layers)"
             },
             {
                 "command": "pixi.openTerminal",
@@ -356,6 +364,10 @@
                     "when": "pixi.hasPixiProject"
                 },
                 {
+                    "command": "pixi.openManifest",
+                    "when": "pixi.hasPixiProject"
+                },
+                {
                     "command": "pixi.revealPackageInManifest",
                     "when": "pixi.hasPixiProject"
                 },
@@ -474,6 +486,11 @@
                     "command": "pixi.addPackage",
                     "when": "view == pixi.views.projects && viewItem == pixiProject",
                     "group": "inline@1"
+                },
+                {
+                    "command": "pixi.openManifest",
+                    "when": "view == pixi.views.projects && viewItem == pixiProject",
+                    "group": "1_manage@0"
                 },
                 {
                     "command": "pixi.createEnvironment",
@@ -634,6 +651,31 @@
                     "command": "pixi.tasks.revealInManifest",
                     "when": "view == pixi.views.tasks && viewItem == pixiTaskItem",
                     "group": "2_nav@1"
+                },
+                {
+                    "command": "pixi.runTask",
+                    "when": "view == pixi.views.tasks && viewItem == pixiTaskProject",
+                    "group": "inline@1"
+                },
+                {
+                    "command": "pixi.openManifest",
+                    "when": "view == pixi.views.tasks && viewItem == pixiTaskProject",
+                    "group": "inline@2"
+                },
+                {
+                    "command": "pixi.runTask",
+                    "when": "view == pixi.views.tasks && viewItem == pixiTaskProject",
+                    "group": "1_run@1"
+                },
+                {
+                    "command": "pixi.runTaskInEnvironment",
+                    "when": "view == pixi.views.tasks && viewItem == pixiTaskProject",
+                    "group": "1_run@2"
+                },
+                {
+                    "command": "pixi.openManifest",
+                    "when": "view == pixi.views.tasks && viewItem == pixiTaskProject",
+                    "group": "2_manifest@1"
                 }
             ]
         },

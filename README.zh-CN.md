@@ -86,6 +86,7 @@
 | **Pixi: Create Environment...**           | `pixi.createEnvironment`       | 在当前项目中新建环境（或在空白文件夹中初始化项目）。                                                               |
 | **Pixi: Delete Environment...**           | `pixi.deleteEnvironment`       | 从磁盘清理或从清单中移除 Pixi 环境（具备安全确认弹窗）。                                                           |
 | **Pixi: Initialize Project...**           | `pixi.init`                    | 在当前文件夹初始化 Pixi 项目（可选择 `pixi.toml` 或 `pyproject.toml`）。                                           |
+| **Pixi: Open Manifest**                   | `pixi.openManifest`            | 在编辑器中打开项目清单（`pixi.toml` 或 `pyproject.toml`）；支持在侧边栏项目节点上一键直接打开。                    |
 | **Pixi: Add Package...**                  | `pixi.addPackage`              | 交互式添加依赖（支持实时搜索与多源选择）；支持在侧边栏项目和环境节点上一键点击 `+`，自动继承上下文并跳过冗余选择。 |
 | **Pixi: Remove Package...**               | `pixi.removePackage`           | 交互式选择并移除已安装包（自动识别 Conda 或 PyPI 渠道）；支持在侧边栏显式依赖包上一键点击垃圾桶图标直接移除。      |
 | **Pixi: Update Package...**               | `pixi.updatePackage`           | 交互式选择并更新单个依赖包至最新兼容版本（`pixi update <pkg>`）；支持在显式依赖包上一键点击向上箭头图标直接更新。  |
