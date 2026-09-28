@@ -11,6 +11,7 @@ export interface PythonToolchainInfo {
 export interface CppToolchainInfo {
     compiler?: string;
     compilerType?: 'gcc' | 'clang' | 'msvc';
+    version?: string;
     cmake?: string;
     ninja?: string;
     includeDir?: string;
@@ -111,7 +112,7 @@ export async function scanPythonToolchain(
 /**
  * Scans an environment prefix for C/C++ toolchains (compilers, cmake, ninja, headers).
  */
-export async function scanCppToolchain(envPath: string): Promise<CppToolchainInfo | undefined> {
+export async function scanCppToolchain(envPath: string, metaFiles?: string[]): Promise<CppToolchainInfo | undefined> {
     // 1. Detect compiler
     const compiler = await findExecutable(envPath, {
         posix: ['bin/g++', 'bin/gcc', 'bin/clang++', 'bin/clang'],
@@ -164,9 +165,31 @@ export async function scanCppToolchain(envPath: string): Promise<CppToolchainInf
         }
     }
 
+    let version: string | undefined;
+    if (compilerType === 'gcc') {
+        const files = metaFiles ?? (await readCondaMetaFiles(envPath));
+        version =
+            findPackageVersionFromFiles(files, '(?:gcc|gxx)(?:_[a-zA-Z0-9_]+-[a-zA-Z0-9_]+)?') ||
+            findPackageVersionFromFiles(files, 'gcc') ||
+            findPackageVersionFromFiles(files, 'gxx');
+    } else if (compilerType === 'clang') {
+        const files = metaFiles ?? (await readCondaMetaFiles(envPath));
+        version =
+            findPackageVersionFromFiles(files, '(?:clang|clangxx|llvm)(?:_[a-zA-Z0-9_]+-[a-zA-Z0-9_]+)?') ||
+            findPackageVersionFromFiles(files, 'clang') ||
+            findPackageVersionFromFiles(files, 'clangxx') ||
+            findPackageVersionFromFiles(files, 'llvm');
+    } else if (compilerType === 'msvc') {
+        const files = metaFiles ?? (await readCondaMetaFiles(envPath));
+        version =
+            findPackageVersionFromFiles(files, 'vs(?:2015|2017|2019|2022)(?:_[a-zA-Z0-9_]+-[a-zA-Z0-9_]+)?') ||
+            findPackageVersionFromFiles(files, 'msvc-tools');
+    }
+
     return {
         compiler: compiler ?? undefined,
         compilerType,
+        version,
         cmake: cmake ?? undefined,
         ninja: ninja ?? undefined,
         includeDir,
@@ -234,7 +257,7 @@ export async function scanEnvironmentToolchains(envPath: string): Promise<Enviro
     const metaFiles = await readCondaMetaFiles(envPath);
     const [python, cpp, r, rust] = await Promise.all([
         scanPythonToolchain(envPath, metaFiles),
-        scanCppToolchain(envPath),
+        scanCppToolchain(envPath, metaFiles),
         scanRToolchain(envPath, metaFiles),
         scanRustToolchain(envPath, metaFiles),
     ]);
