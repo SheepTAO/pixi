@@ -326,7 +326,7 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
             if (b.pixiEnvName === 'default') {
                 return 1;
             }
-            return 0;
+            return a.pixiEnvName.localeCompare(b.pixiEnvName, undefined, { sensitivity: 'base' });
         });
     }
 

@@ -362,6 +362,22 @@
                 {
                     "command": "pixi.copyPackageName",
                     "when": "pixi.hasPixiProject"
+                },
+                {
+                    "command": "pixi.tasks.refresh",
+                    "when": "pixi.hasPixiProject"
+                },
+                {
+                    "command": "pixi.tasks.revealInManifest",
+                    "when": "pixi.hasPixiProject"
+                },
+                {
+                    "command": "pixi.tasks.run",
+                    "when": "false"
+                },
+                {
+                    "command": "pixi.tasks.runInEnvironment",
+                    "when": "false"
                 }
             ],
             "editor/title": [

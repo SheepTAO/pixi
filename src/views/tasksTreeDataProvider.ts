@@ -42,7 +42,10 @@ export class PixiTaskTreeItem extends TreeItem {
         super(task.name, TreeItemCollapsibleState.None);
 
         const envTag = task.default_environment ? `[${task.default_environment}]` : '';
-        const descText = task.description || task.cmd;
+        let descText = task.description || task.cmd;
+        if (!descText && task.depends_on && task.depends_on.length > 0) {
+            descText = `depends: ${task.depends_on.map((d) => d.task_name).join(', ')}`;
+        }
         this.description = [envTag, descText].filter(Boolean).join(' ');
 
         // Intelligent Codicon matching based on task name semantics
@@ -106,9 +109,10 @@ export class PixiTaskTreeItem extends TreeItem {
 export class PixiTaskEmptyTreeItem extends TreeItem {
     constructor(public readonly project?: PixiProject) {
         super('No tasks found', TreeItemCollapsibleState.None);
-        this.description = '(define tasks in pixi.toml)';
+        const manifestName = project ? path.basename(project.manifestPath) : 'manifest';
+        this.description = `(define tasks in ${manifestName})`;
         this.tooltip = project
-            ? `No tasks defined in ${project.name}. Define tasks under [tasks] in ${path.basename(project.manifestPath)}.`
+            ? `No tasks defined in ${project.name}. Define tasks under [tasks] in ${manifestName}.`
             : 'No tasks found. Define tasks under [tasks] in your manifest.';
         this.iconPath = new ThemeIcon('info', new ThemeColor('descriptionForeground'));
         this.contextValue = 'pixiTaskEmpty';
@@ -136,7 +140,10 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
     ) {
         this.disposables.push(
             this.projectManager.onDidProjectsChanged(() => this.refresh()),
-            this.taskProvider.onDidChangeTasks(() => this._onDidChangeTreeData.fire()),
+            this.taskProvider.onDidChangeTasks(() => {
+                this.updateViewDescription();
+                this._onDidChangeTreeData.fire();
+            }),
         );
     }
 
@@ -160,8 +167,6 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
 
     public refresh(): void {
         this.taskProvider.refresh();
-        this.updateViewDescription();
-        this._onDidChangeTreeData.fire();
     }
 
     public dispose(): void {
@@ -221,56 +226,57 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
         const d3 = commands.registerCommand('pixi.tasks.runInEnvironment', async (targetItem?: any) => {
             const task: PixiTask | undefined =
                 targetItem?.task || (targetItem?.name && targetItem?.projectPath ? targetItem : undefined);
-            if (!task) {
-                await commands.executeCommand('pixi.runTaskInEnvironment');
-                return;
-            }
-
-            const envs = this.projectManager.getEnvironmentsForProject(task.projectPath);
-            if (envs.length === 0) {
-                await this.taskProvider.executePixiTask(task);
-                return;
-            }
-
-            interface EnvItem {
-                label: string;
-                description?: string;
-                envName: string;
-            }
-
-            const items: EnvItem[] = envs.map((e) => {
-                let icon = '$(layers)';
-                let statusText = '';
-                if (e.pixiStatus === 'uninstalled') {
-                    icon = '$(cloud-download)';
-                    statusText = '(not installed)';
-                } else if (e.pixiStatus === 'incompatible') {
-                    icon = '$(circle-slash)';
-                    statusText = '(incompatible)';
-                }
-                return {
-                    label: `${icon} ${e.pixiEnvName}`,
-                    description: statusText,
-                    envName: e.pixiEnvName,
-                };
-            });
-
-            const picked = await window.showQuickPick(items, {
-                title: `Pixi: Run Task '${task.name}'`,
-                placeHolder: `Select environment to run '${task.name}' in`,
-            });
-            if (!picked) {
-                return;
-            }
-
-            await this.taskProvider.executePixiTask(task, picked.envName);
+            await this.taskProvider.promptAndRunTaskInEnvironment(task);
         });
 
         const d4 = commands.registerCommand('pixi.tasks.revealInManifest', async (targetItem?: any) => {
-            const task: PixiTask | undefined =
+            let task: PixiTask | undefined =
                 targetItem?.task || (targetItem?.name && targetItem?.projectPath ? targetItem : undefined);
+
             if (!task) {
-                return;
+                const projectPaths = this.projectManager.getProjectPaths();
+                if (projectPaths.length === 0) {
+                    window.showWarningMessage('No Pixi projects found in the workspace.');
+                    return;
+                }
+                const allTasks: PixiTask[] = [];
+                for (const p of projectPaths) {
+                    allTasks.push(...(await this.taskProvider.getTasksForProject(p)));
+                }
+                if (allTasks.length === 0) {
+                    window.showInformationMessage('No Pixi tasks found.');
+                    return;
+                }
+                const isMulti = projectPaths.length > 1;
+                const picked = await window.showQuickPick(
+                    allTasks.map((t) => {
+                        let detail = t.description || t.cmd;
+                        if (!detail && t.depends_on && t.depends_on.length > 0) {
+                            detail = `depends: ${t.depends_on.map((d) => d.task_name).join(', ')}`;
+                        }
+                        return {
+                            label: t.name,
+                            description: [
+                                t.default_environment ? `[${t.default_environment}]` : '',
+                                isMulti ? `(${path.basename(t.projectPath)})` : '',
+                            ]
+                                .filter(Boolean)
+                                .join(' '),
+                            detail,
+                            task: t,
+                        };
+                    }),
+                    {
+                        title: 'Select Task to Reveal in Manifest',
+                        placeHolder: 'Select a task to jump to its definition in manifest',
+                        matchOnDescription: true,
+                        matchOnDetail: true,
+                    },
+                );
+                if (!picked) {
+                    return;
+                }
+                task = picked.task;
             }
 
             const projectPath = task.projectPath;
@@ -302,20 +308,52 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
                 const escapedName = task.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
                 const keyRegex = new RegExp(`^\\s*["']?${escapedName}["']?\\s*=`, 'i');
-                const sectionRegex = new RegExp(`^\\[.*tasks\\.${escapedName}\\]`, 'i');
+                const sectionRegex = new RegExp(`^\\[+.*tasks\\.${escapedName}\\]+`, 'i');
 
                 let targetLine = -1;
+                let currentSection = '';
+                // First pass: locate within a tasks table or section header
                 for (let i = 0; i < lines.length; i++) {
-                    if (keyRegex.test(lines[i]) || sectionRegex.test(lines[i])) {
+                    const line = lines[i];
+                    const sectionMatch = line.match(/^\s*\[+([^\]]+)\]+/);
+                    if (sectionMatch) {
+                        currentSection = sectionMatch[1].trim();
+                    }
+
+                    if (sectionRegex.test(line)) {
+                        targetLine = i;
+                        break;
+                    }
+
+                    const isTasksSection = /(^|\.)tasks(\.|$)/i.test(currentSection);
+                    if (isTasksSection && keyRegex.test(line)) {
                         targetLine = i;
                         break;
                     }
                 }
 
+                // Fallback pass: if not found in recognized tasks section, match any key
+                if (targetLine < 0) {
+                    for (let i = 0; i < lines.length; i++) {
+                        if (keyRegex.test(lines[i])) {
+                            targetLine = i;
+                            break;
+                        }
+                    }
+                }
+
                 if (targetLine >= 0) {
                     const lineText = lines[targetLine];
-                    const startPos = new Position(targetLine, 0);
-                    const endPos = new Position(targetLine, lineText.length);
+                    const nameMatch = lineText.match(new RegExp(`(["']?)(${escapedName})\\1`, 'i'));
+                    let startCol = 0;
+                    let endCol = lineText.length;
+                    if (nameMatch && nameMatch.index !== undefined) {
+                        const quoteOffset = nameMatch[1] ? nameMatch[1].length : 0;
+                        startCol = nameMatch.index + quoteOffset;
+                        endCol = startCol + task.name.length;
+                    }
+                    const startPos = new Position(targetLine, startCol);
+                    const endPos = new Position(targetLine, endCol);
                     editor.selection = new Selection(startPos, endPos);
                     editor.revealRange(new Range(startPos, endPos), TextEditorRevealType.InCenter);
                 } else {

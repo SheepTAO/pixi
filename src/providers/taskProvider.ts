@@ -47,6 +47,7 @@ interface TaskQuickPickItem extends QuickPickItem {
 export class PixiTaskProvider implements TaskProvider, Disposable {
     private readonly disposables: Disposable[] = [];
     private taskCache = new Map<string, PixiTask[]>();
+    private taskPromises = new Map<string, Promise<PixiTask[]>>();
     private readonly _onDidChangeTasks = new EventEmitter<void>();
     readonly onDidChangeTasks: Event<void> = this._onDidChangeTasks.event;
 
@@ -64,13 +65,20 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
         this.disposables.push(tasks.registerTaskProvider('pixi', this));
     }
 
-    public refresh(): void {
-        this.taskCache.clear();
+    public refresh(projectPath?: string): void {
+        if (projectPath) {
+            this.taskCache.delete(projectPath);
+            this.taskPromises.delete(projectPath);
+        } else {
+            this.taskCache.clear();
+            this.taskPromises.clear();
+        }
         this._onDidChangeTasks.fire();
     }
 
     dispose() {
         this.taskCache.clear();
+        this.taskPromises.clear();
         this._onDidChangeTasks.dispose();
         for (const d of this.disposables) {
             d.dispose();
@@ -136,16 +144,26 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
         if (this.taskCache.has(projectPath)) {
             return this.taskCache.get(projectPath)!;
         }
-
-        try {
-            const stdout = await runPixi(['task', 'list', '--json'], { cwd: projectPath });
-            const tasks = this.parsePixiTasksJson(stdout, projectPath);
-            this.taskCache.set(projectPath, tasks);
-            return tasks;
-        } catch (err) {
-            traceVerbose(`Could not load tasks for ${projectPath}:`, err);
-            return [];
+        if (this.taskPromises.has(projectPath)) {
+            return this.taskPromises.get(projectPath)!;
         }
+
+        const promise = (async () => {
+            try {
+                const stdout = await runPixi(['task', 'list', '--json'], { cwd: projectPath });
+                const tasks = this.parsePixiTasksJson(stdout, projectPath);
+                this.taskCache.set(projectPath, tasks);
+                return tasks;
+            } catch (err) {
+                traceVerbose(`Could not load tasks for ${projectPath}:`, err);
+                return [];
+            } finally {
+                this.taskPromises.delete(projectPath);
+            }
+        })();
+
+        this.taskPromises.set(projectPath, promise);
+        return promise;
     }
 
     private parsePixiTasksJson(jsonStr: string, projectPath: string): PixiTask[] {
@@ -163,13 +181,38 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
                         }
                     }
                     for (const t of all) {
-                        if (t && t.name && !taskMap.has(t.name)) {
+                        if (!t || !t.name) {
+                            continue;
+                        }
+                        const cmdStr =
+                            typeof t.cmd === 'string' ? t.cmd : Array.isArray(t.cmd) ? t.cmd.join(' ') : undefined;
+                        const dependsOn = Array.isArray(t.depends_on) ? t.depends_on : undefined;
+
+                        const existing = taskMap.get(t.name);
+                        if (existing) {
+                            if (!existing.cmd && cmdStr) {
+                                existing.cmd = cmdStr;
+                            }
+                            if (!existing.description && t.description) {
+                                existing.description = t.description;
+                            }
+                            if (!existing.default_environment && t.default_environment) {
+                                existing.default_environment = t.default_environment;
+                            }
+                            if (
+                                (!existing.depends_on || existing.depends_on.length === 0) &&
+                                dependsOn &&
+                                dependsOn.length > 0
+                            ) {
+                                existing.depends_on = dependsOn;
+                            }
+                        } else {
                             taskMap.set(t.name, {
                                 name: t.name,
-                                cmd: typeof t.cmd === 'string' ? t.cmd : undefined,
+                                cmd: cmdStr,
                                 description: t.description || undefined,
                                 default_environment: t.default_environment || undefined,
-                                depends_on: t.depends_on,
+                                depends_on: dependsOn,
                                 projectPath,
                             });
                         }
@@ -233,15 +276,20 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
         const items: TaskQuickPickItem[] = allTasks.map((t) => {
             const envTag = t.default_environment ? `[${t.default_environment}]` : '';
             const projTag = isMultiProject ? `(${path.basename(t.projectPath)})` : '';
+            let detail = t.description || t.cmd;
+            if (!detail && t.depends_on && t.depends_on.length > 0) {
+                detail = `depends: ${t.depends_on.map((d) => d.task_name).join(', ')}`;
+            }
             return {
                 label: t.name,
                 description: [envTag, projTag].filter(Boolean).join(' '),
-                detail: t.description || t.cmd,
+                detail,
                 pixiTask: t,
             };
         });
 
         const selected = await window.showQuickPick(items, {
+            title: 'Pixi: Run Task',
             placeHolder: 'Select a Pixi task to run',
             matchOnDescription: true,
             matchOnDetail: true,
@@ -279,7 +327,7 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
         await tasks.executeTask(vsTask);
     }
 
-    private async promptAndRunTaskInEnvironment(presetTask?: PixiTask) {
+    public async promptAndRunTaskInEnvironment(presetTask?: PixiTask): Promise<void> {
         let selectedTask: PixiTask | undefined = presetTask;
 
         if (!selectedTask) {
@@ -299,14 +347,28 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
                 return;
             }
 
+            const isMultiProject = projectPaths.length > 1;
             const picked = await window.showQuickPick(
-                allTasks.map((t) => ({
-                    label: t.name,
-                    description: t.default_environment ? `[default: ${t.default_environment}]` : '',
-                    detail: t.description || t.cmd,
-                    pixiTask: t,
-                })),
-                { placeHolder: 'Step 1: Select a Pixi task' },
+                allTasks.map((t) => {
+                    const envTag = t.default_environment ? `[default: ${t.default_environment}]` : '';
+                    const projTag = isMultiProject ? `(${path.basename(t.projectPath)})` : '';
+                    let detail = t.description || t.cmd;
+                    if (!detail && t.depends_on && t.depends_on.length > 0) {
+                        detail = `depends: ${t.depends_on.map((d) => d.task_name).join(', ')}`;
+                    }
+                    return {
+                        label: t.name,
+                        description: [envTag, projTag].filter(Boolean).join(' '),
+                        detail,
+                        pixiTask: t,
+                    };
+                }),
+                {
+                    title: 'Pixi: Run Task in Environment',
+                    placeHolder: 'Step 1: Select a Pixi task to run in a specific environment',
+                    matchOnDescription: true,
+                    matchOnDetail: true,
+                },
             );
 
             if (!picked) {
@@ -349,7 +411,8 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
                   ];
 
         const selectedEnvItem = await window.showQuickPick(envItems, {
-            placeHolder: `Select environment to run '${selectedTask.name}'`,
+            title: `Pixi: Run Task '${selectedTask.name}'`,
+            placeHolder: `Select environment to run '${selectedTask.name}' in`,
         });
 
         if (!selectedEnvItem) {
