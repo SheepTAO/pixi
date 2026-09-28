@@ -8,6 +8,30 @@ import { PixiPackage } from './types';
 
 export { PixiPackage };
 
+interface ManifestCandidate {
+    filename: string;
+    versionRegex: RegExp;
+}
+
+const MANIFEST_CANDIDATES: readonly ManifestCandidate[] = [
+    {
+        filename: 'pixi.toml',
+        versionRegex: /(?:^|\n)\s*version\s*=\s*["']([^"']+)["']/,
+    },
+    {
+        filename: 'pyproject.toml',
+        versionRegex: /(?:^|\n)\s*version\s*=\s*["']([^"']+)["']/,
+    },
+    {
+        filename: 'setup.cfg',
+        versionRegex: /(?:^|\n)\s*version\s*=\s*([^\s\r\n]+)/,
+    },
+    {
+        filename: 'setup.py',
+        versionRegex: /version\s*=\s*["']([^"']+)["']/,
+    },
+];
+
 /**
  * Enriches local/editable subpackages with version and manifest path from their local directories.
  */
@@ -18,7 +42,7 @@ export async function enrichLocalPackages(packages: PixiPackage[], projectPath: 
                 let candidateDir: string | undefined;
 
                 if (pkg.source && (pkg.source.startsWith('.') || path.isAbsolute(pkg.source))) {
-                    candidateDir = path.isAbsolute(pkg.source) ? pkg.source : path.resolve(projectPath, pkg.source);
+                    candidateDir = path.resolve(projectPath, pkg.source);
                 } else if (pkg.requested_spec) {
                     const pathMatch = pkg.requested_spec.match(/path\s*=\s*["']([^"']+)["']/);
                     if (pathMatch && pathMatch[1]) {
@@ -42,47 +66,18 @@ export async function enrichLocalPackages(packages: PixiPackage[], projectPath: 
                     : Boolean(pkg.source && (pkg.source.startsWith('.') || pkg.source.includes('packages')));
                 pkg.local_path = path.relative(projectPath, candidateDir);
 
-                // Look for manifest file: pixi.toml, pyproject.toml, setup.cfg, setup.py
-                const pixiFile = path.join(candidateDir, 'pixi.toml');
-                const pyprojectFile = path.join(candidateDir, 'pyproject.toml');
-                const setupCfgFile = path.join(candidateDir, 'setup.cfg');
-                const setupPyFile = path.join(candidateDir, 'setup.py');
-
-                if (fs.existsSync(pixiFile)) {
-                    pkg.local_manifest_path = pixiFile;
-                    if (!pkg.version) {
-                        const content = await fs.promises.readFile(pixiFile, 'utf8').catch(() => '');
-                        const m = content.match(/(?:^|\n)\s*version\s*=\s*["']([^"']+)["']/);
-                        if (m && m[1]) {
-                            pkg.version = m[1];
+                for (const candidate of MANIFEST_CANDIDATES) {
+                    const candidateFile = path.join(candidateDir, candidate.filename);
+                    const content = await fs.promises.readFile(candidateFile, 'utf8').catch(() => null);
+                    if (content !== null) {
+                        pkg.local_manifest_path = candidateFile;
+                        if (!pkg.version) {
+                            const m = content.match(candidate.versionRegex);
+                            if (m && m[1]) {
+                                pkg.version = m[1];
+                            }
                         }
-                    }
-                } else if (fs.existsSync(pyprojectFile)) {
-                    pkg.local_manifest_path = pyprojectFile;
-                    if (!pkg.version) {
-                        const content = await fs.promises.readFile(pyprojectFile, 'utf8').catch(() => '');
-                        const m = content.match(/(?:^|\n)\s*version\s*=\s*["']([^"']+)["']/);
-                        if (m && m[1]) {
-                            pkg.version = m[1];
-                        }
-                    }
-                } else if (fs.existsSync(setupCfgFile)) {
-                    pkg.local_manifest_path = setupCfgFile;
-                    if (!pkg.version) {
-                        const content = await fs.promises.readFile(setupCfgFile, 'utf8').catch(() => '');
-                        const m = content.match(/(?:^|\n)\s*version\s*=\s*([^\s\r\n]+)/);
-                        if (m && m[1]) {
-                            pkg.version = m[1];
-                        }
-                    }
-                } else if (fs.existsSync(setupPyFile)) {
-                    pkg.local_manifest_path = setupPyFile;
-                    if (!pkg.version) {
-                        const content = await fs.promises.readFile(setupPyFile, 'utf8').catch(() => '');
-                        const m = content.match(/version\s*=\s*["']([^"']+)["']/);
-                        if (m && m[1]) {
-                            pkg.version = m[1];
-                        }
+                        break;
                     }
                 }
             } catch {

@@ -78,7 +78,7 @@ export class PixiPackageTreeItem extends TreeItem {
         if (pkg.license) {
             lines.push(`License: ${pkg.license}`);
         }
-        if (pkg.source) {
+        if (pkg.source && !pkg.is_local) {
             lines.push(`Source: ${pkg.source}`);
         }
         if (pkg.local_manifest_path) {
@@ -384,13 +384,9 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
             }
 
             if (displayMode === 'all') {
-                const sorted = [...packages].sort((a, b) => {
-                    if (a.is_explicit !== b.is_explicit) {
-                        return a.is_explicit ? -1 : 1;
-                    }
-                    return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
-                });
-                return sorted.map((pkg) => new PixiPackageTreeItem(pkg, element.env, element.project));
+                return [...explicit, ...transitive].map(
+                    (pkg) => new PixiPackageTreeItem(pkg, element.env, element.project),
+                );
             }
 
             // 'grouped' mode (default)
@@ -407,10 +403,7 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
         }
 
         if (element instanceof PixiTransitiveGroupTreeItem) {
-            const sorted = [...element.packages].sort((a, b) =>
-                a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
-            );
-            return sorted.map((pkg) => new PixiPackageTreeItem(pkg, element.env, element.project));
+            return element.packages.map((pkg) => new PixiPackageTreeItem(pkg, element.env, element.project));
         }
 
         return [];
