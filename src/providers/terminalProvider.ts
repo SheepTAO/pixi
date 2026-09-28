@@ -8,7 +8,9 @@ import {
     TerminalProfile,
     TerminalProfileProvider,
     ThemeIcon,
+    Uri,
     window,
+    workspace,
 } from 'vscode';
 
 import { getPixi } from '../cli/pixiCli';
@@ -60,8 +62,13 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
         return false;
     }
 
-    private async pickEnvironment(token?: CancellationToken): Promise<PixiEnvironmentInfo | undefined> {
-        const envs = this.projectManager.getAllEnvironments();
+    private async pickEnvironment(
+        token?: CancellationToken,
+        targetProjectPath?: string,
+    ): Promise<PixiEnvironmentInfo | undefined> {
+        const envs = targetProjectPath
+            ? this.projectManager.getEnvironmentsForProject(targetProjectPath)
+            : this.projectManager.getAllEnvironments();
         if (!envs || envs.length === 0) {
             const choice = await window.showWarningMessage(
                 'No Pixi environments found in current workspace. Would you like to initialize a Pixi project?',
@@ -78,6 +85,36 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
                 return undefined;
             }
             return envs[0];
+        }
+
+        const activeUri = window.activeTextEditor?.document?.uri;
+        const configScope = targetProjectPath ? Uri.file(targetProjectPath) : activeUri;
+        const config = workspace.getConfiguration('pixi', configScope);
+        const defaultEnvSetting = config.get<string>('terminal.defaultEnvironment')?.trim();
+
+        if (defaultEnvSetting) {
+            let matchedEnv: PixiEnvironmentInfo | undefined;
+            if (targetProjectPath) {
+                matchedEnv = envs.find((e) => e.pixiEnvName === defaultEnvSetting);
+            } else if (activeUri) {
+                const projectPath = this.projectManager.findProjectForUri(activeUri);
+                if (projectPath) {
+                    const projectEnvs = this.projectManager.getEnvironmentsForProject(projectPath);
+                    matchedEnv = projectEnvs.find((e) => e.pixiEnvName === defaultEnvSetting);
+                }
+            }
+            if (!matchedEnv) {
+                const matching = envs.filter((e) => e.pixiEnvName === defaultEnvSetting);
+                if (matching.length === 1) {
+                    matchedEnv = matching[0];
+                }
+            }
+            if (matchedEnv) {
+                if (await this.handleUninstalledOrError(matchedEnv)) {
+                    return undefined;
+                }
+                return matchedEnv;
+            }
         }
 
         const items: EnvQuickPickItem[] = envs.map((env) => {
@@ -152,15 +189,25 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
         }
     }
 
-    async openTerminal(target?: PixiEnvironmentInfo | { env?: PixiEnvironmentInfo }): Promise<void> {
+    async openTerminal(target?: any): Promise<void> {
         try {
             let env: PixiEnvironmentInfo | undefined;
+            let targetProjectPath: string | undefined;
+
             if (target && 'pixiEnvName' in target) {
                 env = target as PixiEnvironmentInfo;
             } else if (target && 'env' in target && target.env) {
                 env = target.env;
-            } else {
-                env = await this.pickEnvironment();
+            } else if (target && 'project' in target && target.project?.projectPath) {
+                targetProjectPath = target.project.projectPath;
+            } else if (target && 'projectPath' in target && typeof target.projectPath === 'string') {
+                targetProjectPath = target.projectPath;
+            } else if (target && 'fsPath' in target && typeof target.fsPath === 'string') {
+                targetProjectPath = this.projectManager.findProjectForUri(target as Uri);
+            }
+
+            if (!env) {
+                env = await this.pickEnvironment(undefined, targetProjectPath);
             }
             if (!env) {
                 return;

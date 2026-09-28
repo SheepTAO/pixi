@@ -45,12 +45,17 @@
 
 ## ⚙️ Extension Settings
 
-| Setting                     | Type       | Default                       | Scope    | Description                                                                                                |
-| :-------------------------- | :--------- | :---------------------------- | :------- | :--------------------------------------------------------------------------------------------------------- |
-| `pixi.executablePath`       | `string`   | `""`                          | Machine  | Path to the Pixi binary. Supports `${workspaceFolder}` and relative paths. Uses `PATH` discovery if empty. |
-| `pixi.displayNameFormat`    | `string`   | `"${project}:${env}"`         | Resource | Template for environment names. Placeholders: `${project}`, `${env}`, `${python}`.                         |
-| `pixi.environmentRules`     | `string[]` | `[]`                          | Resource | Map glob patterns to Pixi environment names (e.g. `tests/**=dev`). Also supports object format in JSON.    |
-| `pixi.searchIgnorePatterns` | `string[]` | `["**/node_modules/**", ...]` | Resource | Glob patterns to exclude when scanning the workspace for Pixi projects.                                    |
+| Setting                            | Type       | Default                       | Scope    | Description                                                                                                |
+| :--------------------------------- | :--------- | :---------------------------- | :------- | :--------------------------------------------------------------------------------------------------------- |
+| `pixi.executablePath`              | `string`   | `""`                          | Machine  | Path to the Pixi binary. Supports `${workspaceFolder}` and relative paths. Uses `PATH` discovery if empty. |
+| `pixi.displayNameFormat`           | `string`   | `"${project}:${env}"`         | Resource | Template for environment names. Placeholders: `${project}`, `${env}`, `${version}`.                        |
+| `pixi.defaultManifestFormat`       | `string`   | `"ask"`                       | Resource | Default manifest format when initializing a new Pixi project (`"ask"`, `"pixi"`, or `"pyproject"`).        |
+| `pixi.autoInstallOnOpen`           | `string`   | `"prompt"`                    | Resource | Behavior when opening projects with uninstalled environments (`"prompt"`, `"always"`, or `"never"`).       |
+| `pixi.terminal.defaultEnvironment` | `string`   | `""`                          | Resource | Default environment to activate in Pixi terminal. If empty, prompts when multiple environments exist.      |
+| `pixi.packageSearch.includePypi`   | `boolean`  | `true`                        | Resource | Whether to include PyPI packages in interactive package search results.                                    |
+| `pixi.cache.autoMeasureSize`       | `boolean`  | `true`                        | Window   | Whether to automatically compute the disk size of Pixi/Rattler cache directories in Pixi Info.             |
+| `pixi.environmentRules`            | `string[]` | `[]`                          | Resource | Map glob patterns to Pixi environment names (e.g. `tests/**=dev`). Also supports object format in JSON.    |
+| `pixi.searchIgnorePatterns`        | `string[]` | `["**/node_modules/**", ...]` | Resource | Glob patterns to exclude when scanning the workspace for Pixi projects.                                    |
 
 ### Example Configuration
 
@@ -58,7 +63,9 @@ Add this to your project's `.vscode/settings.json`:
 
 ```json
 {
-    "pixi.environmentRules": ["tests/**=dev", "train/**=train", "scripts/*.py=dev"]
+    "pixi.environmentRules": ["tests/**=dev", "train/**=train", "scripts/*.py=dev"],
+    "pixi.defaultManifestFormat": "pixi",
+    "pixi.displayNameFormat": "${project}:${env} (${version})"
 }
 ```
 
@@ -88,6 +95,7 @@ Add this to your project's `.vscode/settings.json`:
 | **Pixi: Update Pixi CLI ...**             | `pixi.selfUpdate`           | Check for updates and automatically update the installed Pixi CLI to the latest version.                                                                 |
 | **Pixi: Refresh Pixi Info**               | `pixi.refreshInfo`          | Refresh Pixi CLI and system information in the Pixi Info view.                                                                                           |
 | **Pixi: Clean Package Cache ...**         | `pixi.cleanCache`           | Clean the global Pixi package cache (`pixi clean cache -y`) with 1-click inline action in Pixi Info.                                                     |
+| **Pixi: Measure Cache Size**              | `pixi.measureCacheSize`     | Compute and update the disk size of the Pixi package cache directory in Pixi Info.                                                                       |
 
 ---
 

@@ -45,12 +45,17 @@
 
 ## ⚙️ 扩展配置项
 
-| 配置项                      | 类型       | 默认值                        | 作用域 | 说明                                                                                              |
-| :-------------------------- | :--------- | :---------------------------- | :----- | :------------------------------------------------------------------------------------------------ |
-| `pixi.executablePath`       | `string`   | `""`                          | 机器级 | Pixi 可执行文件路径。支持 `${workspaceFolder}` 及相对路径。为空时自动从系统 `PATH` 探测。         |
-| `pixi.displayNameFormat`    | `string`   | `"${project}:${env}"`         | 资源级 | 环境名称展示模板。支持占位符：`${project}`、`${env}`、`${python}`。                               |
-| `pixi.environmentRules`     | `string[]` | `[]`                          | 资源级 | 将 Glob 模式映射到 Pixi 环境名称（例如 `tests/**=dev`）。支持在设置面板通过 "Add Item" 交互添加。 |
-| `pixi.searchIgnorePatterns` | `string[]` | `["**/node_modules/**", ...]` | 资源级 | 扫描工作区 Pixi 工程时忽略的 Glob 目录模式。                                                      |
+| 配置项                             | 类型       | 默认值                        | 作用域 | 说明                                                                                               |
+| :--------------------------------- | :--------- | :---------------------------- | :----- | :------------------------------------------------------------------------------------------------- |
+| `pixi.executablePath`              | `string`   | `""`                          | 机器级 | Pixi 可执行文件路径。支持 `${workspaceFolder}` 及相对路径。为空时自动从系统 `PATH` 探测。          |
+| `pixi.displayNameFormat`           | `string`   | `"${project}:${env}"`         | 资源级 | 环境名称展示模板。支持占位符：`${project}`、`${env}`、`${version}`。                               |
+| `pixi.defaultManifestFormat`       | `string`   | `"ask"`                       | 资源级 | 初始化 Pixi 项目时的默认清单格式（`"ask"`、`"pixi"` 或 `"pyproject"`）。                           |
+| `pixi.autoInstallOnOpen`           | `string`   | `"prompt"`                    | 资源级 | 打开包含未安装环境的项目时的行为控制（`"prompt"` 弹窗提示、`"always"` 自动安装、`"never"` 忽略）。 |
+| `pixi.terminal.defaultEnvironment` | `string`   | `""`                          | 资源级 | 打开 Pixi 终端时默认激活的环境名（留空时在多环境下交互式弹出选择列表）。                           |
+| `pixi.packageSearch.includePypi`   | `boolean`  | `true`                        | 资源级 | 交互式搜索包时是否连带检索 PyPI 软件包源。                                                         |
+| `pixi.cache.autoMeasureSize`       | `boolean`  | `true`                        | 窗口级 | Pixi Info 视图中是否在加载时自动计算 Pixi/Rattler 全局缓存的磁盘占用体积。                         |
+| `pixi.environmentRules`            | `string[]` | `[]`                          | 资源级 | 将 Glob 模式映射到 Pixi 环境名称（例如 `tests/**=dev`）。支持在设置面板通过 "Add Item" 交互添加。  |
+| `pixi.searchIgnorePatterns`        | `string[]` | `["**/node_modules/**", ...]` | 资源级 | 扫描工作区 Pixi 工程时忽略的 Glob 目录模式。                                                       |
 
 ### 配置示例
 
@@ -58,7 +63,9 @@
 
 ```json
 {
-    "pixi.environmentRules": ["tests/**=dev", "train/**=train", "scripts/*.py=dev"]
+    "pixi.environmentRules": ["tests/**=dev", "train/**=train", "scripts/*.py=dev"],
+    "pixi.defaultManifestFormat": "pixi",
+    "pixi.displayNameFormat": "${project}:${env} (${version})"
 }
 ```
 
@@ -88,6 +95,7 @@
 | **Pixi: Update Pixi CLI ...**             | `pixi.selfUpdate`           | 检查更新并自动升级系统上的 Pixi CLI 命令行工具至最新版本。                                                         |
 | **Pixi: Refresh Pixi Info**               | `pixi.refreshInfo`          | 刷新 Pixi Info 视图中的系统环境与版本信息。                                                                        |
 | **Pixi: Clean Package Cache ...**         | `pixi.cleanCache`           | 清理 Pixi 系统级全局包缓存（`pixi clean cache -y`），支持在 Pixi Info 视图中一键点击垃圾桶图标清理并展示占用体积。 |
+| **Pixi: Measure Cache Size**              | `pixi.measureCacheSize`     | 按需计算并刷新 Pixi Info 视图中全局包缓存的磁盘占用体积。                                                          |
 
 ---
 

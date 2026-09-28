@@ -198,6 +198,12 @@
                 "icon": "$(trash)"
             },
             {
+                "command": "pixi.measureCacheSize",
+                "title": "Measure Cache Size",
+                "category": "Pixi",
+                "icon": "$(dashboard)"
+            },
+            {
                 "command": "pixi.openLocation",
                 "title": "Open Location ...",
                 "category": "Pixi"
@@ -453,6 +459,11 @@
                     "command": "pixi.cleanCache",
                     "when": "view == pixi.views.info && viewItem == pixiInfoCache",
                     "group": "inline@1"
+                },
+                {
+                    "command": "pixi.measureCacheSize",
+                    "when": "view == pixi.views.info && viewItem == pixiInfoCache",
+                    "group": "inline@2"
                 }
             ]
         },
@@ -567,8 +578,58 @@
                 "pixi.displayNameFormat": {
                     "type": "string",
                     "default": "${project}:${env}",
-                    "description": "Format template for environment display names. Supported placeholders: ${project} (or {{project}}), ${env}, ${python} (or ${version}).",
+                    "description": "Format template for environment display names. Supported placeholders: ${project} (or {{project}}), ${env}, ${version} (or {{version}}).",
                     "scope": "resource"
+                },
+                "pixi.defaultManifestFormat": {
+                    "type": "string",
+                    "enum": [
+                        "ask",
+                        "pixi",
+                        "pyproject"
+                    ],
+                    "enumDescriptions": [
+                        "Always prompt to choose between pixi.toml and pyproject.toml",
+                        "Use pixi.toml format",
+                        "Use pyproject.toml format"
+                    ],
+                    "default": "ask",
+                    "description": "Default manifest format when initializing a new Pixi project.",
+                    "scope": "resource"
+                },
+                "pixi.autoInstallOnOpen": {
+                    "type": "string",
+                    "enum": [
+                        "prompt",
+                        "always",
+                        "never"
+                    ],
+                    "enumDescriptions": [
+                        "Prompt to install uninstalled Pixi environments when opening a project",
+                        "Automatically install uninstalled environments in the background",
+                        "Never prompt or automatically install environments on open"
+                    ],
+                    "default": "prompt",
+                    "description": "Control automatic environment installation when opening a Pixi project with uninstalled environments.",
+                    "scope": "resource"
+                },
+                "pixi.terminal.defaultEnvironment": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Default environment name to activate when opening a Pixi terminal (e.g. 'default' or 'dev'). If empty, prompts for selection when multiple environments exist.",
+                    "scope": "resource"
+                },
+                "pixi.packageSearch.includePypi": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Include PyPI packages in package search results.",
+                    "scope": "resource"
+                },
+                "pixi.cache.autoMeasureSize": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Automatically compute the disk size of Pixi/Rattler cache directories in the Pixi Info view.",
+                    "scope": "window"
                 }
             }
         },

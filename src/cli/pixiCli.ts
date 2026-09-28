@@ -5,7 +5,7 @@ import * as https from 'https';
 import * as os from 'os';
 import * as path from 'path';
 import semver from 'semver';
-import { CancellationError, CancellationToken, commands, window, workspace } from 'vscode';
+import { CancellationError, CancellationToken, commands, Uri, window, workspace } from 'vscode';
 import which from 'which';
 
 import { createDeferred } from '../common/deferred';
@@ -452,7 +452,13 @@ export async function searchPixiPackages(
         }
     })();
 
-    const pypiPromise = options?.includePypi === false ? Promise.resolve(null) : fetchPypiPackage(cleanQuery, token);
+    const shouldIncludePypi =
+        options?.includePypi ??
+        workspace
+            .getConfiguration('pixi', options?.cwd ? Uri.file(options.cwd) : undefined)
+            .get<boolean>('packageSearch.includePypi', true);
+
+    const pypiPromise = shouldIncludePypi === false ? Promise.resolve(null) : fetchPypiPackage(cleanQuery, token);
 
     const [condaRes, pypiRes] = await Promise.allSettled([condaPromise, pypiPromise]);
     const condaResults = condaRes.status === 'fulfilled' ? condaRes.value : [];

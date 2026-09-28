@@ -1,6 +1,16 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { commands, Disposable, EventEmitter, LogOutputChannel, ProgressLocation, Uri, window, workspace } from 'vscode';
+import {
+    commands,
+    ConfigurationTarget,
+    Disposable,
+    EventEmitter,
+    LogOutputChannel,
+    ProgressLocation,
+    Uri,
+    window,
+    workspace,
+} from 'vscode';
 
 import { runPixi } from '../cli/pixiCli';
 import { safeJsonParse } from '../common/execUtils';
@@ -84,10 +94,13 @@ export class PixiProjectManager implements Disposable {
         );
     }
 
+    private promptedAutoInstallProjects = new Set<string>();
+
     public async initialize(): Promise<void> {
         this.projectPaths = await resolvePixiProjectPaths();
         await this.updateHasPixiProjectContext();
         await this.refreshAll();
+        await this.checkAutoInstall();
     }
 
     public getProjectPaths(): string[] {
@@ -348,6 +361,52 @@ export class PixiProjectManager implements Disposable {
         } catch (error) {
             traceError(`Failed to refresh Pixi project at ${normalized}:`, error);
             this.projectToEnvs.set(normalized, []);
+        }
+    }
+
+    private async checkAutoInstall(): Promise<void> {
+        for (const projectPath of this.projectPaths) {
+            const normalized = path.normalize(projectPath);
+            const envs = this.getEnvironmentsForProject(normalized);
+            const uninstalledEnvs = envs.filter((e) => e.pixiStatus === 'uninstalled');
+
+            if (uninstalledEnvs.length === 0) {
+                this.promptedAutoInstallProjects.delete(normalized);
+                continue;
+            }
+
+            if (this.promptedAutoInstallProjects.has(normalized)) {
+                continue;
+            }
+
+            const config = workspace.getConfiguration('pixi', Uri.file(normalized));
+            const policy = config.get<'prompt' | 'always' | 'never'>('autoInstallOnOpen', 'prompt');
+            if (policy === 'never') {
+                continue;
+            }
+
+            this.promptedAutoInstallProjects.add(normalized);
+            const projectName = envs[0]?.projectName || path.basename(normalized);
+
+            if (policy === 'always') {
+                traceVerbose(`Auto-installing environments for '${projectName}' (${normalized})`);
+                await commands.executeCommand('pixi.install', Uri.file(normalized));
+            } else if (policy === 'prompt') {
+                const uninstalledNames = uninstalledEnvs.map((e) => `'${e.pixiEnvName}'`).join(', ');
+                window
+                    .showInformationMessage(
+                        `Pixi environment(s) ${uninstalledNames} for project '${projectName}' are not installed. Would you like to install now?`,
+                        'Install',
+                        'Never for this Project',
+                    )
+                    .then(async (selection) => {
+                        if (selection === 'Install') {
+                            await commands.executeCommand('pixi.install', Uri.file(normalized));
+                        } else if (selection === 'Never for this Project') {
+                            await config.update('autoInstallOnOpen', 'never', ConfigurationTarget.WorkspaceFolder);
+                        }
+                    });
+            }
         }
     }
 

@@ -81,6 +81,9 @@ export async function activate(context: ExtensionContext): Promise<PixiExtension
                     await projectManager.refresh(undefined);
                 }
             }
+            if (e.affectsConfiguration('pixi.cache.autoMeasureSize')) {
+                infoTreeDataProvider.refresh();
+            }
         }),
     );
 

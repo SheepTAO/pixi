@@ -36,7 +36,14 @@ interface EnvQuickPickItem extends QuickPickItem {
     envName?: string;
 }
 
-export async function pickManifestFormat(): Promise<'pixi' | 'pyproject' | undefined> {
+export async function pickManifestFormat(target?: Uri | string): Promise<'pixi' | 'pyproject' | undefined> {
+    const targetUri = typeof target === 'string' ? Uri.file(target) : target;
+    const config = workspace.getConfiguration('pixi', targetUri);
+    const defaultFormat = config.get<'ask' | 'pixi' | 'pyproject'>('defaultManifestFormat', 'ask');
+    if (defaultFormat === 'pixi' || defaultFormat === 'pyproject') {
+        return defaultFormat;
+    }
+
     const pick = await window.showQuickPick(
         [
             {
@@ -704,7 +711,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                 return;
             }
 
-            const format = await pickManifestFormat();
+            const format = await pickManifestFormat(targetFolder);
             if (!format) {
                 return;
             }
@@ -767,7 +774,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                     `Pixi: Environment '${trimmedName}' created and ready.`,
                 );
             } else {
-                const format = await pickManifestFormat();
+                const format = await pickManifestFormat(targetFolder);
                 if (!format) {
                     return;
                 }

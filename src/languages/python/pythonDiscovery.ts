@@ -66,17 +66,12 @@ export function sortEnvironments(envs: PixiPythonEnvironment[]): PixiPythonEnvir
     });
 }
 
-export function formatDisplayName(
-    template: string,
-    projectName: string,
-    envName: string,
-    pythonVersion?: string,
-): string {
+export function formatDisplayName(template: string, projectName: string, envName: string, version?: string): string {
     const defaultName = projectName ? `${projectName}:${envName}` : envName || 'default';
     const raw = (template || '${project}:${env}')
         .replace(/(\$\{|\{\{)project(\}|\}\})/g, projectName || '')
         .replace(/(\$\{|\{\{)env(\}|\}\})/g, envName || '')
-        .replace(/(\$\{|\{\{)(python|version)(\}|\}\})/g, pythonVersion || '')
+        .replace(/(\$\{|\{\{)version(\}|\}\})/g, version || '')
         .replace(/(\$\{|\{\{)[^}]+(\}|\}\})/g, '');
 
     const cleaned = raw

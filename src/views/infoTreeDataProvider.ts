@@ -130,7 +130,33 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
         const d2 = commands.registerCommand('pixi.refreshInfo', () => this.refresh());
         const d3 = commands.registerCommand('pixi.cleanCache', () => this.cleanCache());
         const d4 = commands.registerCommand('pixi.openLocation', (targetPath: string) => this.openLocation(targetPath));
-        return Disposable.from(d1, d2, d3, d4);
+        const d5 = commands.registerCommand('pixi.measureCacheSize', () => this.measureCacheSize());
+        return Disposable.from(d1, d2, d3, d4, d5);
+    }
+
+    public async measureCacheSize(): Promise<void> {
+        if (!this.cachedSystemInfo?.cache_dir || this.isCalculatingCacheSize) {
+            return;
+        }
+        this.isCalculatingCacheSize = true;
+        this._onDidChangeTreeData.fire();
+        const currentEpoch = this.cacheCalculationEpoch;
+        try {
+            const bytes = await computeDirectorySize(this.cachedSystemInfo.cache_dir);
+            if (this.cacheCalculationEpoch !== currentEpoch) {
+                return;
+            }
+            this.isCalculatingCacheSize = false;
+            if (bytes !== null) {
+                this.cachedCacheSize = formatBytes(bytes);
+            }
+            this._onDidChangeTreeData.fire();
+        } catch {
+            if (this.cacheCalculationEpoch === currentEpoch) {
+                this.isCalculatingCacheSize = false;
+                this._onDidChangeTreeData.fire();
+            }
+        }
     }
 
     public getTreeItem(element: PixiInfoItem): TreeItem {
@@ -188,10 +214,17 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
 
         // 3. Cache Directory
         if (info.cache_dir) {
+            const autoMeasure = workspace.getConfiguration('pixi').get<boolean>('cache.autoMeasureSize', true);
             const cacheItem = new PixiInfoItem('Cache Directory', TreeItemCollapsibleState.None);
             const sizeStr =
                 this.cachedCacheSize ||
-                (this.isCalculatingCacheSize ? 'Calculating...' : info.cache_size ? String(info.cache_size) : null);
+                (this.isCalculatingCacheSize
+                    ? 'Calculating...'
+                    : autoMeasure
+                      ? info.cache_size
+                          ? String(info.cache_size)
+                          : null
+                      : null);
             cacheItem.description = sizeStr ? `${sizeStr} (${info.cache_dir})` : info.cache_dir;
             cacheItem.iconPath = new ThemeIcon('database');
             cacheItem.contextValue = 'pixiInfoCache';
@@ -200,6 +233,9 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
                 tooltip += `\nTotal Size: ${this.cachedCacheSize}`;
             } else if (this.isCalculatingCacheSize) {
                 tooltip += '\nCalculating cache size...';
+            } else if (!autoMeasure) {
+                tooltip +=
+                    '\nAuto-measure is disabled in settings (pixi.cache.autoMeasureSize). Click the dashboard icon to calculate.';
             }
             tooltip += '\nClick to open in terminal or copy path';
             cacheItem.tooltip = tooltip;
@@ -210,7 +246,7 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
             };
             items.push(cacheItem);
 
-            if (!this.cachedCacheSize && !this.isCalculatingCacheSize) {
+            if (!this.cachedCacheSize && !this.isCalculatingCacheSize && autoMeasure) {
                 this.isCalculatingCacheSize = true;
                 const currentEpoch = this.cacheCalculationEpoch;
                 computeDirectorySize(info.cache_dir)
