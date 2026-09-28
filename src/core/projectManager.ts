@@ -97,8 +97,6 @@ export class PixiProjectManager implements Disposable {
     private promptedAutoInstallProjects = new Set<string>();
 
     public async initialize(): Promise<void> {
-        this.projectPaths = await resolvePixiProjectPaths();
-        await this.updateHasPixiProjectContext();
         await this.refreshAll();
         await this.checkAutoInstall();
     }

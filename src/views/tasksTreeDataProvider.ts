@@ -140,6 +140,7 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
     ) {
         this.disposables.push(
             this.projectManager.onDidProjectsChanged(() => this.refresh()),
+            this.projectManager.onDidChangeEnvironments(() => this.refresh()),
             this.taskProvider.onDidChangeTasks(() => {
                 this.updateViewDescription();
                 this._onDidChangeTreeData.fire();
