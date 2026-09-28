@@ -106,7 +106,7 @@ export class PixiProjectManager implements Disposable {
     }
 
     public getProjects(): PixiProject[] {
-        return this.projectPaths.map((p) => {
+        const projects = this.projectPaths.map((p) => {
             const envs = this.projectToEnvs.get(path.normalize(p));
             if (envs && envs.length > 0) {
                 return {
@@ -128,6 +128,7 @@ export class PixiProjectManager implements Disposable {
                 manifestPath,
             };
         });
+        return projects.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
     }
 
     public getEnvironmentsForProject(projectPath: string): PixiEnvironmentInfo[] {
@@ -196,7 +197,8 @@ export class PixiProjectManager implements Disposable {
 
     public findProjectForUri(uri: Uri): string | undefined {
         const filePath = path.normalize(uri.fsPath);
-        for (const projectPath of this.projectPaths) {
+        const sortedPaths = [...this.projectPaths].sort((a, b) => b.length - a.length);
+        for (const projectPath of sortedPaths) {
             if (filePath === projectPath || filePath.startsWith(projectPath + path.sep)) {
                 return projectPath;
             }
