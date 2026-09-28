@@ -219,6 +219,24 @@
                 "title": "Why is This Installed? (Reverse Tree)",
                 "category": "Pixi",
                 "icon": "$(type-hierarchy-sub)"
+            },
+            {
+                "command": "pixi.updatePackage",
+                "title": "Update Package",
+                "category": "Pixi",
+                "icon": "$(arrow-up)"
+            },
+            {
+                "command": "pixi.revealPackageInManifest",
+                "title": "Go to Definition in Manifest",
+                "category": "Pixi",
+                "icon": "$(go-to-file)"
+            },
+            {
+                "command": "pixi.copyPackageName",
+                "title": "Copy Package Name",
+                "category": "Pixi",
+                "icon": "$(copy)"
             }
         ],
         "menus": {
@@ -307,6 +325,18 @@
                 },
                 {
                     "command": "pixi.whyPackage",
+                    "when": "pixi.hasPixiProject"
+                },
+                {
+                    "command": "pixi.updatePackage",
+                    "when": "pixi.hasPixiProject"
+                },
+                {
+                    "command": "pixi.revealPackageInManifest",
+                    "when": "pixi.hasPixiProject"
+                },
+                {
+                    "command": "pixi.copyPackageName",
                     "when": "pixi.hasPixiProject"
                 }
             ],
@@ -431,29 +461,44 @@
                     "group": "inline@2"
                 },
                 {
-                    "command": "pixi.clean",
-                    "when": "view == pixi.views.projects && viewItem == pixiEnvInstalled",
-                    "group": "inline@3"
-                },
-                {
                     "command": "pixi.addPackage",
-                    "when": "view == pixi.views.projects && (viewItem == pixiEnvInstalled || viewItem == pixiEnvUninstalled || viewItem == pixiPackageExplicit || viewItem == pixiPackageTransitive || viewItem == pixiEmpty)",
+                    "when": "view == pixi.views.projects && (viewItem == pixiEnvInstalled || viewItem == pixiEnvUninstalled || viewItem == pixiEmpty)",
                     "group": "1_package@1"
                 },
                 {
                     "command": "pixi.removePackage",
+                    "when": "view == pixi.views.projects && viewItem == pixiEnvInstalled",
+                    "group": "1_package@2"
+                },
+                {
+                    "command": "pixi.update",
+                    "when": "view == pixi.views.projects && (viewItem == pixiEnvInstalled || viewItem == pixiEmpty)",
+                    "group": "1_package@3"
+                },
+                {
+                    "command": "pixi.updatePackage",
                     "when": "view == pixi.views.projects && viewItem == pixiPackageExplicit",
                     "group": "inline@1"
                 },
                 {
                     "command": "pixi.removePackage",
-                    "when": "view == pixi.views.projects && (viewItem == pixiEnvInstalled || viewItem == pixiPackageExplicit || viewItem == pixiPackageTransitive)",
-                    "group": "1_package@2"
+                    "when": "view == pixi.views.projects && viewItem == pixiPackageExplicit",
+                    "group": "inline@2"
                 },
                 {
-                    "command": "pixi.update",
-                    "when": "view == pixi.views.projects && (viewItem == pixiEnvInstalled || viewItem == pixiPackageExplicit || viewItem == pixiPackageTransitive || viewItem == pixiEmpty)",
-                    "group": "1_package@3"
+                    "command": "pixi.updatePackage",
+                    "when": "view == pixi.views.projects && (viewItem == pixiPackageExplicit || viewItem == pixiPackageTransitive)",
+                    "group": "1_item@1"
+                },
+                {
+                    "command": "pixi.removePackage",
+                    "when": "view == pixi.views.projects && viewItem == pixiPackageExplicit",
+                    "group": "1_item@2"
+                },
+                {
+                    "command": "pixi.revealPackageInManifest",
+                    "when": "view == pixi.views.projects && viewItem == pixiPackageExplicit",
+                    "group": "1_item@3"
                 },
                 {
                     "command": "pixi.whyPackage",
@@ -474,6 +519,11 @@
                     "command": "pixi.whyPackage",
                     "when": "view == pixi.views.projects && (viewItem == pixiEnvInstalled || viewItem == pixiPackageExplicit || viewItem == pixiPackageTransitive || viewItem == pixiTransitiveGroup)",
                     "group": "2_tree@2"
+                },
+                {
+                    "command": "pixi.copyPackageName",
+                    "when": "view == pixi.views.projects && (viewItem == pixiPackageExplicit || viewItem == pixiPackageTransitive)",
+                    "group": "3_copy@1"
                 },
                 {
                     "command": "pixi.deleteEnvironment",

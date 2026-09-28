@@ -7,9 +7,13 @@ import {
     Disposable,
     env as vscodeEnv,
     OutputChannel,
+    Position,
     ProgressLocation,
     QuickPickItem,
     QuickPickItemKind,
+    Range,
+    Selection,
+    TextEditorRevealType,
     Uri,
     window,
     workspace,
@@ -2087,6 +2091,251 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                 true,
                 targetPkgName,
             );
+        }),
+    );
+
+    // Pixi: Update Package
+    disposables.push(
+        commands.registerCommand('pixi.updatePackage', async (targetItem?: any) => {
+            // Case 1: Package item in tree view
+            if (targetItem?.pkg && targetItem?.env) {
+                const pkg: PixiPackage = targetItem.pkg;
+                const env: PixiEnvironmentInfo = targetItem.env;
+                const projectPath: string = targetItem.project?.projectPath || env.projectPath;
+                const envName = env.pixiEnvName;
+                const projectName = path.basename(projectPath);
+                const args = ['update'];
+                if (envName) {
+                    args.push('-e', envName);
+                }
+                args.push(pkg.name);
+                await runPixiWithProgress(
+                    `Pixi: Updating package '${pkg.name}' in '${envName}' (${projectName})...`,
+                    args,
+                    projectPath,
+                    manager,
+                    `Pixi: Package '${pkg.name}' updated successfully in '${envName}'.`,
+                );
+                return;
+            }
+
+            // Case 2: Project item or Command Palette
+            const projectPath = await pickPixiProject(manager, 'Select Pixi project to update package in', targetItem);
+            if (!projectPath) {
+                return;
+            }
+
+            const envs = manager.getEnvironmentsForProject(projectPath);
+            const directEnvName =
+                (typeof targetItem?.env?.pixiEnvName === 'string' && targetItem.env.pixiEnvName.trim()) ||
+                (typeof targetItem?.envName === 'string' && targetItem.envName.trim()) ||
+                undefined;
+
+            let targetEnv: string | undefined = directEnvName;
+            if (!targetEnv && envs.length > 1) {
+                const selected = await pickTargetEnvironment(
+                    envs,
+                    'inspect',
+                    'Select environment to update package in',
+                );
+                if (selected === null) {
+                    return;
+                }
+                targetEnv = selected;
+            }
+
+            const envLabel = targetEnv || 'default';
+            const packages = await manager.getPackagesForEnvironment(envLabel, projectPath);
+            if (packages.length === 0) {
+                window.showInformationMessage(`No packages found in environment '${envLabel}'.`);
+                return;
+            }
+
+            const sorted = [...packages].sort((a, b) => {
+                if (a.is_explicit !== b.is_explicit) {
+                    return a.is_explicit ? -1 : 1;
+                }
+                return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+            });
+
+            const pick = await window.showQuickPick(
+                sorted.map((p) => {
+                    const channelBadge = p.kind === 'pypi' ? '[PyPI]' : '[Conda]';
+                    const explicitBadge = p.is_explicit ? 'explicit' : 'transitive';
+                    return {
+                        label: `${p.is_explicit ? '$(package)' : '$(symbol-field)'} ${p.name}`,
+                        description: p.version
+                            ? `${channelBadge} v${p.version} (${explicitBadge})`
+                            : `${channelBadge} (${explicitBadge})`,
+                        pkgName: p.name,
+                    };
+                }),
+                {
+                    title: `Pixi: Select Package to Update (${envLabel})`,
+                    placeHolder: 'Select a package to update to latest compatible version',
+                    matchOnDescription: true,
+                },
+            );
+            if (!pick) {
+                return;
+            }
+
+            const projectName = path.basename(projectPath);
+            const args = ['update'];
+            if (targetEnv) {
+                args.push('-e', targetEnv);
+            }
+            args.push(pick.pkgName);
+            await runPixiWithProgress(
+                `Pixi: Updating package '${pick.pkgName}' in '${envLabel}' (${projectName})...`,
+                args,
+                projectPath,
+                manager,
+                `Pixi: Package '${pick.pkgName}' updated successfully in '${envLabel}'.`,
+            );
+        }),
+    );
+
+    // Pixi: Reveal Package in Manifest (pixi.toml / pyproject.toml)
+    disposables.push(
+        commands.registerCommand('pixi.revealPackageInManifest', async (targetItem?: any) => {
+            let pkgName: string | undefined = targetItem?.pkg?.name;
+            let projectPath: string | undefined = targetItem?.project?.projectPath || targetItem?.env?.projectPath;
+            let manifestPath: string | undefined = targetItem?.project?.manifestPath || targetItem?.env?.manifestPath;
+
+            if (!projectPath) {
+                projectPath = await pickPixiProject(manager, 'Select Pixi project', targetItem);
+                if (!projectPath) {
+                    return;
+                }
+            }
+
+            if (!manifestPath && projectPath) {
+                const pixiToml = path.join(projectPath, 'pixi.toml');
+                const pyprojectToml = path.join(projectPath, 'pyproject.toml');
+                if (fs.existsSync(pixiToml)) {
+                    manifestPath = pixiToml;
+                } else if (fs.existsSync(pyprojectToml)) {
+                    manifestPath = pyprojectToml;
+                }
+            }
+
+            if (!manifestPath || !fs.existsSync(manifestPath)) {
+                window.showWarningMessage('Could not find manifest file for this project.');
+                return;
+            }
+
+            if (!pkgName) {
+                const envs = manager.getEnvironmentsForProject(projectPath);
+                const envLabel = envs.length > 0 ? envs[0].pixiEnvName : 'default';
+                const packages = await manager.getPackagesForEnvironment(envLabel, projectPath);
+                const explicit = packages.filter((p) => p.is_explicit);
+                const candidates = explicit.length > 0 ? explicit : packages;
+                if (candidates.length === 0) {
+                    window.showInformationMessage('No packages found to reveal in manifest.');
+                    return;
+                }
+                const pick = await window.showQuickPick(
+                    candidates.map((p) => ({
+                        label: p.name,
+                        description: p.version ? `v${p.version}` : undefined,
+                        pkgName: p.name,
+                    })),
+                    {
+                        title: 'Select Package to Reveal in Manifest',
+                        placeHolder: 'Select a package to jump to its definition',
+                        matchOnDescription: true,
+                    },
+                );
+                if (!pick) {
+                    return;
+                }
+                pkgName = pick.pkgName;
+            }
+
+            try {
+                const doc = await workspace.openTextDocument(Uri.file(manifestPath));
+                const editor = await window.showTextDocument(doc);
+
+                const text = doc.getText();
+                const lines = text.split(/\r?\n/);
+                const escapedName = pkgName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const altName = pkgName.includes('-')
+                    ? pkgName.replace(/-/g, '_')
+                    : pkgName.includes('_')
+                      ? pkgName.replace(/_/g, '-')
+                      : undefined;
+                const escapedAlt = altName?.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const namePattern = escapedAlt ? `(?:${escapedName}|${escapedAlt})` : escapedName;
+
+                const exactKeyRegex = new RegExp(`^\\s*["']?${namePattern}["']?\\s*=`, 'i');
+                const pyprojectDepRegex = new RegExp(`["']${namePattern}(\\s*[\\[><=~!^;]|["'])`, 'i');
+
+                let targetLine = -1;
+                for (let i = 0; i < lines.length; i++) {
+                    if (exactKeyRegex.test(lines[i]) || pyprojectDepRegex.test(lines[i])) {
+                        targetLine = i;
+                        break;
+                    }
+                }
+
+                if (targetLine >= 0) {
+                    const lineLength = lines[targetLine].length;
+                    const startPos = new Position(targetLine, 0);
+                    const endPos = new Position(targetLine, lineLength);
+                    editor.selection = new Selection(startPos, endPos);
+                    editor.revealRange(new Range(startPos, endPos), TextEditorRevealType.InCenter);
+                } else {
+                    window.showInformationMessage(
+                        `Could not locate definition for '${pkgName}' in ${path.basename(manifestPath)}.`,
+                    );
+                }
+            } catch (err) {
+                window.showErrorMessage(`Failed to open manifest: ${err instanceof Error ? err.message : String(err)}`);
+            }
+        }),
+    );
+
+    // Pixi: Copy Package Name
+    disposables.push(
+        commands.registerCommand('pixi.copyPackageName', async (targetItem?: any) => {
+            let pkgName =
+                targetItem?.pkg?.name ||
+                (typeof targetItem?.name === 'string' ? targetItem.name : undefined) ||
+                (typeof targetItem === 'string' ? targetItem : undefined);
+
+            if (!pkgName) {
+                const projectPath = await pickPixiProject(manager, 'Select Pixi project to copy package from');
+                if (!projectPath) {
+                    return;
+                }
+                const envs = manager.getEnvironmentsForProject(projectPath);
+                const envLabel = envs.length > 0 ? envs[0].pixiEnvName : 'default';
+                const packages = await manager.getPackagesForEnvironment(envLabel, projectPath);
+                if (packages.length === 0) {
+                    window.showInformationMessage(`No packages found in environment '${envLabel}'.`);
+                    return;
+                }
+                const pick = await window.showQuickPick(
+                    packages.map((p) => ({
+                        label: p.name,
+                        description: p.version ? `v${p.version}` : undefined,
+                        pkgName: p.name,
+                    })),
+                    {
+                        title: 'Select Package to Copy Name',
+                        placeHolder: 'Select a package to copy its name to clipboard',
+                        matchOnDescription: true,
+                    },
+                );
+                if (!pick) {
+                    return;
+                }
+                pkgName = pick.pkgName;
+            }
+
+            await vscodeEnv.clipboard.writeText(pkgName);
+            window.showInformationMessage(`Copied '${pkgName}' to clipboard.`);
         }),
     );
 
