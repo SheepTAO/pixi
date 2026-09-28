@@ -207,6 +207,18 @@
                 "command": "pixi.openLocation",
                 "title": "Open Location ...",
                 "category": "Pixi"
+            },
+            {
+                "command": "pixi.showDependencyTree",
+                "title": "Show Dependency Tree",
+                "category": "Pixi",
+                "icon": "$(list-tree)"
+            },
+            {
+                "command": "pixi.whyPackage",
+                "title": "Why is This Installed? (Reverse Tree)",
+                "category": "Pixi",
+                "icon": "$(type-hierarchy-sub)"
             }
         ],
         "menus": {
@@ -287,6 +299,14 @@
                 },
                 {
                     "command": "pixi.openTerminal",
+                    "when": "pixi.hasPixiProject"
+                },
+                {
+                    "command": "pixi.showDependencyTree",
+                    "when": "pixi.hasPixiProject"
+                },
+                {
+                    "command": "pixi.whyPackage",
                     "when": "pixi.hasPixiProject"
                 }
             ],
@@ -434,6 +454,26 @@
                     "command": "pixi.update",
                     "when": "view == pixi.views.projects && (viewItem == pixiEnvInstalled || viewItem == pixiPackageExplicit || viewItem == pixiPackageTransitive || viewItem == pixiEmpty)",
                     "group": "1_package@3"
+                },
+                {
+                    "command": "pixi.whyPackage",
+                    "when": "view == pixi.views.projects && viewItem == pixiPackageTransitive",
+                    "group": "inline@1"
+                },
+                {
+                    "command": "pixi.showDependencyTree",
+                    "when": "view == pixi.views.projects && viewItem == pixiTransitiveGroup",
+                    "group": "inline@1"
+                },
+                {
+                    "command": "pixi.showDependencyTree",
+                    "when": "view == pixi.views.projects && (viewItem == pixiEnvInstalled || viewItem == pixiPackageExplicit || viewItem == pixiPackageTransitive || viewItem == pixiTransitiveGroup)",
+                    "group": "2_tree@1"
+                },
+                {
+                    "command": "pixi.whyPackage",
+                    "when": "view == pixi.views.projects && (viewItem == pixiPackageExplicit || viewItem == pixiPackageTransitive)",
+                    "group": "2_tree@2"
                 },
                 {
                     "command": "pixi.deleteEnvironment",
@@ -623,6 +663,22 @@
                     "type": "boolean",
                     "default": true,
                     "description": "Include PyPI packages in package search results.",
+                    "scope": "resource"
+                },
+                "pixi.packages.displayMode": {
+                    "type": "string",
+                    "enum": [
+                        "grouped",
+                        "explicitOnly",
+                        "all"
+                    ],
+                    "enumDescriptions": [
+                        "Group transitive dependencies under a collapsible 'Transitive Dependencies' folder (recommended)",
+                        "Show only explicit dependencies declared in the project manifest",
+                        "Show all packages in a flat list"
+                    ],
+                    "default": "grouped",
+                    "description": "Control how installed packages are displayed in the Environments tree view.",
                     "scope": "resource"
                 },
                 "pixi.cache.autoMeasureSize": {

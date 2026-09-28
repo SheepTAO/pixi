@@ -45,17 +45,18 @@
 
 ## ⚙️ 扩展配置项
 
-| 配置项                             | 类型       | 默认值                        | 作用域 | 说明                                                                                               |
-| :--------------------------------- | :--------- | :---------------------------- | :----- | :------------------------------------------------------------------------------------------------- |
-| `pixi.executablePath`              | `string`   | `""`                          | 机器级 | Pixi 可执行文件路径。支持 `${workspaceFolder}` 及相对路径。为空时自动从系统 `PATH` 探测。          |
-| `pixi.displayNameFormat`           | `string`   | `"${project}:${env}"`         | 资源级 | 环境名称展示模板。支持占位符：`${project}`、`${env}`、`${version}`。                               |
-| `pixi.defaultManifestFormat`       | `string`   | `"ask"`                       | 资源级 | 初始化 Pixi 项目时的默认清单格式（`"ask"`、`"pixi"` 或 `"pyproject"`）。                           |
-| `pixi.autoInstallOnOpen`           | `string`   | `"prompt"`                    | 资源级 | 打开包含未安装环境的项目时的行为控制（`"prompt"` 弹窗提示、`"always"` 自动安装、`"never"` 忽略）。 |
-| `pixi.terminal.defaultEnvironment` | `string`   | `""`                          | 资源级 | 打开 Pixi 终端时默认激活的环境名（留空时在多环境下交互式弹出选择列表）。                           |
-| `pixi.packageSearch.includePypi`   | `boolean`  | `true`                        | 资源级 | 交互式搜索包时是否连带检索 PyPI 软件包源。                                                         |
-| `pixi.cache.autoMeasureSize`       | `boolean`  | `true`                        | 窗口级 | Pixi Info 视图中是否在加载时自动计算 Pixi/Rattler 全局缓存的磁盘占用体积。                         |
-| `pixi.environmentRules`            | `string[]` | `[]`                          | 资源级 | 将 Glob 模式映射到 Pixi 环境名称（例如 `tests/**=dev`）。支持在设置面板通过 "Add Item" 交互添加。  |
-| `pixi.searchIgnorePatterns`        | `string[]` | `["**/node_modules/**", ...]` | 资源级 | 扫描工作区 Pixi 工程时忽略的 Glob 目录模式。                                                       |
+| 配置项                             | 类型       | 默认值                        | 作用域 | 说明                                                                                                             |
+| :--------------------------------- | :--------- | :---------------------------- | :----- | :--------------------------------------------------------------------------------------------------------------- |
+| `pixi.executablePath`              | `string`   | `""`                          | 机器级 | Pixi 可执行文件路径。支持 `${workspaceFolder}` 及相对路径。为空时自动从系统 `PATH` 探测。                        |
+| `pixi.displayNameFormat`           | `string`   | `"${project}:${env}"`         | 资源级 | 环境名称展示模板。支持占位符：`${project}`、`${env}`、`${version}`。                                             |
+| `pixi.defaultManifestFormat`       | `string`   | `"ask"`                       | 资源级 | 初始化 Pixi 项目时的默认清单格式（`"ask"`、`"pixi"` 或 `"pyproject"`）。                                         |
+| `pixi.autoInstallOnOpen`           | `string`   | `"prompt"`                    | 资源级 | 打开包含未安装环境的项目时的行为控制（`"prompt"` 弹窗提示、`"always"` 自动安装、`"never"` 忽略）。               |
+| `pixi.terminal.defaultEnvironment` | `string`   | `""`                          | 资源级 | 打开 Pixi 终端时默认激活的环境名（留空时在多环境下交互式弹出选择列表）。                                         |
+| `pixi.packageSearch.includePypi`   | `boolean`  | `true`                        | 资源级 | 交互式搜索包时是否连带检索 PyPI 软件包源。                                                                       |
+| `pixi.packages.displayMode`        | `string`   | `"grouped"`                   | 资源级 | Environments 树视图中已安装包的展示模式（`"grouped"` 分组收纳、`"explicitOnly"` 仅显式依赖、`"all"` 全部平铺）。 |
+| `pixi.cache.autoMeasureSize`       | `boolean`  | `true`                        | 窗口级 | Pixi Info 视图中是否在加载时自动计算 Pixi/Rattler 全局缓存的磁盘占用体积。                                       |
+| `pixi.environmentRules`            | `string[]` | `[]`                          | 资源级 | 将 Glob 模式映射到 Pixi 环境名称（例如 `tests/**=dev`）。支持在设置面板通过 "Add Item" 交互添加。                |
+| `pixi.searchIgnorePatterns`        | `string[]` | `["**/node_modules/**", ...]` | 资源级 | 扫描工作区 Pixi 工程时忽略的 Glob 目录模式。                                                                     |
 
 ### 配置示例
 
@@ -65,7 +66,8 @@
 {
     "pixi.environmentRules": ["tests/**=dev", "train/**=train", "scripts/*.py=dev"],
     "pixi.defaultManifestFormat": "pixi",
-    "pixi.displayNameFormat": "${project}:${env} (${version})"
+    "pixi.displayNameFormat": "${project}:${env} (${version})",
+    "pixi.packages.displayMode": "grouped"
 }
 ```
 
@@ -86,6 +88,8 @@
 | **Pixi: Initialize Project...**           | `pixi.init`                 | 在当前文件夹初始化 Pixi 项目（可选择 `pixi.toml` 或 `pyproject.toml`）。                                           |
 | **Pixi: Add Package...**                  | `pixi.addPackage`           | 交互式添加依赖（支持实时搜索与多源选择）；支持在侧边栏项目和环境节点上一键点击 `+`，自动继承上下文并跳过冗余选择。 |
 | **Pixi: Remove Package...**               | `pixi.removePackage`        | 交互式选择并移除已安装包（自动识别 Conda 或 PyPI 渠道）；支持在侧边栏显式依赖包上一键点击垃圾桶图标直接移除。      |
+| **Pixi: Show Dependency Tree**            | `pixi.showDependencyTree`   | 在专用输出面板/编辑器视图中查看完整环境或指定包的依赖树（支持在环境与包节点上一键查看）。                          |
+| **Pixi: Why is This Installed?**          | `pixi.whyPackage`           | 诊断包引入来源，生成反向依赖链路树（`pixi tree -i`）；在侧边栏间接依赖项上悬停即可一键点击排查。                   |
 | **Pixi: Add Channel...**                  | `pixi.addChannel`           | 为项目清单添加 Conda 渠道或镜像 URL，并支持指定优先级顺序。                                                        |
 | **Pixi: Remove Channel...**               | `pixi.removeChannel`        | 交互式选择并从项目清单中移除已配置的 Conda 渠道。                                                                  |
 | **Pixi: Run Task**                        | `pixi.runTask`              | 快速搜索并运行当前工程中定义的任意 Pixi task。                                                                     |

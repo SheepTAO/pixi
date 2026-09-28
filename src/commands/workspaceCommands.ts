@@ -1,10 +1,13 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import {
+    CancellationError,
     CancellationTokenSource,
     commands,
     Disposable,
     env as vscodeEnv,
+    OutputChannel,
+    ProgressLocation,
     QuickPickItem,
     Uri,
     window,
@@ -1442,9 +1445,16 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                 const envName = env.pixiEnvName;
 
                 if (!pkg.is_explicit) {
-                    window.showWarningMessage(
-                        `'${pkg.name}' is a transitive dependency (installed automatically by another package) and cannot be removed directly. Remove the top-level package that depends on it.`,
-                    );
+                    window
+                        .showWarningMessage(
+                            `'${pkg.name}' is a transitive dependency (installed automatically by another package) and cannot be removed directly. Remove the top-level package that depends on it.`,
+                            'Why is this installed?',
+                        )
+                        .then((action) => {
+                            if (action === 'Why is this installed?') {
+                                commands.executeCommand('pixi.whyPackage', targetItem);
+                            }
+                        });
                     return;
                 }
 
@@ -1742,6 +1752,275 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
             );
         }),
     );
+
+    let treeOutputChannel: OutputChannel | undefined;
+
+    function getTreeOutputChannel(): OutputChannel {
+        if (!treeOutputChannel) {
+            treeOutputChannel = window.createOutputChannel('Pixi Tree');
+        }
+        return treeOutputChannel;
+    }
+
+    async function displayTreeOutput(
+        label: string,
+        args: string[],
+        projectPath: string,
+        isReverse?: boolean,
+    ): Promise<void> {
+        const channel = getTreeOutputChannel();
+        const treeKind = isReverse ? 'reverse dependency tree' : 'dependency tree';
+        const bannerTitle = isReverse
+            ? `Pixi Reverse Dependency Tree (Why Installed): ${label}`
+            : `Pixi Dependency Tree: ${label}`;
+
+        try {
+            await window.withProgress(
+                {
+                    location: ProgressLocation.Notification,
+                    title: `Pixi: Generating ${treeKind} for ${label}...`,
+                    cancellable: true,
+                },
+                async (_progress, token) => {
+                    const output = await runPixi(args, { cwd: projectPath }, token);
+                    const divider = '─'.repeat(60);
+                    const banner = [
+                        divider,
+                        bannerTitle,
+                        `Directory: ${projectPath}`,
+                        `Command: pixi ${args.join(' ')}`,
+                        divider,
+                        '',
+                    ].join('\n');
+
+                    const fullContent = banner + output;
+                    channel.clear();
+                    channel.appendLine(fullContent);
+                    channel.show(true);
+
+                    const capitalizedKind = isReverse ? 'Reverse dependency tree' : 'Dependency tree';
+                    window
+                        .showInformationMessage(
+                            `${capitalizedKind} for ${label} displayed in Pixi Tree output.`,
+                            'Open in Editor',
+                        )
+                        .then(async (action) => {
+                            if (action === 'Open in Editor') {
+                                const doc = await workspace.openTextDocument({
+                                    content: fullContent,
+                                    language: 'text',
+                                });
+                                await window.showTextDocument(doc, { preview: true });
+                            }
+                        });
+                },
+            );
+        } catch (err) {
+            if (err instanceof CancellationError) {
+                return;
+            }
+            window.showErrorMessage(
+                `Failed to generate ${treeKind}: ${err instanceof Error ? err.message : String(err)}`,
+            );
+        }
+    }
+
+    // Pixi: Show Dependency Tree
+    disposables.push(
+        commands.registerCommand('pixi.showDependencyTree', async (targetItem?: any) => {
+            // Case 1: Package item
+            if (targetItem?.pkg && targetItem?.env) {
+                const pkg: PixiPackage = targetItem.pkg;
+                const env: PixiEnvironmentInfo = targetItem.env;
+                const projectPath: string = targetItem.project?.projectPath || env.projectPath;
+                const envName = env.pixiEnvName;
+                const args = ['tree', '--color', 'never'];
+                if (envName && envName !== 'default') {
+                    args.push('-e', envName);
+                }
+                args.push(pkg.name);
+                await displayTreeOutput(`package '${pkg.name}' in '${envName}'`, args, projectPath);
+                return;
+            }
+
+            // Case 2: Environment item or transitive group item
+            if (targetItem?.env && targetItem?.project) {
+                const env: PixiEnvironmentInfo = targetItem.env;
+                const projectPath: string = targetItem.project.projectPath;
+                const envName = env.pixiEnvName;
+                const args = ['tree', '--color', 'never'];
+                if (envName && envName !== 'default') {
+                    args.push('-e', envName);
+                }
+                await displayTreeOutput(`environment '${envName}'`, args, projectPath);
+                return;
+            }
+
+            // Case 4: Project item or Command Palette
+            const projectPath = await pickPixiProject(
+                manager,
+                'Select Pixi project to view dependency tree for',
+                targetItem,
+            );
+            if (!projectPath) {
+                return;
+            }
+
+            const envs = manager.getEnvironmentsForProject(projectPath);
+            const directEnvName =
+                (typeof targetItem?.env?.pixiEnvName === 'string' && targetItem.env.pixiEnvName.trim()) ||
+                (typeof targetItem?.envName === 'string' && targetItem.envName.trim()) ||
+                undefined;
+
+            let targetEnv: string | undefined = directEnvName;
+            if (!targetEnv && envs.length > 1) {
+                const selected = await pickTargetEnvironment(envs, 'remove');
+                if (selected === null) {
+                    return;
+                }
+                targetEnv = selected;
+            }
+
+            const envLabel = targetEnv || 'default';
+            const action = await window.showQuickPick(
+                [
+                    {
+                        label: '$(list-tree) Full Environment Dependency Tree',
+                        description: `Show the full dependency tree for '${envLabel}'`,
+                        mode: 'full' as const,
+                    },
+                    {
+                        label: '$(filter) Filter by Package Name / Regex...',
+                        description: `Show dependency tree for a specific package in '${envLabel}'`,
+                        mode: 'filter' as const,
+                    },
+                ],
+                {
+                    title: `Pixi: Dependency Tree for '${envLabel}'`,
+                    placeHolder: 'Select tree view mode',
+                },
+            );
+            if (!action) {
+                return;
+            }
+
+            const args = ['tree', '--color', 'never'];
+            if (targetEnv && targetEnv !== 'default') {
+                args.push('-e', targetEnv);
+            }
+
+            if (action.mode === 'filter') {
+                const pkgInput = await window.showInputBox({
+                    title: 'Pixi: Filter Dependency Tree',
+                    prompt: 'Enter package name or regular expression',
+                    placeHolder: 'e.g. numpy, python, torch',
+                });
+                if (!pkgInput?.trim()) {
+                    return;
+                }
+                args.push(pkgInput.trim());
+                await displayTreeOutput(`package '${pkgInput.trim()}' in '${envLabel}'`, args, projectPath);
+            } else {
+                await displayTreeOutput(`environment '${envLabel}'`, args, projectPath);
+            }
+        }),
+    );
+
+    // Pixi: Why is This Package Installed? (Reverse Tree)
+    disposables.push(
+        commands.registerCommand('pixi.whyPackage', async (targetItem?: any) => {
+            // Case 1: Package item in tree view
+            if (targetItem?.pkg && targetItem?.env) {
+                const pkg: PixiPackage = targetItem.pkg;
+                const env: PixiEnvironmentInfo = targetItem.env;
+                const projectPath: string = targetItem.project?.projectPath || env.projectPath;
+                const envName = env.pixiEnvName;
+                const args = ['tree', '--color', 'never', '-i'];
+                if (envName && envName !== 'default') {
+                    args.push('-e', envName);
+                }
+                args.push(pkg.name);
+                await displayTreeOutput(`package '${pkg.name}' in '${envName}'`, args, projectPath, true);
+                return;
+            }
+
+            // Case 2: Project item or Command Palette
+            const projectPath = await pickPixiProject(
+                manager,
+                'Select Pixi project to inspect package dependencies',
+                targetItem,
+            );
+            if (!projectPath) {
+                return;
+            }
+
+            const envs = manager.getEnvironmentsForProject(projectPath);
+            let targetEnv: string | undefined;
+            if (envs.length > 1) {
+                const selected = await pickTargetEnvironment(envs, 'remove');
+                if (selected === null) {
+                    return;
+                }
+                targetEnv = selected;
+            }
+
+            const envLabel = targetEnv || 'default';
+            const packages = await manager.getPackagesForEnvironment(envLabel, projectPath);
+            let targetPkgName: string | undefined;
+
+            if (packages.length > 0) {
+                const sorted = [...packages].sort((a, b) => {
+                    if (a.is_explicit !== b.is_explicit) {
+                        return a.is_explicit ? -1 : 1;
+                    }
+                    return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+                });
+
+                const pick = await window.showQuickPick(
+                    sorted.map((p) => ({
+                        label: `${p.is_explicit ? '$(package)' : '$(symbol-field)'} ${p.name}`,
+                        description: p.version
+                            ? `v${p.version} (${p.is_explicit ? 'explicit' : 'transitive'})`
+                            : undefined,
+                        pkgName: p.name,
+                    })),
+                    {
+                        title: `Pixi: Select Package to Inspect (${envLabel})`,
+                        placeHolder: 'Select a package to see what depends on it (reverse dependency tree)',
+                        matchOnDescription: true,
+                    },
+                );
+                if (!pick) {
+                    return;
+                }
+                targetPkgName = pick.pkgName;
+            } else {
+                const input = await window.showInputBox({
+                    title: `Pixi: Inspect Package in '${envLabel}'`,
+                    prompt: 'Enter package name to find what depends on it',
+                    placeHolder: 'e.g. libgcc, certifi, urllib3',
+                });
+                if (!input?.trim()) {
+                    return;
+                }
+                targetPkgName = input.trim();
+            }
+
+            const args = ['tree', '--color', 'never', '-i'];
+            if (targetEnv && targetEnv !== 'default') {
+                args.push('-e', targetEnv);
+            }
+            args.push(targetPkgName);
+            await displayTreeOutput(`package '${targetPkgName}' in '${envLabel}'`, args, projectPath, true);
+        }),
+    );
+
+    disposables.push({
+        dispose: () => {
+            treeOutputChannel?.dispose();
+            treeOutputChannel = undefined;
+        },
+    });
 
     disposables.push(
         commands.registerCommand('pixi.refreshProjects', async () => {
