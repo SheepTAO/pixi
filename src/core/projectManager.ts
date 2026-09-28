@@ -15,7 +15,7 @@ import {
 import { runPixi } from '../cli/pixiCli';
 import { safeJsonParse } from '../common/execUtils';
 import { traceError, traceVerbose } from '../common/logging';
-import { matchEnvironmentRule } from './environmentRules';
+import { matchEnvironmentRule, sortPixiEnvironments } from './environmentRules';
 import { listPixiPackages, PixiPackage } from './packageManager';
 import { findManifestPath, isPixiProject, resolvePixiProjectPaths } from './projectDiscovery';
 import { scanEnvironmentToolchains } from './toolchains';
@@ -356,7 +356,7 @@ export class PixiProjectManager implements Disposable {
                 }),
             );
 
-            this.projectToEnvs.set(normalized, envs);
+            this.projectToEnvs.set(normalized, sortPixiEnvironments(envs));
         } catch (error) {
             traceError(`Failed to refresh Pixi project at ${normalized}:`, error);
             this.projectToEnvs.set(normalized, []);

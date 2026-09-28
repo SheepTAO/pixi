@@ -140,16 +140,11 @@ export async function scanCppToolchain(envPath: string, metaFiles?: string[]): P
     });
 
     // 4. Detect include directory
-    let includeDir: string | undefined;
-    const posixInclude = path.join(envPath, 'include');
-    const winInclude = path.join(envPath, 'Library', 'include');
-    const firstInclude = process.platform === 'win32' ? winInclude : posixInclude;
-    const secondInclude = process.platform === 'win32' ? posixInclude : winInclude;
-    if (fs.existsSync(firstInclude)) {
-        includeDir = firstInclude;
-    } else if (fs.existsSync(secondInclude)) {
-        includeDir = secondInclude;
-    }
+    const includeCandidates =
+        process.platform === 'win32'
+            ? [path.join(envPath, 'Library', 'include'), path.join(envPath, 'include')]
+            : [path.join(envPath, 'include'), path.join(envPath, 'Library', 'include')];
+    const includeDir = includeCandidates.find(fs.existsSync);
 
     if (!compiler && !cmake && !ninja && !includeDir) {
         return undefined;

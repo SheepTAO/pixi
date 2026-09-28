@@ -56,7 +56,7 @@ export function getEnvironmentQuickPickInfo(env: PixiPythonEnvironment): Environ
 }
 
 export function sortEnvironments(envs: PixiPythonEnvironment[]): PixiPythonEnvironment[] {
-    return envs.sort((a, b) => {
+    return [...envs].sort((a, b) => {
         const pA = getEnvironmentPriority(a);
         const pB = getEnvironmentPriority(b);
         if (pA !== pB) {
