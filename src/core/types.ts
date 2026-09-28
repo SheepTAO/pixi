@@ -26,6 +26,11 @@ export interface PixiPackage {
     build?: string;
     license?: string;
     source?: string;
+    requested_spec?: string;
+    is_local?: boolean;
+    is_editable?: boolean;
+    local_path?: string;
+    local_manifest_path?: string;
 }
 
 export type PixiEnvironmentStatus = 'installed' | 'uninstalled' | 'incompatible';

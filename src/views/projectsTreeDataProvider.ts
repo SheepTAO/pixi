@@ -50,15 +50,28 @@ export class PixiPackageTreeItem extends TreeItem {
     ) {
         super(pkg.name, TreeItemCollapsibleState.None);
         const versionStr = pkg.version ? ` v${pkg.version}` : '';
-        this.description = pkg.version ? (pkg.kind === 'pypi' ? `${pkg.version} (pypi)` : pkg.version) : undefined;
-        this.iconPath = pkg.is_explicit
-            ? new ThemeIcon('package')
-            : new ThemeIcon('symbol-field', new ThemeColor('descriptionForeground'));
+
+        if (pkg.is_editable || pkg.is_local) {
+            const tag = pkg.is_editable ? 'editable' : 'local';
+            this.description = pkg.version ? `${pkg.version} (${tag})` : `(${tag})`;
+            this.iconPath = new ThemeIcon('folder-library', new ThemeColor('charts.blue'));
+        } else {
+            this.description = pkg.version ? (pkg.kind === 'pypi' ? `${pkg.version} (pypi)` : pkg.version) : undefined;
+            this.iconPath = pkg.is_explicit
+                ? new ThemeIcon('package')
+                : new ThemeIcon('symbol-field', new ThemeColor('descriptionForeground'));
+        }
 
         const lines = [
             `${pkg.name}${versionStr}`,
             `Kind: ${pkg.kind ? pkg.kind.toUpperCase() : 'Conda'}${pkg.is_explicit ? ' (explicit dependency)' : ' (transitive dependency)'}`,
         ];
+        if (pkg.is_editable || pkg.is_local) {
+            lines.push(`Type: Local ${pkg.is_editable ? 'Editable ' : ''}Subpackage`);
+        }
+        if (pkg.local_path) {
+            lines.push(`Path: ${pkg.local_path}`);
+        }
         if (pkg.build) {
             lines.push(`Build: ${pkg.build}`);
         }
@@ -67,6 +80,14 @@ export class PixiPackageTreeItem extends TreeItem {
         }
         if (pkg.source) {
             lines.push(`Source: ${pkg.source}`);
+        }
+        if (pkg.local_manifest_path) {
+            lines.push(`\nClick to open ${path.basename(pkg.local_manifest_path)}`);
+            this.command = {
+                command: 'vscode.open',
+                title: 'Open Subpackage Manifest',
+                arguments: [Uri.file(pkg.local_manifest_path)],
+            };
         }
         this.tooltip = lines.join('\n');
         this.contextValue = pkg.is_explicit ? 'pixiPackageExplicit' : 'pixiPackageTransitive';
