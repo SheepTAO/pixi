@@ -879,7 +879,6 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
             if (targetEnvName === '__ALL__') {
                 const confirmed = await window.showWarningMessage(
                     'Are you sure you want to clean all installed Pixi environments in this project? (Can be re-installed using pixi install)',
-                    { modal: true },
                     'Clean All',
                 );
                 if (confirmed !== 'Clean All') {
@@ -900,7 +899,6 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
             if (envName === 'default') {
                 const confirmed = await window.showWarningMessage(
                     "Delete the installed 'default' environment on disk? (Can be re-installed using pixi install)",
-                    { modal: true },
                     'Delete',
                 );
                 if (confirmed !== 'Delete') {
@@ -917,7 +915,6 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
             } else {
                 const choice = await window.showWarningMessage(
                     `Delete Pixi environment '${envName}'?`,
-                    { modal: true },
                     'Delete from Disk & Manifest',
                     'Clean from Disk Only',
                 );
@@ -951,7 +948,6 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                 const projectPath = target.env.projectPath;
                 const confirmed = await window.showWarningMessage(
                     `Are you sure you want to clean installed environment '${envName}' on disk?`,
-                    { modal: true },
                     'Clean Environment',
                 );
                 if (confirmed === 'Clean Environment') {
@@ -1474,7 +1470,6 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
 
                 const confirmed = await window.showWarningMessage(
                     `Are you sure you want to remove package '${pkg.name}' from environment '${envName}'?`,
-                    { modal: true },
                     'Remove',
                 );
                 if (confirmed !== 'Remove') {

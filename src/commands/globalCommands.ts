@@ -76,7 +76,6 @@ export async function executeGlobalUpdate(toolName?: string): Promise<boolean> {
 export async function executeGlobalUninstall(toolName: string): Promise<boolean> {
     const confirm = await window.showWarningMessage(
         `Are you sure you want to uninstall global tool '${toolName}'?`,
-        { modal: true },
         'Uninstall',
     );
     if (confirm !== 'Uninstall') {
