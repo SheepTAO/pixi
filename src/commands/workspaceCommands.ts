@@ -1755,6 +1755,10 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
 
     let treeOutputChannel: OutputChannel | undefined;
 
+    function exactPackageRegex(name: string): string {
+        return `^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`;
+    }
+
     function getTreeOutputChannel(): OutputChannel {
         if (!treeOutputChannel) {
             treeOutputChannel = window.createOutputChannel('Pixi Tree');
@@ -1767,6 +1771,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
         args: string[],
         projectPath: string,
         isReverse?: boolean,
+        exactPkgName?: string,
     ): Promise<void> {
         const channel = getTreeOutputChannel();
         const treeKind = isReverse ? 'reverse dependency tree' : 'dependency tree';
@@ -1793,7 +1798,21 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                         '',
                     ].join('\n');
 
-                    const fullContent = banner + output;
+                    let processedOutput = output;
+                    if (isReverse && exactPkgName) {
+                        const lines = output
+                            .split(/\r?\n/)
+                            .map((l) => l.trim())
+                            .filter(Boolean);
+                        const hasBranches = lines.some(
+                            (l) => l.includes('└──') || l.includes('├──') || l.includes('│'),
+                        );
+                        if (!hasBranches) {
+                            processedOutput += `\n\nℹ️  '${exactPkgName}' is a direct top-level dependency specified in your project manifest.\n    No other packages in this environment depend on it.\n`;
+                        }
+                    }
+
+                    const fullContent = banner + processedOutput;
                     channel.clear();
                     channel.appendLine(fullContent);
                     channel.show(true);
@@ -1838,7 +1857,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                 if (envName && envName !== 'default') {
                     args.push('-e', envName);
                 }
-                args.push(pkg.name);
+                args.push(exactPackageRegex(pkg.name));
                 await displayTreeOutput(`package '${pkg.name}' in '${envName}'`, args, projectPath);
                 return;
             }
@@ -1939,8 +1958,8 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                 if (envName && envName !== 'default') {
                     args.push('-e', envName);
                 }
-                args.push(pkg.name);
-                await displayTreeOutput(`package '${pkg.name}' in '${envName}'`, args, projectPath, true);
+                args.push(exactPackageRegex(pkg.name));
+                await displayTreeOutput(`package '${pkg.name}' in '${envName}'`, args, projectPath, true, pkg.name);
                 return;
             }
 
@@ -2010,8 +2029,14 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
             if (targetEnv && targetEnv !== 'default') {
                 args.push('-e', targetEnv);
             }
-            args.push(targetPkgName);
-            await displayTreeOutput(`package '${targetPkgName}' in '${envLabel}'`, args, projectPath, true);
+            args.push(exactPackageRegex(targetPkgName));
+            await displayTreeOutput(
+                `package '${targetPkgName}' in '${envLabel}'`,
+                args,
+                projectPath,
+                true,
+                targetPkgName,
+            );
         }),
     );
 
