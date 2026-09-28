@@ -76,11 +76,7 @@ async function pickTargetEnvironment(
     placeholder?: string,
 ): Promise<string | undefined | null> {
     if (envs.length <= 1) {
-        return action === 'add'
-            ? undefined
-            : envs[0]?.pixiEnvName === 'default'
-              ? undefined
-              : envs[0]?.pixiEnvName;
+        return action === 'add' ? undefined : envs[0]?.pixiEnvName === 'default' ? undefined : envs[0]?.pixiEnvName;
     }
 
     const isAdd = action === 'add';
