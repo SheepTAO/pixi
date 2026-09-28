@@ -318,7 +318,8 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
 
         if (scope instanceof Uri) {
             const project = this.api.getPythonProject(scope);
-            const envs = project ? this.projectToEnvs.get(project.uri.fsPath) || [] : [];
+            const projectPath = project?.uri.fsPath || this.projectManager.findProjectForUri(scope);
+            const envs = projectPath ? this.projectToEnvs.get(projectPath) || [] : [];
             return sortEnvironments(envs);
         }
 
@@ -333,22 +334,19 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
         }
 
         const project = this.api.getPythonProject(scope);
-        if (!project) {
+        const projectPath = project?.uri.fsPath || this.projectManager.findProjectForUri(scope);
+        if (!projectPath) {
             return this.globalEnv;
         }
 
         if (scope.scheme === 'file') {
-            const relPath = path.relative(project.uri.fsPath, scope.fsPath).replace(/\\/g, '/');
+            const relPath = path.relative(projectPath, scope.fsPath).replace(/\\/g, '/');
             if (!relPath.startsWith('..')) {
                 const rules = workspace
                     .getConfiguration('pixi', scope)
                     .get<string[] | Record<string, string>>('environmentRules');
                 if (rules) {
-                    const matched = matchEnvironmentRule(
-                        rules,
-                        relPath,
-                        this.projectToEnvs.get(project.uri.fsPath) || [],
-                    );
+                    const matched = matchEnvironmentRule(rules, relPath, this.projectToEnvs.get(projectPath) || []);
                     if (matched) {
                         return matched;
                     }
@@ -356,12 +354,12 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
             }
         }
 
-        const active = this.activeEnv.get(project.uri.fsPath);
+        const active = this.activeEnv.get(projectPath);
         if (active) {
             return active;
         }
 
-        const projectEnvs = this.projectToEnvs.get(project.uri.fsPath) || [];
+        const projectEnvs = this.projectToEnvs.get(projectPath) || [];
         return this.getDefaultProjectEnv(projectEnvs) || this.globalEnv;
     }
 

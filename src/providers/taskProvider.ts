@@ -251,7 +251,9 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
         } catch (e) {
             traceError('Failed to parse pixi task list JSON:', e);
         }
-        return Array.from(taskMap.values());
+        return Array.from(taskMap.values()).sort((a, b) =>
+            a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
+        );
     }
 
     private async createVsCodeTask(t: PixiTask, customDef?: PixiTaskDefinition): Promise<Task> {

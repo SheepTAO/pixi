@@ -143,10 +143,12 @@ export async function scanCppToolchain(envPath: string, metaFiles?: string[]): P
     let includeDir: string | undefined;
     const posixInclude = path.join(envPath, 'include');
     const winInclude = path.join(envPath, 'Library', 'include');
-    if (fs.existsSync(posixInclude)) {
-        includeDir = posixInclude;
-    } else if (fs.existsSync(winInclude)) {
-        includeDir = winInclude;
+    const firstInclude = process.platform === 'win32' ? winInclude : posixInclude;
+    const secondInclude = process.platform === 'win32' ? posixInclude : winInclude;
+    if (fs.existsSync(firstInclude)) {
+        includeDir = firstInclude;
+    } else if (fs.existsSync(secondInclude)) {
+        includeDir = secondInclude;
     }
 
     if (!compiler && !cmake && !ninja && !includeDir) {

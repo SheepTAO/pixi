@@ -86,7 +86,8 @@ export async function resolvePixiProjectPaths(): Promise<string[]> {
         }
     }
 
-    return [...new Set(projectRoots.map(path.normalize))];
+    const uniqueRoots = [...new Set(projectRoots.map(path.normalize))];
+    return uniqueRoots.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
 }
 
 function getWorkspaceSearchPaths(): string[] {
@@ -174,12 +175,13 @@ async function findPixiDirectories(patterns: string[]): Promise<string[]> {
         const normalized = pattern.replace(/\\/g, '/').replace(/\/$/, '');
         const lastSegment = path.posix.basename(normalized);
 
-        if (lastSegment === '.pixi') {
+        if (lastSegment === '.pixi' || lastSegment === 'pixi.toml') {
             pixiPatterns.push(normalized);
         } else if (lastSegment.startsWith('.')) {
             continue;
         } else {
             pixiPatterns.push(`${normalized}/**/.pixi`);
+            pixiPatterns.push(`${normalized}/**/pixi.toml`);
         }
     }
 
@@ -187,13 +189,13 @@ async function findPixiDirectories(patterns: string[]): Promise<string[]> {
         return [];
     }
 
-    traceVerbose('Searching for .pixi directories with patterns:', pixiPatterns);
+    traceVerbose('Searching for .pixi directories or manifests with patterns:', pixiPatterns);
 
     const ignorePatterns = getSearchIgnorePatterns();
 
     try {
         const results = await fg(pixiPatterns, {
-            onlyDirectories: true,
+            onlyDirectories: false,
             absolute: true,
             dot: true,
             followSymbolicLinks: false,
@@ -202,10 +204,10 @@ async function findPixiDirectories(patterns: string[]): Promise<string[]> {
             suppressErrors: true,
         });
 
-        traceVerbose(`Found ${results.length} .pixi directories`);
+        traceVerbose(`Found ${results.length} .pixi entries or manifests`);
         return results;
     } catch (error) {
-        traceError('Error searching for .pixi directories:', error);
+        traceError('Error searching for .pixi directories or manifests:', error);
         return [];
     }
 }
