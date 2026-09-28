@@ -135,6 +135,14 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
     }
 
     public async measureCacheSize(): Promise<void> {
+        if (!this.cachedSystemInfo) {
+            try {
+                const rawJson = await runPixi(['info', '--json']);
+                this.cachedSystemInfo = safeJsonParse<PixiSystemInfo>(rawJson);
+            } catch {
+                // ignore
+            }
+        }
         if (!this.cachedSystemInfo?.cache_dir || this.isCalculatingCacheSize) {
             return;
         }

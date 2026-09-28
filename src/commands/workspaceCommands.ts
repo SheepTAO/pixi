@@ -9,6 +9,7 @@ import {
     OutputChannel,
     ProgressLocation,
     QuickPickItem,
+    QuickPickItemKind,
     Uri,
     window,
     workspace,
@@ -67,18 +68,22 @@ export async function pickManifestFormat(target?: Uri | string): Promise<'pixi' 
 
 async function pickTargetEnvironment(
     envs: PixiEnvironmentInfo[],
-    action: 'add' | 'remove',
+    action: 'add' | 'remove' | 'inspect',
+    placeholder?: string,
 ): Promise<string | undefined | null> {
     if (envs.length <= 1) {
         return undefined;
     }
 
     const isAdd = action === 'add';
+    const isInspect = action === 'inspect';
     const namedEnvs = envs.filter((e) => e.pixiEnvName !== 'default');
     const items: EnvQuickPickItem[] = [
         {
             label: '$(globe) Default',
-            description: `${isAdd ? 'Default environment / feature (available to all environments)' : 'Default environment'}`,
+            description: isAdd
+                ? 'Default environment / feature (available to all environments)'
+                : 'Default environment',
             envName: undefined,
         },
         ...namedEnvs.map((e) => {
@@ -99,9 +104,14 @@ async function pickTargetEnvironment(
         }),
     ];
 
+    const title = isInspect ? 'Pixi: Select Environment' : `Pixi: Target Environment${isAdd ? ' (Optional)' : ''}`;
+    const defaultPlaceholder = isInspect
+        ? 'Select environment to inspect'
+        : `Select target environment or feature to ${action} package`;
+
     const selected = await window.showQuickPick(items, {
-        title: `Pixi: Target Environment${isAdd ? ' (Optional)' : ''}`,
-        placeHolder: `Select target environment or feature to ${action} package`,
+        title,
+        placeHolder: placeholder || defaultPlaceholder,
     });
 
     if (!selected) {
@@ -1838,9 +1848,15 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
             if (err instanceof CancellationError) {
                 return;
             }
-            window.showErrorMessage(
-                `Failed to generate ${treeKind}: ${err instanceof Error ? err.message : String(err)}`,
-            );
+            const rawMsg = err instanceof Error ? err.message : String(err);
+            if (
+                rawMsg.includes('No dependencies matched the given regular expression') ||
+                rawMsg.includes('Nothing depends on the given regular expression')
+            ) {
+                window.showWarningMessage(`No packages or dependencies matched '${label}' in this environment.`);
+                return;
+            }
+            window.showErrorMessage(`Failed to generate ${treeKind}: ${rawMsg}`);
         }
     }
 
@@ -1893,7 +1909,11 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
 
             let targetEnv: string | undefined = directEnvName;
             if (!targetEnv && envs.length > 1) {
-                const selected = await pickTargetEnvironment(envs, 'remove');
+                const selected = await pickTargetEnvironment(
+                    envs,
+                    'inspect',
+                    'Select environment to view dependency tree for',
+                );
                 if (selected === null) {
                     return;
                 }
@@ -1974,9 +1994,18 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
             }
 
             const envs = manager.getEnvironmentsForProject(projectPath);
-            let targetEnv: string | undefined;
-            if (envs.length > 1) {
-                const selected = await pickTargetEnvironment(envs, 'remove');
+            const directEnvName =
+                (typeof targetItem?.env?.pixiEnvName === 'string' && targetItem.env.pixiEnvName.trim()) ||
+                (typeof targetItem?.envName === 'string' && targetItem.envName.trim()) ||
+                undefined;
+
+            let targetEnv: string | undefined = directEnvName;
+            if (!targetEnv && envs.length > 1) {
+                const selected = await pickTargetEnvironment(
+                    envs,
+                    'inspect',
+                    'Select environment to inspect package dependencies',
+                );
                 if (selected === null) {
                     return;
                 }
@@ -1988,28 +2017,49 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
             let targetPkgName: string | undefined;
 
             if (packages.length > 0) {
-                const sorted = [...packages].sort((a, b) => {
-                    if (a.is_explicit !== b.is_explicit) {
-                        return a.is_explicit ? -1 : 1;
-                    }
-                    return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
-                });
+                const transitivePkgs = packages
+                    .filter((p) => !p.is_explicit)
+                    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+                const explicitPkgs = packages
+                    .filter((p) => p.is_explicit)
+                    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
 
-                const pick = await window.showQuickPick(
-                    sorted.map((p) => ({
-                        label: `${p.is_explicit ? '$(package)' : '$(symbol-field)'} ${p.name}`,
-                        description: p.version
-                            ? `v${p.version} (${p.is_explicit ? 'explicit' : 'transitive'})`
-                            : undefined,
-                        pkgName: p.name,
-                    })),
-                    {
-                        title: `Pixi: Select Package to Inspect (${envLabel})`,
-                        placeHolder: 'Select a package to see what depends on it (reverse dependency tree)',
-                        matchOnDescription: true,
-                    },
-                );
-                if (!pick) {
+                const items: (QuickPickItem & { pkgName?: string })[] = [];
+
+                if (transitivePkgs.length > 0) {
+                    items.push({
+                        label: 'Transitive Dependencies',
+                        kind: QuickPickItemKind.Separator,
+                    });
+                    for (const p of transitivePkgs) {
+                        items.push({
+                            label: `$(symbol-field) ${p.name}`,
+                            description: p.version ? `v${p.version} (transitive)` : '(transitive)',
+                            pkgName: p.name,
+                        });
+                    }
+                }
+
+                if (explicitPkgs.length > 0) {
+                    items.push({
+                        label: 'Explicit Dependencies (Top-level)',
+                        kind: QuickPickItemKind.Separator,
+                    });
+                    for (const p of explicitPkgs) {
+                        items.push({
+                            label: `$(package) ${p.name}`,
+                            description: p.version ? `v${p.version} (explicit)` : '(explicit)',
+                            pkgName: p.name,
+                        });
+                    }
+                }
+
+                const pick = await window.showQuickPick(items, {
+                    title: `Pixi: Select Package to Inspect (${envLabel})`,
+                    placeHolder: 'Select a package to see what depends on it (reverse dependency tree)',
+                    matchOnDescription: true,
+                });
+                if (!pick || !pick.pkgName) {
                     return;
                 }
                 targetPkgName = pick.pkgName;

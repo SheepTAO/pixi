@@ -472,7 +472,7 @@
                 },
                 {
                     "command": "pixi.whyPackage",
-                    "when": "view == pixi.views.projects && (viewItem == pixiPackageExplicit || viewItem == pixiPackageTransitive)",
+                    "when": "view == pixi.views.projects && (viewItem == pixiEnvInstalled || viewItem == pixiPackageExplicit || viewItem == pixiPackageTransitive || viewItem == pixiTransitiveGroup)",
                     "group": "2_tree@2"
                 },
                 {
