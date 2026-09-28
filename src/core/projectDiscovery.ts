@@ -26,27 +26,32 @@ export function isPixiProject(folderPath: string): boolean {
 }
 
 /**
+ * Resolves the path to the manifest file ('pixi.toml' or 'pyproject.toml') for a given folder if it exists.
+ */
+export function findManifestPath(folderPath: string): string | undefined {
+    return [path.join(folderPath, 'pixi.toml'), path.join(folderPath, 'pyproject.toml')].find(fs.existsSync);
+}
+
+/**
  * Reads configured Conda channels from pixi.toml or pyproject.toml in a project directory.
  */
 export function getProjectConfiguredChannels(projectPath: string): string[] {
-    for (const manifestName of ['pixi.toml', 'pyproject.toml']) {
-        const manifestFile = path.join(projectPath, manifestName);
-        if (fs.existsSync(manifestFile)) {
-            try {
-                const content = fs.readFileSync(manifestFile, 'utf8');
-                const match = content.match(/channels\s*=\s*\[([^\]]*)\]/);
-                if (match && match[1]) {
-                    const parsed = match[1]
-                        .split(',')
-                        .map((s) => s.trim().replace(/^['"]|['"]$/g, ''))
-                        .filter(Boolean);
-                    if (parsed.length > 0) {
-                        return parsed;
-                    }
+    const manifestFile = findManifestPath(projectPath);
+    if (manifestFile) {
+        try {
+            const content = fs.readFileSync(manifestFile, 'utf8');
+            const match = content.match(/channels\s*=\s*\[([^\]]*)\]/);
+            if (match && match[1]) {
+                const parsed = match[1]
+                    .split(',')
+                    .map((s) => s.trim().replace(/^['"]|['"]$/g, ''))
+                    .filter(Boolean);
+                if (parsed.length > 0) {
+                    return parsed;
                 }
-            } catch {
-                // ignore
             }
+        } catch {
+            // ignore
         }
     }
     return [];

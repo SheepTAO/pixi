@@ -17,7 +17,7 @@ import { safeJsonParse } from '../common/execUtils';
 import { traceError, traceVerbose } from '../common/logging';
 import { matchEnvironmentRule } from './environmentRules';
 import { listPixiPackages, PixiPackage } from './packageManager';
-import { isPixiProject, resolvePixiProjectPaths } from './projectDiscovery';
+import { findManifestPath, isPixiProject, resolvePixiProjectPaths } from './projectDiscovery';
 import { scanEnvironmentToolchains } from './toolchains';
 import { PixiEnvironmentInfo, PixiEnvironmentStatus, PixiInfo, PixiProject } from './types';
 
@@ -115,13 +115,7 @@ export class PixiProjectManager implements Disposable {
                     manifestPath: envs[0].manifestPath,
                 };
             }
-            const pixiToml = path.join(p, 'pixi.toml');
-            const pyprojectToml = path.join(p, 'pyproject.toml');
-            const manifestPath = fs.existsSync(pixiToml)
-                ? pixiToml
-                : fs.existsSync(pyprojectToml)
-                  ? pyprojectToml
-                  : pixiToml;
+            const manifestPath = findManifestPath(p) || path.join(p, 'pixi.toml');
             return {
                 name: path.basename(p),
                 projectPath: p,

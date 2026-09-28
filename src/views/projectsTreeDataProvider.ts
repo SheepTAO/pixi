@@ -305,10 +305,6 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
         return element;
     }
 
-    private sortEnvironments(envs: PixiEnvironmentInfo[]): PixiEnvironmentInfo[] {
-        return sortPixiEnvironments(envs);
-    }
-
     public async getChildren(element?: PixiProjectsTreeItem): Promise<PixiProjectsTreeItem[]> {
         const projects = this.projectManager.getProjects();
 
@@ -318,7 +314,7 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
             }
             if (projects.length === 1) {
                 const singleProject = projects[0];
-                const envs = this.sortEnvironments(
+                const envs = sortPixiEnvironments(
                     this.projectManager.getEnvironmentsForProject(singleProject.projectPath),
                 );
                 return envs.map((e) => new PixiEnvironmentTreeItem(e, singleProject));
@@ -327,7 +323,7 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
         }
 
         if (element instanceof PixiProjectTreeItem) {
-            const envs = this.sortEnvironments(
+            const envs = sortPixiEnvironments(
                 this.projectManager.getEnvironmentsForProject(element.project.projectPath),
             );
             return envs.map((e) => new PixiEnvironmentTreeItem(e, element.project));

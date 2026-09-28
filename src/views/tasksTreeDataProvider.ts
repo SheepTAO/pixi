@@ -20,6 +20,7 @@ import {
     workspace,
 } from 'vscode';
 
+import { findManifestPath } from '../core/projectDiscovery';
 import { PixiProjectManager } from '../core/projectManager';
 import { PixiProject } from '../core/types';
 import { PixiTask, PixiTaskProvider } from '../providers/taskProvider';
@@ -303,13 +304,7 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
                 manifestPath = p?.manifestPath;
             }
             if (!manifestPath) {
-                const pixiToml = path.join(projectPath, 'pixi.toml');
-                const pyprojectToml = path.join(projectPath, 'pyproject.toml');
-                manifestPath = fs.existsSync(pixiToml)
-                    ? pixiToml
-                    : fs.existsSync(pyprojectToml)
-                      ? pyprojectToml
-                      : undefined;
+                manifestPath = findManifestPath(projectPath);
             }
 
             if (!manifestPath || !fs.existsSync(manifestPath)) {

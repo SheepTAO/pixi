@@ -21,7 +21,7 @@ import {
 
 import { PixiPackageSearchResult, runPixi, searchPixiPackages } from '../cli/pixiCli';
 import { runPixiWithProgress } from '../cli/workspaceCli';
-import { getProjectConfiguredChannels, isPixiProject } from '../core/projectDiscovery';
+import { findManifestPath, getProjectConfiguredChannels, isPixiProject } from '../core/projectDiscovery';
 import { PixiProjectManager } from '../core/projectManager';
 import { PixiEnvironmentInfo, PixiPackage } from '../core/types';
 import { handleGlobalInstall } from './globalCommands';
@@ -713,13 +713,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                 return;
             }
 
-            const pixiToml = path.join(targetFolder, 'pixi.toml');
-            const pyprojectToml = path.join(targetFolder, 'pyproject.toml');
-            const manifestPath = fs.existsSync(pixiToml)
-                ? pixiToml
-                : fs.existsSync(pyprojectToml)
-                  ? pyprojectToml
-                  : undefined;
+            const manifestPath = findManifestPath(targetFolder);
 
             if (manifestPath) {
                 window.showInformationMessage(
@@ -743,7 +737,10 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                 'Pixi: Project initialized successfully.',
             );
 
-            const createdManifest = format === 'pyproject' ? pyprojectToml : pixiToml;
+            const createdManifest =
+                format === 'pyproject'
+                    ? path.join(targetFolder, 'pyproject.toml')
+                    : path.join(targetFolder, 'pixi.toml');
             await openDocumentIfExists(createdManifest);
         }),
     );
@@ -2225,9 +2222,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                     return;
                 }
                 const p = manager.getProjects().find((proj) => proj.projectPath === projectPath);
-                manifestPath =
-                    p?.manifestPath ||
-                    [path.join(projectPath, 'pixi.toml'), path.join(projectPath, 'pyproject.toml')].find(fs.existsSync);
+                manifestPath = p?.manifestPath || findManifestPath(projectPath);
             }
 
             if (!manifestPath || !fs.existsSync(manifestPath)) {
@@ -2259,13 +2254,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
             }
 
             if (!manifestPath && projectPath) {
-                const pixiToml = path.join(projectPath, 'pixi.toml');
-                const pyprojectToml = path.join(projectPath, 'pyproject.toml');
-                if (fs.existsSync(pixiToml)) {
-                    manifestPath = pixiToml;
-                } else if (fs.existsSync(pyprojectToml)) {
-                    manifestPath = pyprojectToml;
-                }
+                manifestPath = findManifestPath(projectPath);
             }
 
             if (!manifestPath || !fs.existsSync(manifestPath)) {
