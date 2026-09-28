@@ -18,7 +18,8 @@ import {
     workspace,
 } from 'vscode';
 
-import { clearPixiCache, runPixi } from '../cli/pixiCli';
+import { clearGlobalManifestCache } from '../cli/globalCli';
+import { clearPixiCache, clearSearchCache, runPixi } from '../cli/pixiCli';
 import { safeJsonParse } from '../common/execUtils';
 import { traceError, traceVerbose } from '../common/logging';
 
@@ -61,13 +62,18 @@ export async function computeDirectorySize(dirPath: string): Promise<number | nu
         return await new Promise<number | null>((resolve) => {
             const escaped = dirPath.replace(/'/g, "''");
             const psCmd = `(Get-ChildItem -LiteralPath '${escaped}' -Recurse -File -Force -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum`;
-            ch.exec(`powershell -NoProfile -NonInteractive -Command "${psCmd}"`, { timeout: 10000 }, (err, stdout) => {
-                if (err || !stdout) {
-                    return resolve(null);
-                }
-                const bytes = parseInt(stdout.trim(), 10);
-                resolve(isNaN(bytes) ? null : bytes);
-            });
+            ch.execFile(
+                'powershell',
+                ['-NoProfile', '-NonInteractive', '-Command', psCmd],
+                { timeout: 10000 },
+                (err, stdout) => {
+                    if (err || !stdout) {
+                        return resolve(null);
+                    }
+                    const bytes = parseInt(stdout.trim(), 10);
+                    resolve(isNaN(bytes) ? null : bytes);
+                },
+            );
         });
     } catch {
         // Fall back
@@ -436,6 +442,8 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
                         window.showInformationMessage(`Pixi update: ${cleanOutput}`);
                     }
                     clearPixiCache();
+                    clearGlobalManifestCache();
+                    clearSearchCache();
                     this.refresh();
                 } catch (err: unknown) {
                     const msg = err instanceof Error ? err.message : String(err);
@@ -466,6 +474,7 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
                 try {
                     await runPixi(['clean', 'cache', '-y']);
                     clearPixiCache();
+                    clearSearchCache();
                     this.refresh();
                     window.showInformationMessage('Pixi: Global package cache cleaned.');
                 } catch (err: unknown) {

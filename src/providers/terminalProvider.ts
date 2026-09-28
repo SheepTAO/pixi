@@ -15,6 +15,7 @@ import {
 
 import { getPixi } from '../cli/pixiCli';
 import { traceError, traceVerbose } from '../common/logging';
+import { sortPixiEnvironments } from '../core/environmentRules';
 import { PixiProjectManager } from '../core/projectManager';
 import { PixiEnvironmentInfo } from '../core/types';
 
@@ -66,10 +67,10 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
         token?: CancellationToken,
         targetProjectPath?: string,
     ): Promise<PixiEnvironmentInfo | undefined> {
-        const envs = targetProjectPath
+        const rawEnvs = targetProjectPath
             ? this.projectManager.getEnvironmentsForProject(targetProjectPath)
             : this.projectManager.getAllEnvironments();
-        if (!envs || envs.length === 0) {
+        if (!rawEnvs || rawEnvs.length === 0) {
             const choice = await window.showWarningMessage(
                 'No Pixi environments found in current workspace. Would you like to initialize a Pixi project?',
                 'Initialize Project',
@@ -79,6 +80,8 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
             }
             return undefined;
         }
+
+        const envs = sortPixiEnvironments(rawEnvs);
 
         if (envs.length === 1) {
             if (await this.handleUninstalledOrError(envs[0])) {
@@ -194,7 +197,9 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
             let env: PixiEnvironmentInfo | undefined;
             let targetProjectPath: string | undefined;
 
-            if (target && 'pixiEnvName' in target) {
+            if (typeof target === 'string') {
+                targetProjectPath = this.projectManager.findProjectForUri(Uri.file(target)) || target;
+            } else if (target && 'pixiEnvName' in target) {
                 env = target as PixiEnvironmentInfo;
             } else if (target && 'env' in target && target.env) {
                 env = target.env;

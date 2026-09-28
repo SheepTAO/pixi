@@ -190,7 +190,9 @@ export async function handleGlobalList(): Promise<void> {
         return;
     }
 
-    const items = tools.map((t) => {
+    const sortedTools = [...tools].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+
+    const items = sortedTools.map((t) => {
         const mainDep = t.dependencies?.[0];
         const versionStr = mainDep?.version ? `v${mainDep.version}` : '';
         const exposedStr = t.exposed?.map((e) => e.exposed_name).join(', ') || t.name;
@@ -245,13 +247,15 @@ export async function handleGlobalUpdate(): Promise<void> {
         return;
     }
 
+    const sortedTools = [...tools].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+
     const choices = [
         {
             label: '$(sync) Update All Tools',
-            description: `Update all ${tools.length} global tools to their latest versions`,
+            description: `Update all ${sortedTools.length} global tools to their latest versions`,
             target: undefined,
         },
-        ...tools.map((t) => ({
+        ...sortedTools.map((t) => ({
             label: `$(tools) ${t.name}`,
             description: t.dependencies?.[0]?.version ? `v${t.dependencies[0].version}` : '',
             target: t.name,
@@ -279,7 +283,9 @@ export async function handleGlobalUninstall(): Promise<void> {
         return;
     }
 
-    const items = tools.map((t) => ({
+    const sortedTools = [...tools].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+
+    const items = sortedTools.map((t) => ({
         label: `$(trash) ${t.name}`,
         description: t.dependencies?.[0]?.version ? `v${t.dependencies[0].version}` : '',
         toolName: t.name,

@@ -58,3 +58,32 @@ export function matchEnvironmentRule<T extends { pixiEnvName: string; displayNam
         envs.find((e) => (e.displayName && e.displayName.startsWith(`${target} `)) || e.name === target)
     );
 }
+
+/**
+ * Deterministically sorts Pixi environments: installed first, default first, then alphabetically by envName.
+ */
+export function sortPixiEnvironments<T extends { pixiEnvName: string; pixiStatus: string }>(envs: T[]): T[] {
+    const statusPriority: Record<string, number> = {
+        installed: 0,
+        uninstalled: 1,
+        incompatible: 2,
+    };
+
+    return [...envs].sort((a, b) => {
+        const prioA = statusPriority[a.pixiStatus] ?? 99;
+        const prioB = statusPriority[b.pixiStatus] ?? 99;
+        if (prioA !== prioB) {
+            return prioA - prioB;
+        }
+        if (a.pixiEnvName === b.pixiEnvName) {
+            return 0;
+        }
+        if (a.pixiEnvName === 'default') {
+            return -1;
+        }
+        if (b.pixiEnvName === 'default') {
+            return 1;
+        }
+        return a.pixiEnvName.localeCompare(b.pixiEnvName, undefined, { sensitivity: 'base' });
+    });
+}

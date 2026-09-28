@@ -13,8 +13,9 @@ import {
     workspace,
 } from 'vscode';
 
+import { sortPixiEnvironments } from '../core/environmentRules';
 import { PixiProjectManager } from '../core/projectManager';
-import { PixiEnvironmentInfo, PixiEnvironmentStatus, PixiPackage, PixiProject } from '../core/types';
+import { PixiEnvironmentInfo, PixiPackage, PixiProject } from '../core/types';
 
 export class PixiProjectTreeItem extends TreeItem {
     constructor(public readonly project: PixiProject) {
@@ -305,29 +306,7 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
     }
 
     private sortEnvironments(envs: PixiEnvironmentInfo[]): PixiEnvironmentInfo[] {
-        const statusPriority: Record<PixiEnvironmentStatus, number> = {
-            installed: 0,
-            uninstalled: 1,
-            incompatible: 2,
-        };
-
-        return [...envs].sort((a, b) => {
-            const prioA = statusPriority[a.pixiStatus] ?? 99;
-            const prioB = statusPriority[b.pixiStatus] ?? 99;
-            if (prioA !== prioB) {
-                return prioA - prioB;
-            }
-            if (a.pixiEnvName === b.pixiEnvName) {
-                return 0;
-            }
-            if (a.pixiEnvName === 'default') {
-                return -1;
-            }
-            if (b.pixiEnvName === 'default') {
-                return 1;
-            }
-            return a.pixiEnvName.localeCompare(b.pixiEnvName, undefined, { sensitivity: 'base' });
-        });
+        return sortPixiEnvironments(envs);
     }
 
     public async getChildren(element?: PixiProjectsTreeItem): Promise<PixiProjectsTreeItem[]> {
