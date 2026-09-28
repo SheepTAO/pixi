@@ -197,9 +197,13 @@ export class PixiProjectManager implements Disposable {
 
     public findProjectForUri(uri: Uri): string | undefined {
         const filePath = path.normalize(uri.fsPath);
+        const isWindows = process.platform === 'win32';
+        const normFilePath = isWindows ? filePath.toLowerCase() : filePath;
         const sortedPaths = [...this.projectPaths].sort((a, b) => b.length - a.length);
         for (const projectPath of sortedPaths) {
-            if (filePath === projectPath || filePath.startsWith(projectPath + path.sep)) {
+            const normProjectPath = isWindows ? projectPath.toLowerCase() : projectPath;
+            const sep = path.sep;
+            if (normFilePath === normProjectPath || normFilePath.startsWith(normProjectPath + sep)) {
                 return projectPath;
             }
         }
@@ -257,6 +261,7 @@ export class PixiProjectManager implements Disposable {
                 const normalized = path.normalize(projectPath);
                 if (!this.projectPaths.map(path.normalize).includes(normalized)) {
                     this.projectPaths.push(normalized);
+                    this.projectPaths.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
                     await this.updateHasPixiProjectContext();
                     this._onDidProjectsChanged.fire(this.projectPaths);
                 }

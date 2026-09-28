@@ -41,7 +41,7 @@ export interface PixiExtensionApi {
     findProjectForUri(uri: Uri): string | undefined;
     getEnvironmentForUri(uri: Uri): PixiEnvironmentInfo | undefined;
     getActiveEnvironment(scope?: Uri): Promise<PixiEnvironmentInfo | undefined>;
-    setActiveEnvironment(scope: Uri | undefined, envName: string): Promise<boolean>;
+    setActiveEnvironment(scope: Uri | undefined, envName?: string): Promise<boolean>;
     refresh(scope?: Uri): Promise<void>;
     readonly onDidProjectsChanged: Event<string[]>;
     readonly onDidChangeEnvironments: Event<void>;

@@ -195,7 +195,7 @@ export class PixiExtensionApiImpl implements PixiExtensionApi, Disposable {
         return undefined;
     }
 
-    public async setActiveEnvironment(scope: Uri | undefined, envName: string): Promise<boolean> {
+    public async setActiveEnvironment(scope: Uri | undefined, envName?: string): Promise<boolean> {
         let projectPath: string | undefined;
         if (scope) {
             projectPath = this.projectManager.findProjectForUri(scope);
@@ -209,6 +209,21 @@ export class PixiExtensionApiImpl implements PixiExtensionApi, Disposable {
         }
 
         if (projectPath) {
+            if (!envName) {
+                if (!this.activeEnvNames.has(projectPath)) {
+                    return true;
+                }
+                this.activeEnvNames.delete(projectPath);
+                try {
+                    const storage = await getWorkspacePersistentState();
+                    await storage.set(`projectEnvName:${projectPath}`, undefined);
+                } catch {
+                    // ignore
+                }
+                this._onDidChangeActiveEnvironment.fire({ scope, environment: undefined });
+                return true;
+            }
+
             const envs = this.projectManager.getEnvironmentsForProject(projectPath);
             const targetEnv = envs.find((e) => e.pixiEnvName === envName);
             if (!targetEnv) {
@@ -233,6 +248,21 @@ export class PixiExtensionApiImpl implements PixiExtensionApi, Disposable {
         }
 
         // Global fallback
+        if (!envName) {
+            if (!this.globalActiveEnvName) {
+                return true;
+            }
+            this.globalActiveEnvName = undefined;
+            try {
+                const storage = await getWorkspacePersistentState();
+                await storage.set('globalEnvName', undefined);
+            } catch {
+                // ignore
+            }
+            this._onDidChangeActiveEnvironment.fire({ scope, environment: undefined });
+            return true;
+        }
+
         const allEnvs = this.projectManager.getAllEnvironments();
         const targetEnv = allEnvs.find((e) => e.pixiEnvName === envName);
         if (!targetEnv) {

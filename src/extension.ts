@@ -73,13 +73,19 @@ export async function activate(context: ExtensionContext): Promise<PixiExtension
     const pixiApi = createPixiApi(projectManager);
     context.subscriptions.push(pixiApi);
 
-    // 4. Conditionally activate Python support (if ms-python.vscode-python-envs is available)
+    // 4. Initial project discovery & validation
+    await projectManager.initialize();
+    if (projectManager.getProjectPaths().length > 0) {
+        await validatePixiCli();
+    }
+
+    // 5. Conditionally activate Python support (if ms-python.vscode-python-envs is available)
     const pythonSupport = await activatePythonSupport(projectManager, pixiApi, log);
     if (pythonSupport) {
         context.subscriptions.push(...pythonSupport.disposables);
     }
 
-    // 5. React to configuration changes
+    // 6. React to configuration changes
     context.subscriptions.push(
         workspace.onDidChangeConfiguration(async (e) => {
             if (e.affectsConfiguration('pixi.executablePath')) {
@@ -95,12 +101,6 @@ export async function activate(context: ExtensionContext): Promise<PixiExtension
             }
         }),
     );
-
-    // 6. Initial validation if workspace has Pixi projects
-    await projectManager.initialize();
-    if (projectManager.getProjectPaths().length > 0) {
-        await validatePixiCli();
-    }
 
     // 7. Return public Extension API
     return pixiApi;

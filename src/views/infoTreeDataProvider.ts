@@ -43,7 +43,7 @@ export async function computeDirectorySize(dirPath: string): Promise<number | nu
         }
         if (process.platform !== 'win32') {
             return await new Promise<number | null>((resolve) => {
-                ch.exec(`du -sk "${dirPath}"`, { timeout: 15000 }, (err, stdout) => {
+                ch.execFile('du', ['-sk', dirPath], { timeout: 15000 }, (err, stdout) => {
                     if (err || !stdout) {
                         return resolve(null);
                     }
@@ -207,9 +207,10 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
         const rawVersion = info.version || 'unknown';
         const cleanVersion = rawVersion.startsWith('v') ? rawVersion.slice(1) : rawVersion;
         const versionItem = new PixiInfoItem('Version', TreeItemCollapsibleState.None);
-        versionItem.description = `v${cleanVersion}`;
+        versionItem.description = cleanVersion === 'unknown' ? 'unknown' : `v${cleanVersion}`;
         versionItem.iconPath = new ThemeIcon('tag');
-        versionItem.tooltip = `Pixi CLI version: ${cleanVersion}`;
+        versionItem.tooltip =
+            cleanVersion === 'unknown' ? 'Pixi CLI version unknown' : `Pixi CLI version: ${cleanVersion}`;
         items.push(versionItem);
 
         // 2. Platform & TLS Backend

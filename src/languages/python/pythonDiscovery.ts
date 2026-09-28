@@ -62,11 +62,10 @@ export function sortEnvironments(envs: PixiPythonEnvironment[]): PixiPythonEnvir
         if (pA !== pB) {
             return pA - pB;
         }
-        if (a.shortDisplayName === 'default') {
-            return -1;
-        }
-        if (b.shortDisplayName === 'default') {
-            return 1;
+        const aIsDefault = a.shortDisplayName === 'default';
+        const bIsDefault = b.shortDisplayName === 'default';
+        if (aIsDefault !== bIsDefault) {
+            return aIsDefault ? -1 : 1;
         }
         return a.displayName.localeCompare(b.displayName, undefined, { sensitivity: 'base' });
     });
@@ -81,8 +80,8 @@ export function formatDisplayName(template: string, projectName: string, envName
         .replace(/(\$\{|\{\{)[^}]+(\}|\}\})/g, '');
 
     const cleaned = raw
-        .replace(/\(\s*\)/g, '')
-        .replace(/\[\s*\]/g, '')
+        .replace(/\(\s*v?\s*\)/gi, '')
+        .replace(/\[\s*v?\s*\]/gi, '')
         .replace(/\s+/g, ' ')
         .replace(/^[ \t\-_:/|]+|[ \t\-_:/|]+$/g, '')
         .trim();

@@ -233,7 +233,7 @@ export class PixiPythonPackageManager implements PackageManager, Disposable {
         const envId = environment.envId.id;
         traceInfo(`Called refresh for environment: ${envId}`);
 
-        return (await window.withProgress(
+        await window.withProgress(
             {
                 location: ProgressLocation.Window,
                 title: 'Refreshing Pixi packages',
@@ -244,9 +244,8 @@ export class PixiPythonPackageManager implements PackageManager, Disposable {
                 const after = (await this.fetchAndCachePackages(environment, pixiEnv)) || [];
 
                 this.triggerOnDidChangePackages(environment, before, after);
-                return after;
             },
-        )) as unknown as void;
+        );
     }
 
     async getPackages(environment: PythonEnvironment): Promise<Package[] | undefined> {

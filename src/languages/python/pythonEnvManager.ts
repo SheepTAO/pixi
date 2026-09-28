@@ -83,6 +83,23 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
                             this.globalEnv = pyEnv;
                             this.triggerDidChangeEnvironment(undefined, oldGlobal, pyEnv);
                         }
+                    } else {
+                        if (e.scope) {
+                            const project = this.api.getPythonProject(e.scope);
+                            const projectPath =
+                                project?.uri.fsPath || (e.scope instanceof Uri ? e.scope.fsPath : undefined);
+                            if (projectPath && this.activeEnv.has(projectPath)) {
+                                const oldEnv = this.activeEnv.get(projectPath);
+                                this.activeEnv.delete(projectPath);
+                                this.triggerDidChangeEnvironment(Uri.file(projectPath), oldEnv, undefined);
+                            }
+                        } else {
+                            if (this.globalEnv !== undefined) {
+                                const oldGlobal = this.globalEnv;
+                                this.globalEnv = undefined;
+                                this.triggerDidChangeEnvironment(undefined, oldGlobal, undefined);
+                            }
+                        }
                     }
                 }),
             );
@@ -211,21 +228,31 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
             this._onDidChangeEnvironments.fire(changes);
         }
 
-        // Restore active environments from persistent state
+        // Restore active environments from persistent state or re-link existing instances
         const storage = await getWorkspacePersistentState();
         for (const [projectPath, envs] of this.projectToEnvs) {
+            const currentActive = this.activeEnv.get(projectPath);
             const savedId = await storage.get<string>(`projectEnvId:${projectPath}`);
-            if (savedId) {
-                const found = envs.find((e) => e.envId.id === savedId);
+            const targetId = currentActive?.envId.id || savedId;
+            if (targetId) {
+                const found = envs.find((e) => e.envId.id === targetId);
                 if (found) {
                     this.activeEnv.set(projectPath, found);
+                } else if (!savedId) {
+                    this.activeEnv.delete(projectPath);
                 }
             }
         }
-        const globalSavedId = await storage.get<string>('globalEnvId');
-        if (globalSavedId) {
+        for (const activePath of Array.from(this.activeEnv.keys())) {
+            if (!this.projectToEnvs.has(activePath)) {
+                this.activeEnv.delete(activePath);
+            }
+        }
+
+        const globalTargetId = this.globalEnv?.envId.id || (await storage.get<string>('globalEnvId'));
+        if (globalTargetId) {
             const allEnvs = Array.from(this.projectToEnvs.values()).flat();
-            this.globalEnv = allEnvs.find((e) => e.envId.id === globalSavedId);
+            this.globalEnv = allEnvs.find((e) => e.envId.id === globalTargetId);
         }
     }
 
@@ -233,17 +260,37 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
         oldEnvs: PixiPythonEnvironment[],
         newEnvs: PixiPythonEnvironment[],
     ): DidChangeEnvironmentsEventArgs {
-        const oldIds = new Set(oldEnvs.map((e) => e.envId.id));
-        const newIds = new Set(newEnvs.map((e) => e.envId.id));
+        const oldMap = new Map(oldEnvs.map((e) => [e.envId.id, e]));
+        const newMap = new Map(newEnvs.map((e) => [e.envId.id, e]));
 
-        return [
-            ...oldEnvs
-                .filter((e) => !newIds.has(e.envId.id))
-                .map((e) => ({ environment: e, kind: EnvironmentChangeKind.remove })),
-            ...newEnvs
-                .filter((e) => !oldIds.has(e.envId.id))
-                .map((e) => ({ environment: e, kind: EnvironmentChangeKind.add })),
-        ];
+        const changes: DidChangeEnvironmentsEventArgs = [];
+
+        for (const [id, oldEnv] of oldMap) {
+            if (!newMap.has(id)) {
+                changes.push({ environment: oldEnv, kind: EnvironmentChangeKind.remove });
+            }
+        }
+
+        for (const [id, newEnv] of newMap) {
+            const oldEnv = oldMap.get(id);
+            if (!oldEnv) {
+                changes.push({ environment: newEnv, kind: EnvironmentChangeKind.add });
+            } else {
+                const hasChanged =
+                    oldEnv.pixiStatus !== newEnv.pixiStatus ||
+                    oldEnv.version !== newEnv.version ||
+                    oldEnv.displayName !== newEnv.displayName ||
+                    oldEnv.execInfo?.run?.executable !== newEnv.execInfo?.run?.executable;
+                if (hasChanged) {
+                    changes.push(
+                        { environment: oldEnv, kind: EnvironmentChangeKind.remove },
+                        { environment: newEnv, kind: EnvironmentChangeKind.add },
+                    );
+                }
+            }
+        }
+
+        return changes;
     }
 
     private getDefaultProjectEnv(envs: PixiPythonEnvironment[]): PixiPythonEnvironment | undefined {

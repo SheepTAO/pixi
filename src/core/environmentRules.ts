@@ -4,10 +4,11 @@ import picomatch from 'picomatch';
 const matcherCache = new Map<string, (input: string) => boolean>();
 
 function getMatcher(pattern: string): (input: string) => boolean {
-    let matcher = matcherCache.get(pattern);
+    const norm = pattern.replace(/\\/g, '/');
+    let matcher = matcherCache.get(norm);
     if (!matcher) {
-        matcher = picomatch(pattern);
-        matcherCache.set(pattern, matcher);
+        matcher = picomatch(norm);
+        matcherCache.set(norm, matcher);
     }
     return matcher;
 }
@@ -20,6 +21,7 @@ export function clearMatcherCache(): void {
  * Resolves the target environment name from rules and a relative file path.
  */
 export function matchEnvironmentName(rules: string[] | Record<string, string>, relPath: string): string | undefined {
+    const normalizedRelPath = relPath.replace(/\\/g, '/');
     const entries = Array.isArray(rules)
         ? rules.map((r) => {
               const i = r.indexOf('=') !== -1 ? r.indexOf('=') : r.indexOf(':');
@@ -27,11 +29,11 @@ export function matchEnvironmentName(rules: string[] | Record<string, string>, r
           })
         : Object.entries(rules);
 
-    const baseName = path.posix.basename(relPath);
+    const baseName = path.posix.basename(normalizedRelPath);
     for (const [pattern, target] of entries) {
         if (pattern && target) {
             const matcher = getMatcher(pattern);
-            if (matcher(relPath) || matcher(baseName)) {
+            if (matcher(normalizedRelPath) || matcher(baseName)) {
                 return target;
             }
         }
