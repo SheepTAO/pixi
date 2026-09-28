@@ -237,6 +237,30 @@
                 "title": "Copy Package Name",
                 "category": "Pixi",
                 "icon": "$(copy)"
+            },
+            {
+                "command": "pixi.tasks.refresh",
+                "title": "Refresh Tasks",
+                "category": "Pixi",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "pixi.tasks.run",
+                "title": "Run Task",
+                "category": "Pixi",
+                "icon": "$(play)"
+            },
+            {
+                "command": "pixi.tasks.runInEnvironment",
+                "title": "Run Task in Environment ...",
+                "category": "Pixi",
+                "icon": "$(layers)"
+            },
+            {
+                "command": "pixi.tasks.revealInManifest",
+                "title": "Go to Definition in Manifest",
+                "category": "Pixi",
+                "icon": "$(go-to-file)"
             }
         ],
         "menus": {
@@ -417,6 +441,16 @@
                     "command": "pixi.refreshInfo",
                     "when": "view == pixi.views.info",
                     "group": "navigation@2"
+                },
+                {
+                    "command": "pixi.runTask",
+                    "when": "view == pixi.views.tasks && pixi.hasPixiProject",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "pixi.tasks.refresh",
+                    "when": "view == pixi.views.tasks",
+                    "group": "navigation@2"
                 }
             ],
             "view/item/context": [
@@ -554,6 +588,36 @@
                     "command": "pixi.measureCacheSize",
                     "when": "view == pixi.views.info && viewItem == pixiInfoCache",
                     "group": "inline@2"
+                },
+                {
+                    "command": "pixi.tasks.run",
+                    "when": "view == pixi.views.tasks && viewItem == pixiTaskItem",
+                    "group": "inline@1"
+                },
+                {
+                    "command": "pixi.tasks.runInEnvironment",
+                    "when": "view == pixi.views.tasks && viewItem == pixiTaskItem",
+                    "group": "inline@2"
+                },
+                {
+                    "command": "pixi.tasks.revealInManifest",
+                    "when": "view == pixi.views.tasks && viewItem == pixiTaskItem",
+                    "group": "inline@3"
+                },
+                {
+                    "command": "pixi.tasks.run",
+                    "when": "view == pixi.views.tasks && viewItem == pixiTaskItem",
+                    "group": "1_run@1"
+                },
+                {
+                    "command": "pixi.tasks.runInEnvironment",
+                    "when": "view == pixi.views.tasks && viewItem == pixiTaskItem",
+                    "group": "1_run@2"
+                },
+                {
+                    "command": "pixi.tasks.revealInManifest",
+                    "when": "view == pixi.views.tasks && viewItem == pixiTaskItem",
+                    "group": "2_nav@1"
                 }
             ]
         },
@@ -574,6 +638,11 @@
                     "icon": "assets/pixi-activity.svg"
                 },
                 {
+                    "id": "pixi.views.tasks",
+                    "name": "Tasks",
+                    "icon": "assets/pixi-activity.svg"
+                },
+                {
                     "id": "pixi.views.global",
                     "name": "Global Tools",
                     "icon": "assets/pixi-activity.svg"
@@ -590,6 +659,16 @@
                 "view": "pixi.views.projects",
                 "contents": "No Pixi projects found in current workspace.\n[Initialize Pixi Project](command:pixi.init)",
                 "when": "!pixi.hasPixiProject"
+            },
+            {
+                "view": "pixi.views.tasks",
+                "contents": "No Pixi projects found in current workspace.\n[Initialize Pixi Project](command:pixi.init)",
+                "when": "!pixi.hasPixiProject"
+            },
+            {
+                "view": "pixi.views.tasks",
+                "contents": "No tasks found in current project.\nDefine tasks under [tasks] in pixi.toml or pyproject.toml.",
+                "when": "pixi.hasPixiProject"
             },
             {
                 "view": "pixi.views.global",

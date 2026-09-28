@@ -14,6 +14,7 @@ import { PixiTerminalProvider } from './providers/terminalProvider';
 import { PixiGlobalTreeDataProvider } from './views/globalTreeDataProvider';
 import { PixiInfoTreeDataProvider } from './views/infoTreeDataProvider';
 import { PixiProjectsTreeDataProvider } from './views/projectsTreeDataProvider';
+import { PixiTasksTreeDataProvider } from './views/tasksTreeDataProvider';
 
 export async function activate(context: ExtensionContext): Promise<PixiExtensionApi> {
     const log = window.createOutputChannel('Pixi', { log: true });
@@ -46,6 +47,14 @@ export async function activate(context: ExtensionContext): Promise<PixiExtension
     projectsTreeDataProvider.bindView(projectsTreeView);
 
     context.subscriptions.push(projectsTreeDataProvider, projectsTreeView);
+
+    const tasksTreeDataProvider = new PixiTasksTreeDataProvider(projectManager, taskProvider);
+    const tasksTreeView = window.createTreeView('pixi.views.tasks', {
+        treeDataProvider: tasksTreeDataProvider,
+    });
+    tasksTreeDataProvider.bindView(tasksTreeView);
+
+    context.subscriptions.push(tasksTreeDataProvider, tasksTreeView, tasksTreeDataProvider.registerCommands());
 
     const globalTreeDataProvider = new PixiGlobalTreeDataProvider();
     context.subscriptions.push(

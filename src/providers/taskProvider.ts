@@ -2,6 +2,8 @@ import * as path from 'path';
 import {
     commands,
     Disposable,
+    Event,
+    EventEmitter,
     LogOutputChannel,
     QuickPickItem,
     ShellExecution,
@@ -45,6 +47,8 @@ interface TaskQuickPickItem extends QuickPickItem {
 export class PixiTaskProvider implements TaskProvider, Disposable {
     private readonly disposables: Disposable[] = [];
     private taskCache = new Map<string, PixiTask[]>();
+    private readonly _onDidChangeTasks = new EventEmitter<void>();
+    readonly onDidChangeTasks: Event<void> = this._onDidChangeTasks.event;
 
     constructor(
         private readonly projectManager: PixiProjectManager,
@@ -52,24 +56,39 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
     ) {
         // Invalidate cache when manifest files change
         const watcher = workspace.createFileSystemWatcher('**/{pixi.toml,pyproject.toml}');
-        watcher.onDidChange(() => this.taskCache.clear(), this, this.disposables);
-        watcher.onDidCreate(() => this.taskCache.clear(), this, this.disposables);
-        watcher.onDidDelete(() => this.taskCache.clear(), this, this.disposables);
+        watcher.onDidChange(() => this.refresh(), this, this.disposables);
+        watcher.onDidCreate(() => this.refresh(), this, this.disposables);
+        watcher.onDidDelete(() => this.refresh(), this, this.disposables);
         this.disposables.push(watcher);
 
         this.disposables.push(tasks.registerTaskProvider('pixi', this));
     }
 
+    public refresh(): void {
+        this.taskCache.clear();
+        this._onDidChangeTasks.fire();
+    }
+
     dispose() {
         this.taskCache.clear();
+        this._onDidChangeTasks.dispose();
         for (const d of this.disposables) {
             d.dispose();
         }
     }
 
     registerCommands(): Disposable {
-        const d1 = commands.registerCommand('pixi.runTask', () => this.promptAndRunTask());
-        const d2 = commands.registerCommand('pixi.runTaskInEnvironment', () => this.promptAndRunTaskInEnvironment());
+        const d1 = commands.registerCommand('pixi.runTask', (task?: any) => {
+            const targetTask = task?.task || (task?.name && task?.projectPath ? task : undefined);
+            if (targetTask) {
+                return this.executePixiTask(targetTask);
+            }
+            return this.promptAndRunTask();
+        });
+        const d2 = commands.registerCommand('pixi.runTaskInEnvironment', (task?: any) => {
+            const targetTask = task?.task || (task?.name && task?.projectPath ? task : undefined);
+            return this.promptAndRunTaskInEnvironment(targetTask);
+        });
         return Disposable.from(d1, d2);
     }
 
@@ -229,65 +248,74 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
         });
 
         if (selected) {
-            const envName = selected.pixiTask.default_environment;
-            if (envName) {
-                const envs = this.projectManager.getEnvironmentsForProject(selected.pixiTask.projectPath);
-                const env = envs.find((e) => e.pixiEnvName === envName);
-                if (env?.pixiStatus === 'incompatible') {
-                    const reason = env.statusReason || 'The environment is incompatible with the platform.';
-                    window.showErrorMessage(
-                        `Cannot run task '${selected.pixiTask.name}' in environment '${envName}': ${reason}`,
-                    );
-                    return;
-                }
-                if (env?.pixiStatus === 'uninstalled') {
-                    const action = await window.showWarningMessage(
-                        `Environment '${envName}' required by task '${selected.pixiTask.name}' is not installed yet on disk. Would you like to install it now?`,
-                        'Install Environment',
-                    );
-                    if (action === 'Install Environment') {
-                        await commands.executeCommand('pixi.install', env.projectPath, envName);
-                    }
-                    return;
-                }
-            }
-            const vsTask = await this.createVsCodeTask(selected.pixiTask);
-            await tasks.executeTask(vsTask);
+            await this.executePixiTask(selected.pixiTask);
         }
     }
 
-    private async promptAndRunTaskInEnvironment() {
-        const projectPaths = this.projectManager.getProjectPaths();
-        if (projectPaths.length === 0) {
-            window.showWarningMessage('No Pixi projects found in the workspace.');
-            return;
+    public async executePixiTask(pixiTask: PixiTask, targetEnvName?: string): Promise<void> {
+        const envName = targetEnvName || pixiTask.default_environment;
+        if (envName) {
+            const envs = this.projectManager.getEnvironmentsForProject(pixiTask.projectPath);
+            const env = envs.find((e) => e.pixiEnvName === envName);
+            if (env?.pixiStatus === 'incompatible') {
+                const reason = env.statusReason || 'The environment is incompatible with the platform.';
+                window.showErrorMessage(`Cannot run task '${pixiTask.name}' in environment '${envName}': ${reason}`);
+                return;
+            }
+            if (env?.pixiStatus === 'uninstalled') {
+                const action = await window.showWarningMessage(
+                    `Environment '${envName}' required by task '${pixiTask.name}' is not installed yet on disk. Would you like to install it now?`,
+                    'Install Environment',
+                );
+                if (action === 'Install Environment') {
+                    await commands.executeCommand('pixi.install', env.projectPath, envName);
+                }
+                return;
+            }
         }
 
-        const allTasks: PixiTask[] = [];
-        for (const p of projectPaths) {
-            allTasks.push(...(await this.getTasksForProject(p)));
-        }
+        const taskToRun: PixiTask = targetEnvName ? { ...pixiTask, default_environment: targetEnvName } : pixiTask;
+        const vsTask = await this.createVsCodeTask(taskToRun);
+        await tasks.executeTask(vsTask);
+    }
 
-        if (allTasks.length === 0) {
-            window.showInformationMessage('No Pixi tasks found.');
-            return;
-        }
-
-        const selectedTask = await window.showQuickPick(
-            allTasks.map((t) => ({
-                label: t.name,
-                description: t.default_environment ? `[default: ${t.default_environment}]` : '',
-                detail: t.description || t.cmd,
-                pixiTask: t,
-            })),
-            { placeHolder: 'Step 1: Select a Pixi task' },
-        );
+    private async promptAndRunTaskInEnvironment(presetTask?: PixiTask) {
+        let selectedTask: PixiTask | undefined = presetTask;
 
         if (!selectedTask) {
-            return;
+            const projectPaths = this.projectManager.getProjectPaths();
+            if (projectPaths.length === 0) {
+                window.showWarningMessage('No Pixi projects found in the workspace.');
+                return;
+            }
+
+            const allTasks: PixiTask[] = [];
+            for (const p of projectPaths) {
+                allTasks.push(...(await this.getTasksForProject(p)));
+            }
+
+            if (allTasks.length === 0) {
+                window.showInformationMessage('No Pixi tasks found.');
+                return;
+            }
+
+            const picked = await window.showQuickPick(
+                allTasks.map((t) => ({
+                    label: t.name,
+                    description: t.default_environment ? `[default: ${t.default_environment}]` : '',
+                    detail: t.description || t.cmd,
+                    pixiTask: t,
+                })),
+                { placeHolder: 'Step 1: Select a Pixi task' },
+            );
+
+            if (!picked) {
+                return;
+            }
+            selectedTask = picked.pixiTask;
         }
 
-        const envs = this.projectManager.getEnvironmentsForProject(selectedTask.pixiTask.projectPath);
+        const envs = this.projectManager.getEnvironmentsForProject(selectedTask.projectPath);
         interface TaskEnvItem extends QuickPickItem {
             envName: string;
             pixiEnv?: PixiEnvironmentInfo;
@@ -321,42 +349,13 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
                   ];
 
         const selectedEnvItem = await window.showQuickPick(envItems, {
-            placeHolder: `Step 2: Select environment to run '${selectedTask.label}'`,
+            placeHolder: `Select environment to run '${selectedTask.name}'`,
         });
 
         if (!selectedEnvItem) {
             return;
         }
 
-        if (selectedEnvItem.pixiEnv?.pixiStatus === 'incompatible') {
-            const reason = selectedEnvItem.pixiEnv.statusReason || 'The environment is incompatible with the platform.';
-            window.showErrorMessage(
-                `Cannot run task in environment '${selectedEnvItem.pixiEnv.pixiEnvName}': ${reason}`,
-            );
-            return;
-        }
-
-        if (selectedEnvItem.pixiEnv?.pixiStatus === 'uninstalled') {
-            const action = await window.showWarningMessage(
-                `Environment '${selectedEnvItem.pixiEnv.pixiEnvName}' is not installed yet on disk. Would you like to install it before running this task?`,
-                'Install Environment',
-            );
-            if (action === 'Install Environment') {
-                await commands.executeCommand(
-                    'pixi.install',
-                    selectedEnvItem.pixiEnv.projectPath,
-                    selectedEnvItem.pixiEnv.pixiEnvName,
-                );
-            }
-            return;
-        }
-
-        const taskWithEnv: PixiTask = {
-            ...selectedTask.pixiTask,
-            default_environment: selectedEnvItem.envName,
-        };
-
-        const vsTask = await this.createVsCodeTask(taskWithEnv);
-        await tasks.executeTask(vsTask);
+        await this.executePixiTask(selectedTask, selectedEnvItem.envName);
     }
 }
