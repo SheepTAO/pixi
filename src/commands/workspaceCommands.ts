@@ -124,6 +124,38 @@ async function pickTargetEnvironment(
     return selected.envName;
 }
 
+function resolveEnvName(envName?: string, target?: unknown): string | undefined {
+    const raw =
+        (typeof envName === 'string' && envName.trim()) ||
+        (target as any)?.pixiEnvName ||
+        (target as any)?.env?.pixiEnvName;
+    return typeof raw === 'string' && raw.trim() ? raw.trim() : undefined;
+}
+
+async function resolveTargetEnvironment(
+    envs: PixiEnvironmentInfo[],
+    targetItem?: any,
+    placeholder?: string,
+): Promise<string | undefined | null> {
+    const directEnvName =
+        (typeof targetItem?.env?.pixiEnvName === 'string' && targetItem.env.pixiEnvName.trim()) ||
+        (typeof targetItem?.envName === 'string' && targetItem.envName.trim()) ||
+        (typeof targetItem?.pixiEnvName === 'string' && targetItem.pixiEnvName.trim()) ||
+        undefined;
+
+    if (directEnvName) {
+        return directEnvName;
+    }
+
+    if (envs.length > 1) {
+        return pickTargetEnvironment(envs, 'inspect', placeholder);
+    }
+    if (envs.length === 1 && envs[0].pixiEnvName !== 'default') {
+        return envs[0].pixiEnvName;
+    }
+    return undefined;
+}
+
 function normalizeFolderPath(target?: unknown): string | undefined {
     if (!target) {
         return undefined;
@@ -1061,11 +1093,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
             }
 
             const projectName = path.basename(projectPath);
-            const resolvedEnv =
-                (typeof envName === 'string' && envName.trim()) ||
-                (folderUri as any)?.pixiEnvName ||
-                (folderUri as any)?.env?.pixiEnvName;
-            const validEnvName = resolvedEnv ? resolvedEnv.trim() : undefined;
+            const validEnvName = resolveEnvName(envName, folderUri);
             const args = ['install'];
             if (validEnvName) {
                 args.push('-e', validEnvName);
@@ -1097,11 +1125,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
             }
 
             const projectName = path.basename(projectPath);
-            const resolvedEnv =
-                (typeof envName === 'string' && envName.trim()) ||
-                (folderUri as any)?.pixiEnvName ||
-                (folderUri as any)?.env?.pixiEnvName;
-            const validEnvName = resolvedEnv ? resolvedEnv.trim() : undefined;
+            const validEnvName = resolveEnvName(envName, folderUri);
 
             const runReinstall = async (target?: string, isAll?: boolean) => {
                 const title = target
@@ -1173,11 +1197,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
             }
 
             const projectName = path.basename(projectPath);
-            const resolvedEnv =
-                (typeof envName === 'string' && envName.trim()) ||
-                (folderUri as any)?.pixiEnvName ||
-                (folderUri as any)?.env?.pixiEnvName;
-            const validEnvName = resolvedEnv ? resolvedEnv.trim() : undefined;
+            const validEnvName = resolveEnvName(envName, folderUri);
             const args = ['update'];
             if (validEnvName) {
                 args.push('-e', validEnvName);
@@ -1899,26 +1919,13 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
             }
 
             const envs = manager.getEnvironmentsForProject(projectPath);
-            const directEnvName =
-                (typeof targetItem?.env?.pixiEnvName === 'string' && targetItem.env.pixiEnvName.trim()) ||
-                (typeof targetItem?.envName === 'string' && targetItem.envName.trim()) ||
-                undefined;
-
-            let targetEnv: string | undefined = directEnvName;
-            if (!targetEnv) {
-                if (envs.length > 1) {
-                    const selected = await pickTargetEnvironment(
-                        envs,
-                        'inspect',
-                        'Select environment to view dependency tree for',
-                    );
-                    if (selected === null) {
-                        return;
-                    }
-                    targetEnv = selected;
-                } else if (envs.length === 1 && envs[0].pixiEnvName !== 'default') {
-                    targetEnv = envs[0].pixiEnvName;
-                }
+            const targetEnv = await resolveTargetEnvironment(
+                envs,
+                targetItem,
+                'Select environment to view dependency tree for',
+            );
+            if (targetEnv === null) {
+                return;
             }
 
             const envLabel = targetEnv || 'default';
@@ -1995,26 +2002,13 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
             }
 
             const envs = manager.getEnvironmentsForProject(projectPath);
-            const directEnvName =
-                (typeof targetItem?.env?.pixiEnvName === 'string' && targetItem.env.pixiEnvName.trim()) ||
-                (typeof targetItem?.envName === 'string' && targetItem.envName.trim()) ||
-                undefined;
-
-            let targetEnv: string | undefined = directEnvName;
-            if (!targetEnv) {
-                if (envs.length > 1) {
-                    const selected = await pickTargetEnvironment(
-                        envs,
-                        'inspect',
-                        'Select environment to inspect package dependencies',
-                    );
-                    if (selected === null) {
-                        return;
-                    }
-                    targetEnv = selected;
-                } else if (envs.length === 1 && envs[0].pixiEnvName !== 'default') {
-                    targetEnv = envs[0].pixiEnvName;
-                }
+            const targetEnv = await resolveTargetEnvironment(
+                envs,
+                targetItem,
+                'Select environment to inspect package dependencies',
+            );
+            if (targetEnv === null) {
+                return;
             }
 
             const envLabel = targetEnv || 'default';
@@ -2127,26 +2121,13 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
             }
 
             const envs = manager.getEnvironmentsForProject(projectPath);
-            const directEnvName =
-                (typeof targetItem?.env?.pixiEnvName === 'string' && targetItem.env.pixiEnvName.trim()) ||
-                (typeof targetItem?.envName === 'string' && targetItem.envName.trim()) ||
-                undefined;
-
-            let targetEnv: string | undefined = directEnvName;
-            if (!targetEnv) {
-                if (envs.length > 1) {
-                    const selected = await pickTargetEnvironment(
-                        envs,
-                        'inspect',
-                        'Select environment to update package in',
-                    );
-                    if (selected === null) {
-                        return;
-                    }
-                    targetEnv = selected;
-                } else if (envs.length === 1 && envs[0].pixiEnvName !== 'default') {
-                    targetEnv = envs[0].pixiEnvName;
-                }
+            const targetEnv = await resolveTargetEnvironment(
+                envs,
+                targetItem,
+                'Select environment to update package in',
+            );
+            if (targetEnv === null) {
+                return;
             }
 
             const envLabel = targetEnv || 'default';
@@ -2255,19 +2236,13 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
 
             if (!pkgName) {
                 const envs = manager.getEnvironmentsForProject(projectPath);
-                let targetEnv: string | undefined;
-                if (envs.length > 1) {
-                    const picked = await pickTargetEnvironment(
-                        envs,
-                        'inspect',
-                        'Select environment to reveal package from',
-                    );
-                    if (picked === null) {
-                        return;
-                    }
-                    targetEnv = picked;
-                } else if (envs.length === 1 && envs[0].pixiEnvName !== 'default') {
-                    targetEnv = envs[0].pixiEnvName;
+                const targetEnv = await resolveTargetEnvironment(
+                    envs,
+                    targetItem,
+                    'Select environment to reveal package from',
+                );
+                if (targetEnv === null) {
+                    return;
                 }
                 const envLabel = targetEnv || (envs.length > 0 ? envs[0].pixiEnvName : 'default');
                 const packages = await manager.getPackagesForEnvironment(envLabel, projectPath);
@@ -2388,21 +2363,13 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                     return;
                 }
                 const envs = manager.getEnvironmentsForProject(projectPath);
-                let targetEnv: string | undefined = targetItem?.pixiEnvName || targetItem?.env?.pixiEnvName;
-                if (!targetEnv) {
-                    if (envs.length > 1) {
-                        const picked = await pickTargetEnvironment(
-                            envs,
-                            'inspect',
-                            'Select environment to copy package name from',
-                        );
-                        if (picked === null) {
-                            return;
-                        }
-                        targetEnv = picked;
-                    } else if (envs.length === 1 && envs[0].pixiEnvName !== 'default') {
-                        targetEnv = envs[0].pixiEnvName;
-                    }
+                const targetEnv = await resolveTargetEnvironment(
+                    envs,
+                    targetItem,
+                    'Select environment to copy package name from',
+                );
+                if (targetEnv === null) {
+                    return;
                 }
                 const envLabel = targetEnv || (envs.length > 0 ? envs[0].pixiEnvName : 'default');
                 const packages = await manager.getPackagesForEnvironment(envLabel, projectPath);

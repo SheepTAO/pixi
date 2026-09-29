@@ -217,8 +217,7 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
         if (tasks.length === 0) {
             return [new PixiTaskEmptyTreeItem(project)];
         }
-        const sorted = [...tasks].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
-        return sorted.map((t) => new PixiTaskTreeItem(t, project));
+        return tasks.map((t) => new PixiTaskTreeItem(t, project));
     }
 
     public registerCommands(): Disposable {

@@ -13,7 +13,6 @@ import {
     workspace,
 } from 'vscode';
 
-import { sortPixiEnvironments } from '../core/environmentRules';
 import { PixiProjectManager } from '../core/projectManager';
 import { PixiEnvironmentInfo, PixiPackage, PixiProject } from '../core/types';
 
@@ -314,18 +313,14 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
             }
             if (projects.length === 1) {
                 const singleProject = projects[0];
-                const envs = sortPixiEnvironments(
-                    this.projectManager.getEnvironmentsForProject(singleProject.projectPath),
-                );
+                const envs = this.projectManager.getEnvironmentsForProject(singleProject.projectPath);
                 return envs.map((e) => new PixiEnvironmentTreeItem(e, singleProject));
             }
             return projects.map((p) => new PixiProjectTreeItem(p));
         }
 
         if (element instanceof PixiProjectTreeItem) {
-            const envs = sortPixiEnvironments(
-                this.projectManager.getEnvironmentsForProject(element.project.projectPath),
-            );
+            const envs = this.projectManager.getEnvironmentsForProject(element.project.projectPath);
             return envs.map((e) => new PixiEnvironmentTreeItem(e, element.project));
         }
 
