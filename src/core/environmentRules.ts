@@ -87,3 +87,31 @@ export function sortPixiEnvironments<T extends { pixiEnvName: string; pixiStatus
         return a.pixiEnvName.localeCompare(b.pixiEnvName, undefined, { sensitivity: 'base' });
     });
 }
+
+/**
+ * Picks the most appropriate default environment from a list:
+ * Installed 'default' > any installed > uninstalled 'default' > first environment.
+ */
+export function getDefaultEnvironment<T extends { pixiEnvName: string; pixiStatus: string }>(
+    envs: T[],
+): T | undefined {
+    return (
+        envs.find((e) => e.pixiEnvName === 'default' && e.pixiStatus === 'installed') ||
+        envs.find((e) => e.pixiStatus === 'installed') ||
+        envs.find((e) => e.pixiEnvName === 'default') ||
+        envs[0]
+    );
+}
+
+/**
+ * Returns the status icon and human-readable badge text for environment QuickPick displays.
+ */
+export function getEnvironmentStatusBadge(status?: string): { icon: string; text: string } {
+    if (status === 'uninstalled') {
+        return { icon: '$(cloud-download)', text: '(not installed)' };
+    }
+    if (status === 'incompatible') {
+        return { icon: '$(circle-slash)', text: '(incompatible)' };
+    }
+    return { icon: '$(layers)', text: '' };
+}

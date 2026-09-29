@@ -2,7 +2,7 @@ import * as path from 'path';
 import { Disposable, Event, EventEmitter, Uri, workspace } from 'vscode';
 
 import { getWorkspacePersistentState } from '../common/persistentState';
-import { matchEnvironmentRule } from '../core/environmentRules';
+import { getDefaultEnvironment, matchEnvironmentRule } from '../core/environmentRules';
 import { PixiProjectManager } from '../core/projectManager';
 import { ActiveEnvironmentChangeEvent, PixiEnvironmentInfo, PixiExtensionApi, PixiPackage, PixiProject } from './types';
 
@@ -123,12 +123,7 @@ export class PixiExtensionApiImpl implements PixiExtensionApi, Disposable {
         }
 
         // 3. Fallback to default/installed environment in this project
-        return (
-            envs.find((e) => e.pixiEnvName === 'default' && e.pixiStatus === 'installed') ||
-            envs.find((e) => e.pixiStatus === 'installed') ||
-            envs.find((e) => e.pixiEnvName === 'default') ||
-            envs[0]
-        );
+        return getDefaultEnvironment(envs);
     }
 
     public async refresh(scope?: Uri): Promise<void> {
@@ -184,12 +179,7 @@ export class PixiExtensionApiImpl implements PixiExtensionApi, Disposable {
                     return match;
                 }
             }
-            return (
-                envs.find((e) => e.pixiEnvName === 'default' && e.pixiStatus === 'installed') ||
-                envs.find((e) => e.pixiStatus === 'installed') ||
-                envs.find((e) => e.pixiEnvName === 'default') ||
-                envs[0]
-            );
+            return getDefaultEnvironment(envs);
         }
 
         return undefined;

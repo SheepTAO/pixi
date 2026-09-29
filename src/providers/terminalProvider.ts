@@ -15,7 +15,7 @@ import {
 
 import { getPixi } from '../cli/pixiCli';
 import { traceError, traceVerbose } from '../common/logging';
-import { sortPixiEnvironments } from '../core/environmentRules';
+import { getEnvironmentStatusBadge, sortPixiEnvironments } from '../core/environmentRules';
 import { PixiProjectManager } from '../core/projectManager';
 import { PixiEnvironmentInfo } from '../core/types';
 
@@ -121,18 +121,10 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
         }
 
         const items: EnvQuickPickItem[] = envs.map((env) => {
-            let icon = '$(layers)';
-            let statusText = '';
-            if (env.pixiStatus === 'uninstalled') {
-                icon = '$(cloud-download)';
-                statusText = '(not installed)';
-            } else if (env.pixiStatus === 'incompatible') {
-                icon = '$(circle-slash)';
-                statusText = '(incompatible)';
-            }
+            const { icon, text } = getEnvironmentStatusBadge(env.pixiStatus);
             return {
                 label: `${icon} ${env.pixiEnvName}`,
-                description: statusText ? `${env.projectName} ${statusText}` : env.projectName,
+                description: text ? `${env.projectName} ${text}` : env.projectName,
                 detail: env.statusReason || env.prefix,
                 env,
             };

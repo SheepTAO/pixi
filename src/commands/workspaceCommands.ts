@@ -21,6 +21,7 @@ import {
 
 import { PixiPackageSearchResult, runPixi, searchPixiPackages } from '../cli/pixiCli';
 import { runPixiWithProgress } from '../cli/workspaceCli';
+import { getEnvironmentStatusBadge } from '../core/environmentRules';
 import { findManifestPath, getProjectConfiguredChannels, isPixiProject } from '../core/projectDiscovery';
 import { PixiProjectManager } from '../core/projectManager';
 import { PixiEnvironmentInfo, PixiPackage } from '../core/types';
@@ -91,18 +92,10 @@ async function pickTargetEnvironment(
             envName: undefined,
         },
         ...namedEnvs.map((e) => {
-            let icon = '$(layers)';
-            let statusText = '';
-            if (e.pixiStatus === 'uninstalled') {
-                icon = '$(cloud-download)';
-                statusText = '(not installed)';
-            } else if (e.pixiStatus === 'incompatible') {
-                icon = '$(circle-slash)';
-                statusText = '(incompatible)';
-            }
+            const { icon, text } = getEnvironmentStatusBadge(e.pixiStatus);
             return {
                 label: `${icon} ${e.pixiEnvName}`,
-                description: statusText ? `${e.projectName} ${statusText}` : e.projectName,
+                description: text ? `${e.projectName} ${text}` : e.projectName,
                 envName: e.pixiEnvName,
             };
         }),
@@ -856,18 +849,10 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
 
             const envItems = [
                 ...envs.map((e) => {
-                    let icon = '$(layers)';
-                    let statusText = '';
-                    if (e.pixiStatus === 'uninstalled') {
-                        icon = '$(cloud-download)';
-                        statusText = '(not installed)';
-                    } else if (e.pixiStatus === 'incompatible') {
-                        icon = '$(circle-slash)';
-                        statusText = '(incompatible)';
-                    }
+                    const { icon, text } = getEnvironmentStatusBadge(e.pixiStatus);
                     return {
                         label: `${icon} ${e.pixiEnvName}`,
-                        description: statusText,
+                        description: text,
                         envName: e.pixiEnvName,
                     };
                 }),

@@ -15,7 +15,7 @@ import {
 import { runPixi } from '../cli/pixiCli';
 import { safeJsonParse } from '../common/execUtils';
 import { traceError, traceVerbose } from '../common/logging';
-import { matchEnvironmentRule, sortPixiEnvironments } from './environmentRules';
+import { getDefaultEnvironment, matchEnvironmentRule, sortPixiEnvironments } from './environmentRules';
 import { listPixiPackages, PixiPackage } from './packageManager';
 import { findManifestPath, isPixiProject, resolvePixiProjectPaths } from './projectDiscovery';
 import { scanEnvironmentToolchains } from './toolchains';
@@ -240,12 +240,7 @@ export class PixiProjectManager implements Disposable {
             }
         }
 
-        return (
-            envs.find((e) => e.pixiEnvName === 'default' && e.pixiStatus === 'installed') ||
-            envs.find((e) => e.pixiStatus === 'installed') ||
-            envs.find((e) => e.pixiEnvName === 'default') ||
-            envs[0]
-        );
+        return getDefaultEnvironment(envs);
     }
 
     public async refresh(scope?: Uri): Promise<void> {

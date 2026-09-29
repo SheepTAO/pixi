@@ -1,6 +1,7 @@
 import * as path from 'path';
 import { commands, MarkdownString, ThemeIcon, Uri, window } from 'vscode';
 
+import { getEnvironmentStatusBadge } from '../../core/environmentRules';
 import { scanPythonToolchain } from '../../core/toolchains';
 import { PixiEnvironmentInfo } from '../../core/types';
 import { PIXI_MANAGER_ID } from './constants';
@@ -46,13 +47,13 @@ export interface EnvironmentQuickPickInfo {
 }
 
 export function getEnvironmentQuickPickInfo(env: PixiPythonEnvironment): EnvironmentQuickPickInfo {
-    if (env.pixiStatus === 'uninstalled' || env.error?.includes('not installed')) {
-        return { icon: '$(cloud-download)', statusText: '(not installed)' };
-    }
-    if (env.pixiStatus === 'incompatible' || env.error) {
-        return { icon: '$(circle-slash)', statusText: '(incompatible)' };
-    }
-    return { icon: '$(python)' };
+    const isUninstalled = env.pixiStatus === 'uninstalled' || env.error?.includes('not installed');
+    const isIncompatible = env.pixiStatus === 'incompatible' || Boolean(env.error);
+    const badge = getEnvironmentStatusBadge(isUninstalled ? 'uninstalled' : isIncompatible ? 'incompatible' : undefined);
+    return {
+        icon: badge.icon === '$(layers)' ? '$(python)' : badge.icon,
+        statusText: badge.text || undefined,
+    };
 }
 
 export function sortEnvironments(envs: PixiPythonEnvironment[]): PixiPythonEnvironment[] {

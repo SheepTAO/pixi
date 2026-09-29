@@ -21,7 +21,7 @@ import { getPixi } from '../../cli/pixiCli';
 import { createDeferred, Deferred } from '../../common/deferred';
 import { traceVerbose } from '../../common/logging';
 import { getWorkspacePersistentState } from '../../common/persistentState';
-import { matchEnvironmentRule } from '../../core/environmentRules';
+import { getDefaultEnvironment, matchEnvironmentRule } from '../../core/environmentRules';
 import { PixiProjectManager } from '../../core/projectManager';
 import { PIXI_MANAGER_ID } from './constants';
 import {
@@ -293,20 +293,7 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
         return changes;
     }
 
-    private getDefaultProjectEnv(envs: PixiPythonEnvironment[]): PixiPythonEnvironment | undefined {
-        const installedEnvs = envs.filter((e) => e.pixiStatus === 'installed' || (!e.pixiStatus && !e.error));
-        const uninstalledEnvs = envs.filter(
-            (e) => e.pixiStatus === 'uninstalled' || (e.error && e.error.includes('not installed')),
-        );
-        return (
-            installedEnvs.find((e) => e.pixiEnvName === 'default') ||
-            installedEnvs[0] ||
-            uninstalledEnvs.find((e) => e.pixiEnvName === 'default') ||
-            uninstalledEnvs[0] ||
-            envs.find((e) => e.pixiEnvName === 'default') ||
-            envs[0]
-        );
-    }
+
 
     async getEnvironments(scope: GetEnvironmentsScope): Promise<PythonEnvironment[]> {
         await this.initialize();
@@ -360,7 +347,7 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
         }
 
         const projectEnvs = this.projectToEnvs.get(projectPath) || [];
-        return this.getDefaultProjectEnv(projectEnvs) || this.globalEnv;
+        return getDefaultEnvironment(projectEnvs) || this.globalEnv;
     }
 
     async set(scope: SetEnvironmentScope, environment?: PythonEnvironment): Promise<void> {
