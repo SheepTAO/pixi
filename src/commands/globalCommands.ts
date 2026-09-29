@@ -22,6 +22,7 @@ import {
     uninstallGlobalTool,
     updateGlobalTool,
 } from '../cli/globalCli';
+import { CONDA_CHANNEL_PRESETS } from '../cli/pixiCli';
 
 export {
     clearGlobalManifestCache,
@@ -119,26 +120,11 @@ export async function handleGlobalInstall(initialTool?: string): Promise<void> {
 
     const channelPick = await window.showQuickPick(
         [
-            {
-                label: '$(server) conda-forge (default)',
-                description: 'Install from official conda-forge repository',
-                channel: undefined,
-            },
-            {
-                label: '$(rocket) Tsinghua Mirror (conda-forge)',
-                description: 'https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge',
-                channel: 'https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge',
-            },
-            {
-                label: '$(rocket) BFSU Mirror (conda-forge)',
-                description: 'https://mirrors.bfsu.edu.cn/anaconda/cloud/conda-forge',
-                channel: 'https://mirrors.bfsu.edu.cn/anaconda/cloud/conda-forge',
-            },
-            {
-                label: '$(beaker) Bioconda',
-                description: 'Bioinformatics and biology package channel',
-                channel: 'bioconda',
-            },
+            ...CONDA_CHANNEL_PRESETS.map((p) => ({
+                label: p.label,
+                description: p.description,
+                channel: p.channel === 'conda-forge' ? undefined : p.channel,
+            })),
             {
                 label: '$(globe) Custom Channel...',
                 description: 'Specify a custom channel name or mirror URL',

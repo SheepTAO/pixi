@@ -14,6 +14,7 @@ import {
 } from 'vscode';
 
 import { getPixi } from '../cli/pixiCli';
+import { normalizeFolderPath } from '../common/execUtils';
 import { traceError, traceVerbose } from '../common/logging';
 import { getEnvironmentStatusBadge, sortPixiEnvironments } from '../core/environmentRules';
 import { PixiProjectManager } from '../core/projectManager';
@@ -187,21 +188,16 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
     async openTerminal(target?: any): Promise<void> {
         try {
             let env: PixiEnvironmentInfo | undefined;
-            let targetProjectPath: string | undefined;
-
-            if (typeof target === 'string') {
-                targetProjectPath = this.projectManager.findProjectForUri(Uri.file(target)) || target;
-            } else if (target && 'pixiEnvName' in target) {
+            if (target && 'pixiEnvName' in target) {
                 env = target as PixiEnvironmentInfo;
             } else if (target && 'env' in target && target.env) {
                 env = target.env;
-            } else if (target && 'project' in target && target.project?.projectPath) {
-                targetProjectPath = target.project.projectPath;
-            } else if (target && 'projectPath' in target && typeof target.projectPath === 'string') {
-                targetProjectPath = target.projectPath;
-            } else if (target && 'fsPath' in target && typeof target.fsPath === 'string') {
-                targetProjectPath = this.projectManager.findProjectForUri(target as Uri);
             }
+
+            const folder = normalizeFolderPath(target);
+            const targetProjectPath = folder
+                ? this.projectManager.findProjectForUri(Uri.file(folder)) || folder
+                : undefined;
 
             if (!env) {
                 env = await this.pickEnvironment(undefined, targetProjectPath);

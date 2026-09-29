@@ -88,3 +88,30 @@ export function safeJsonParse<T>(text: string, fallback?: T): T {
         throw e;
     }
 }
+
+/**
+ * Resolves a directory path from various command arguments (Uri, string path, or tree item objects).
+ */
+export function normalizeFolderPath(target?: unknown): string | undefined {
+    if (!target) {
+        return undefined;
+    }
+    const safeDir = (p: string): string => {
+        try {
+            if (fs.existsSync(p) && !fs.statSync(p).isDirectory()) {
+                return path.dirname(p);
+            }
+        } catch {
+            // ignore stat failure
+        }
+        return p;
+    };
+    const candidate =
+        typeof target === 'string'
+            ? target
+            : (target as any)?.projectPath ||
+              (target as any)?.project?.projectPath ||
+              (target as any)?.env?.projectPath ||
+              (target as any)?.fsPath;
+    return typeof candidate === 'string' ? safeDir(candidate) : undefined;
+}

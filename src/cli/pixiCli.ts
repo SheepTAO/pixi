@@ -218,6 +218,50 @@ export function getHostCondaPlatform(): string {
     return 'linux-64';
 }
 
+export interface CondaChannelPreset {
+    label: string;
+    description: string;
+    channel?: string;
+}
+
+export const CONDA_CHANNEL_PRESETS: readonly CondaChannelPreset[] = [
+    {
+        label: '$(server) conda-forge (default)',
+        description: 'Community-driven Conda repository (default)',
+        channel: 'conda-forge',
+    },
+    {
+        label: '$(rocket) Tsinghua Mirror (conda-forge)',
+        description: 'https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge',
+        channel: 'https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge',
+    },
+    {
+        label: '$(rocket) BFSU Mirror (conda-forge)',
+        description: 'https://mirrors.bfsu.edu.cn/anaconda/cloud/conda-forge',
+        channel: 'https://mirrors.bfsu.edu.cn/anaconda/cloud/conda-forge',
+    },
+    {
+        label: '$(rocket) Aliyun Mirror (conda-forge)',
+        description: 'https://mirrors.aliyun.com/anaconda/cloud/conda-forge',
+        channel: 'https://mirrors.aliyun.com/anaconda/cloud/conda-forge',
+    },
+    {
+        label: '$(server) pytorch',
+        description: 'Official PyTorch Conda channel',
+        channel: 'pytorch',
+    },
+    {
+        label: '$(server) nvidia',
+        description: 'Official NVIDIA CUDA packages channel',
+        channel: 'nvidia',
+    },
+    {
+        label: '$(beaker) bioconda',
+        description: 'Bioinformatics and biology package channel',
+        channel: 'bioconda',
+    },
+];
+
 const MAX_SEARCH_CACHE_SIZE = 100;
 const searchCache = new Map<string, PixiPackageSearchResult[]>();
 

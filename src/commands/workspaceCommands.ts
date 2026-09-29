@@ -19,8 +19,9 @@ import {
     workspace,
 } from 'vscode';
 
-import { PixiPackageSearchResult, runPixi, searchPixiPackages } from '../cli/pixiCli';
+import { CONDA_CHANNEL_PRESETS, PixiPackageSearchResult, runPixi, searchPixiPackages } from '../cli/pixiCli';
 import { runPixiWithProgress } from '../cli/workspaceCli';
+import { normalizeFolderPath } from '../common/execUtils';
 import { getEnvironmentStatusBadge } from '../core/environmentRules';
 import { findManifestPath, getProjectConfiguredChannels, isPixiProject } from '../core/projectDiscovery';
 import { PixiProjectManager } from '../core/projectManager';
@@ -149,29 +150,7 @@ async function resolveTargetEnvironment(
     return undefined;
 }
 
-function normalizeFolderPath(target?: unknown): string | undefined {
-    if (!target) {
-        return undefined;
-    }
-    const safeDir = (p: string): string => {
-        try {
-            if (fs.existsSync(p) && !fs.statSync(p).isDirectory()) {
-                return path.dirname(p);
-            }
-        } catch {
-            // ignore stat failure
-        }
-        return p;
-    };
-    const candidate =
-        typeof target === 'string'
-            ? target
-            : (target as any)?.projectPath ||
-              (target as any)?.project?.projectPath ||
-              (target as any)?.env?.projectPath ||
-              (target as any)?.fsPath;
-    return typeof candidate === 'string' ? safeDir(candidate) : undefined;
-}
+
 
 async function resolveTargetFolder(folderUri?: Uri, placeHolder?: string): Promise<string | undefined> {
     const direct = normalizeFolderPath(folderUri);
@@ -1610,41 +1589,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                     description: 'Enter a custom channel name, internal mirror, or URL',
                     isCustom: true,
                 },
-                {
-                    label: '$(server) conda-forge',
-                    description: 'Community-driven Conda repository (default)',
-                    channel: 'conda-forge',
-                },
-                {
-                    label: '$(rocket) Tsinghua Mirror (conda-forge)',
-                    description: 'https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge',
-                    channel: 'https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge',
-                },
-                {
-                    label: '$(rocket) BFSU Mirror (conda-forge)',
-                    description: 'https://mirrors.bfsu.edu.cn/anaconda/cloud/conda-forge',
-                    channel: 'https://mirrors.bfsu.edu.cn/anaconda/cloud/conda-forge',
-                },
-                {
-                    label: '$(rocket) Aliyun Mirror (conda-forge)',
-                    description: 'https://mirrors.aliyun.com/anaconda/cloud/conda-forge',
-                    channel: 'https://mirrors.aliyun.com/anaconda/cloud/conda-forge',
-                },
-                {
-                    label: '$(server) pytorch',
-                    description: 'Official PyTorch Conda channel',
-                    channel: 'pytorch',
-                },
-                {
-                    label: '$(server) nvidia',
-                    description: 'Official NVIDIA CUDA packages channel',
-                    channel: 'nvidia',
-                },
-                {
-                    label: '$(server) bioconda',
-                    description: 'Bioinformatics and biology package channel',
-                    channel: 'bioconda',
-                },
+                ...CONDA_CHANNEL_PRESETS,
             ];
 
             const pick = await window.showQuickPick(presets, {
