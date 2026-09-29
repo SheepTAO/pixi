@@ -258,8 +258,7 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
             }
 
             const projectPath = task.projectPath;
-            const manifestPath =
-                targetItem?.project?.manifestPath || this.projectManager.getManifestPath(projectPath);
+            const manifestPath = targetItem?.project?.manifestPath || this.projectManager.getManifestPath(projectPath);
 
             if (!manifestPath || !fs.existsSync(manifestPath)) {
                 window.showWarningMessage('Could not find manifest file for this project.');

@@ -49,7 +49,9 @@ export interface EnvironmentQuickPickInfo {
 export function getEnvironmentQuickPickInfo(env: PixiPythonEnvironment): EnvironmentQuickPickInfo {
     const isUninstalled = env.pixiStatus === 'uninstalled' || env.error?.includes('not installed');
     const isIncompatible = env.pixiStatus === 'incompatible' || Boolean(env.error);
-    const badge = getEnvironmentStatusBadge(isUninstalled ? 'uninstalled' : isIncompatible ? 'incompatible' : undefined);
+    const badge = getEnvironmentStatusBadge(
+        isUninstalled ? 'uninstalled' : isIncompatible ? 'incompatible' : undefined,
+    );
     return {
         icon: badge.icon === '$(layers)' ? '$(python)' : badge.icon,
         statusText: badge.text || undefined,

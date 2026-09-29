@@ -293,8 +293,6 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
         return changes;
     }
 
-
-
     async getEnvironments(scope: GetEnvironmentsScope): Promise<PythonEnvironment[]> {
         await this.initialize();
 

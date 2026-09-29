@@ -115,9 +115,7 @@ export function sortPixiEnvironments<T extends { pixiEnvName: string; pixiStatus
  * Picks the most appropriate default environment from a list:
  * Installed 'default' > any installed > uninstalled 'default' > first environment.
  */
-export function getDefaultEnvironment<T extends { pixiEnvName: string; pixiStatus: string }>(
-    envs: T[],
-): T | undefined {
+export function getDefaultEnvironment<T extends { pixiEnvName: string; pixiStatus: string }>(envs: T[]): T | undefined {
     return (
         envs.find((e) => e.pixiEnvName === 'default' && e.pixiStatus === 'installed') ||
         envs.find((e) => e.pixiStatus === 'installed') ||

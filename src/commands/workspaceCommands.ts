@@ -150,8 +150,6 @@ async function resolveTargetEnvironment(
     return undefined;
 }
 
-
-
 async function resolveTargetFolder(folderUri?: Uri, placeHolder?: string): Promise<string | undefined> {
     const direct = normalizeFolderPath(folderUri);
     if (direct) {
