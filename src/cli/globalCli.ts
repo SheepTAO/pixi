@@ -59,7 +59,7 @@ export async function listGlobalEnvironments(): Promise<PixiGlobalEnvironment[] 
         const stdout = await runPixi(['global', 'list', '--json']);
         const parsed = safeJsonParse<PixiGlobalEnvironment[]>(stdout, []);
         if (Array.isArray(parsed)) {
-            return parsed;
+            return parsed.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
         }
         return [];
     } catch (error) {

@@ -69,8 +69,7 @@ export class PixiGlobalTreeDataProvider implements TreeDataProvider<PixiGlobalTr
             if (!tools || tools.length === 0) {
                 return [];
             }
-            const sorted = [...tools].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
-            return sorted.map((tool) => new PixiGlobalToolTreeItem(tool));
+            return tools.map((tool) => new PixiGlobalToolTreeItem(tool));
         }
 
         return [];

@@ -340,17 +340,9 @@ export async function searchPixiPackages(
     }
 
     const platform = options?.platform || getHostCondaPlatform();
-    const allChannels: string[] = [];
-    if (options?.channels && options.channels.length > 0) {
-        for (const ch of options.channels) {
-            if (ch && !allChannels.includes(ch)) {
-                allChannels.push(ch);
-            }
-        }
-    }
-    if (options?.channel && !allChannels.includes(options.channel)) {
-        allChannels.push(options.channel);
-    }
+    const allChannels = [
+        ...new Set([...(options?.channels || []), options?.channel].filter((c): c is string => Boolean(c))),
+    ];
 
     const channelsKey = allChannels.slice().sort().join(',');
     const cacheKey = `${options?.cwd || ''}:${platform}:${channelsKey}:${cleanQuery}`;

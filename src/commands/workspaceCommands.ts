@@ -138,23 +138,14 @@ function normalizeFolderPath(target?: unknown): string | undefined {
         }
         return p;
     };
-    if (typeof target === 'string') {
-        return safeDir(target);
-    }
-    const anyTarget = target as any;
-    if (anyTarget.projectPath && typeof anyTarget.projectPath === 'string') {
-        return safeDir(anyTarget.projectPath);
-    }
-    if (anyTarget.project?.projectPath && typeof anyTarget.project.projectPath === 'string') {
-        return safeDir(anyTarget.project.projectPath);
-    }
-    if (anyTarget.env?.projectPath && typeof anyTarget.env.projectPath === 'string') {
-        return safeDir(anyTarget.env.projectPath);
-    }
-    if (anyTarget.fsPath && typeof anyTarget.fsPath === 'string') {
-        return safeDir(anyTarget.fsPath);
-    }
-    return undefined;
+    const candidate =
+        typeof target === 'string'
+            ? target
+            : (target as any)?.projectPath ||
+              (target as any)?.project?.projectPath ||
+              (target as any)?.env?.projectPath ||
+              (target as any)?.fsPath;
+    return typeof candidate === 'string' ? safeDir(candidate) : undefined;
 }
 
 async function resolveTargetFolder(folderUri?: Uri, placeHolder?: string): Promise<string | undefined> {
