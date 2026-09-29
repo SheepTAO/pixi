@@ -1,6 +1,6 @@
 import * as path from 'path';
 import picomatch from 'picomatch';
-import { Uri, workspace } from 'vscode';
+import { commands, Uri, window, workspace } from 'vscode';
 
 const matcherCache = new Map<string, (input: string) => boolean>();
 
@@ -135,4 +135,23 @@ export function getEnvironmentStatusBadge(status?: string): { icon: string; text
         return { icon: '$(circle-slash)', text: '(incompatible)' };
     }
     return { icon: '$(layers)', text: '' };
+}
+
+/**
+ * Prompts the user to install an uninstalled Pixi environment and executes 'pixi.install'.
+ */
+export async function promptToInstallEnvironment(
+    envName: string,
+    projectPath: string | Uri,
+    message?: string,
+): Promise<boolean> {
+    const prompt =
+        message || `Environment '${envName}' is not installed yet on disk. Would you like to install it now?`;
+    const action = await window.showWarningMessage(prompt, 'Install Environment');
+    if (action === 'Install Environment') {
+        const folder = typeof projectPath === 'string' ? Uri.file(projectPath) : projectPath;
+        void commands.executeCommand('pixi.install', folder, envName);
+        return true;
+    }
+    return false;
 }

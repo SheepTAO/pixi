@@ -13,6 +13,7 @@ import {
     workspace,
 } from 'vscode';
 
+import { sortPixiPackages } from '../core/packageManager';
 import { PixiProjectManager } from '../core/projectManager';
 import { PixiEnvironmentInfo, PixiPackage, PixiProject } from '../core/types';
 
@@ -340,11 +341,9 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
             const config = workspace.getConfiguration('pixi', Uri.file(element.project.projectPath));
             const displayMode = config.get<'grouped' | 'explicitOnly' | 'all'>('packages.displayMode', 'grouped');
 
-            const explicit = packages.filter((p) => p.is_explicit);
-            const transitive = packages.filter((p) => !p.is_explicit);
-
-            explicit.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
-            transitive.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+            const sorted = sortPixiPackages(packages);
+            const explicit = sorted.filter((p) => p.is_explicit);
+            const transitive = sorted.filter((p) => !p.is_explicit);
 
             if (displayMode === 'explicitOnly') {
                 if (explicit.length === 0) {

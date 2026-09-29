@@ -1,7 +1,7 @@
 import * as path from 'path';
-import { commands, MarkdownString, ThemeIcon, Uri, window } from 'vscode';
+import { MarkdownString, ThemeIcon, Uri } from 'vscode';
 
-import { getEnvironmentStatusBadge } from '../../core/environmentRules';
+import { promptToInstallEnvironment as promptCoreInstall } from '../../core/environmentRules';
 import { scanPythonToolchain } from '../../core/toolchains';
 import { PixiEnvironmentInfo } from '../../core/types';
 import { PIXI_MANAGER_ID } from './constants';
@@ -15,17 +15,9 @@ export function isEnvironmentInvalid(env?: PixiPythonEnvironment): boolean {
 }
 
 export async function promptToInstallEnvironment(env: PixiPythonEnvironment, targetFolder?: Uri): Promise<boolean> {
-    const action = await window.showWarningMessage(
-        `Environment '${env.pixiEnvName}' is not installed yet on disk. Would you like to install it now?`,
-        'Install Environment',
-    );
-    if (action === 'Install Environment') {
-        const projectFolder = env.manifestPath ? Uri.file(path.dirname(env.manifestPath)) : undefined;
-        const folder = targetFolder ?? projectFolder ?? env.environmentPath;
-        void commands.executeCommand('pixi.install', folder, env.pixiEnvName);
-        return true;
-    }
-    return false;
+    const projectFolder = env.manifestPath ? Uri.file(path.dirname(env.manifestPath)) : undefined;
+    const folder = targetFolder ?? projectFolder ?? env.environmentPath;
+    return promptCoreInstall(env.pixiEnvName, folder);
 }
 
 export function getEnvironmentPriority(env: PixiPythonEnvironment): number {
@@ -39,23 +31,6 @@ export function getEnvironmentPriority(env: PixiPythonEnvironment): number {
         return 2;
     }
     return 0;
-}
-
-export interface EnvironmentQuickPickInfo {
-    icon: string;
-    statusText?: string;
-}
-
-export function getEnvironmentQuickPickInfo(env: PixiPythonEnvironment): EnvironmentQuickPickInfo {
-    const isUninstalled = env.pixiStatus === 'uninstalled' || env.error?.includes('not installed');
-    const isIncompatible = env.pixiStatus === 'incompatible' || Boolean(env.error);
-    const badge = getEnvironmentStatusBadge(
-        isUninstalled ? 'uninstalled' : isIncompatible ? 'incompatible' : undefined,
-    );
-    return {
-        icon: badge.icon === '$(layers)' ? '$(python)' : badge.icon,
-        statusText: badge.text || undefined,
-    };
 }
 
 export function sortEnvironments(envs: PixiPythonEnvironment[]): PixiPythonEnvironment[] {

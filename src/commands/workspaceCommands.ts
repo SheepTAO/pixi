@@ -7,28 +7,19 @@ import {
     Disposable,
     env as vscodeEnv,
     OutputChannel,
-    Position,
     ProgressLocation,
     QuickPickItem,
     QuickPickItemKind,
-    Range,
-    Selection,
-    TextEditorRevealType,
     Uri,
     window,
     workspace,
 } from 'vscode';
 
-import {
-    cleanGlobalCache,
-    PixiPackageSearchResult,
-    promptCondaChannel,
-    runPixi,
-    searchPixiPackages,
-} from '../cli/pixiCli';
+import { PixiPackageSearchResult, promptCondaChannel, runPixi, searchPixiPackages } from '../cli/pixiCli';
 import { runPixiWithProgress } from '../cli/workspaceCli';
-import { escapeRegex, normalizeFolderPath } from '../common/execUtils';
+import { escapeRegex, normalizeFolderPath, revealRangeInEditor } from '../common/execUtils';
 import { getEnvironmentStatusBadge } from '../core/environmentRules';
+import { sortPixiPackages } from '../core/packageManager';
 import { findManifestPath, getProjectConfiguredChannels, isPixiProject } from '../core/projectDiscovery';
 import { PixiProjectManager } from '../core/projectManager';
 import { PixiEnvironmentInfo, PixiPackage } from '../core/types';
@@ -1010,34 +1001,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                     'Pixi: All environments cleaned in this project.',
                 );
             } else if (selected.targetKind === 'global-cache') {
-                const confirmed = await window.showWarningMessage(
-                    'Are you sure you want to clean the global Pixi package cache? Subsequent installations will re-download packages from the network.',
-                    'Clean Global Cache',
-                );
-                if (confirmed !== 'Clean Global Cache') {
-                    return;
-                }
-
-                try {
-                    await window.withProgress(
-                        {
-                            location: ProgressLocation.Notification,
-                            title: 'Pixi: Cleaning global package cache...',
-                            cancellable: true,
-                        },
-                        async (_progress, token) => {
-                            await cleanGlobalCache(token, projectPath);
-                            await manager.refresh(Uri.file(projectPath));
-                            manager.clearPackagesCache(projectPath);
-                            window.showInformationMessage('Pixi: Global package cache cleaned.');
-                        },
-                    );
-                } catch (error) {
-                    if (error instanceof CancellationError) {
-                        return;
-                    }
-                    window.showErrorMessage(error instanceof Error ? error.message : String(error));
-                }
+                await commands.executeCommand('pixi.cleanCache');
             }
         }),
     );
@@ -1931,12 +1895,9 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
             let targetPkgName: string | undefined;
 
             if (packages.length > 0) {
-                const transitivePkgs = packages
-                    .filter((p) => !p.is_explicit)
-                    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
-                const explicitPkgs = packages
-                    .filter((p) => p.is_explicit)
-                    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+                const sorted = sortPixiPackages(packages);
+                const transitivePkgs = sorted.filter((p) => !p.is_explicit);
+                const explicitPkgs = sorted.filter((p) => p.is_explicit);
 
                 const items: (QuickPickItem & { pkgName?: string })[] = [];
 
@@ -2052,12 +2013,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                 return;
             }
 
-            const sorted = [...packages].sort((a, b) => {
-                if (a.is_explicit !== b.is_explicit) {
-                    return a.is_explicit ? -1 : 1;
-                }
-                return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
-            });
+            const sorted = sortPixiPackages(packages);
 
             const pick = await window.showQuickPick(
                 sorted.map((p) => {
@@ -2244,10 +2200,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                         const matchedWord = match[0].match(new RegExp(namePattern, 'i'));
                         endCol = startCol + (matchedWord ? matchedWord[0].length : pkgName.length);
                     }
-                    const startPos = new Position(targetLine, startCol);
-                    const endPos = new Position(targetLine, endCol);
-                    editor.selection = new Selection(startPos, endPos);
-                    editor.revealRange(new Range(startPos, endPos), TextEditorRevealType.InCenter);
+                    revealRangeInEditor(editor, targetLine, startCol, endCol);
                 } else {
                     window.showInformationMessage(
                         `Could not locate definition for '${pkgName}' in ${path.basename(manifestPath)}.`,

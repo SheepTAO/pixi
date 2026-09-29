@@ -116,3 +116,15 @@ export async function listPixiPackages(envName: string, projectPath: string): Pr
 
     return packages;
 }
+
+/**
+ * Deterministically sorts Pixi packages: explicit dependencies first, then alphabetically by name.
+ */
+export function sortPixiPackages(packages: PixiPackage[]): PixiPackage[] {
+    return [...packages].sort((a, b) => {
+        if (Boolean(a.is_explicit) !== Boolean(b.is_explicit)) {
+            return a.is_explicit ? -1 : 1;
+        }
+        return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+    });
+}

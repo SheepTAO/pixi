@@ -21,7 +21,7 @@ import {
 import { getPixi, runPixi } from '../cli/pixiCli';
 import { safeJsonParse } from '../common/execUtils';
 import { traceError, traceVerbose } from '../common/logging';
-import { getEnvironmentStatusBadge } from '../core/environmentRules';
+import { getEnvironmentStatusBadge, promptToInstallEnvironment } from '../core/environmentRules';
 import { PixiProjectManager } from '../core/projectManager';
 import { PixiEnvironmentInfo } from '../core/types';
 
@@ -366,13 +366,11 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
                 return;
             }
             if (env?.pixiStatus === 'uninstalled') {
-                const action = await window.showWarningMessage(
+                await promptToInstallEnvironment(
+                    envName,
+                    env.projectPath,
                     `Environment '${envName}' required by task '${pixiTask.name}' is not installed yet on disk. Would you like to install it now?`,
-                    'Install Environment',
                 );
-                if (action === 'Install Environment') {
-                    await commands.executeCommand('pixi.install', env.projectPath, envName);
-                }
                 return;
             }
         }

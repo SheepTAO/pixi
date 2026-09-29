@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { Position, Range, Selection, TextEditor, TextEditorRevealType } from 'vscode';
 
 export function quoteStringIfNecessary(arg: string): string {
     // Always return if already quoted to avoid double-quoting
@@ -121,4 +122,14 @@ export function normalizeFolderPath(target?: unknown): string | undefined {
  */
 export function escapeRegex(str: string): string {
     return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Reveals and highlights the specified line and column range in an active text editor.
+ */
+export function revealRangeInEditor(editor: TextEditor, line: number, startCol: number, endCol: number): void {
+    const startPos = new Position(line, startCol);
+    const endPos = new Position(line, endCol);
+    editor.selection = new Selection(startPos, endPos);
+    editor.revealRange(new Range(startPos, endPos), TextEditorRevealType.InCenter);
 }

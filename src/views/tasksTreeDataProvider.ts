@@ -5,10 +5,6 @@ import {
     Disposable,
     Event,
     EventEmitter,
-    Position,
-    Range,
-    Selection,
-    TextEditorRevealType,
     ThemeColor,
     ThemeIcon,
     TreeDataProvider,
@@ -20,7 +16,7 @@ import {
     workspace,
 } from 'vscode';
 
-import { escapeRegex } from '../common/execUtils';
+import { escapeRegex, revealRangeInEditor } from '../common/execUtils';
 import { PixiProjectManager } from '../core/projectManager';
 import { PixiProject } from '../core/types';
 import { PixiTask, PixiTaskProvider } from '../providers/taskProvider';
@@ -334,10 +330,7 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
                         }
                     }
 
-                    const startPos = new Position(targetLine, startCol);
-                    const endPos = new Position(targetLine, endCol);
-                    editor.selection = new Selection(startPos, endPos);
-                    editor.revealRange(new Range(startPos, endPos), TextEditorRevealType.InCenter);
+                    revealRangeInEditor(editor, targetLine, startCol, endCol);
                 } else {
                     window.showInformationMessage(
                         `Could not locate task definition for '${task.name}' in ${path.basename(manifestPath)}.`,

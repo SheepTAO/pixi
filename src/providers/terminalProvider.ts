@@ -16,7 +16,7 @@ import {
 import { getPixi } from '../cli/pixiCli';
 import { normalizeFolderPath } from '../common/execUtils';
 import { traceError, traceVerbose } from '../common/logging';
-import { getEnvironmentStatusBadge, sortPixiEnvironments } from '../core/environmentRules';
+import { getEnvironmentStatusBadge, promptToInstallEnvironment, sortPixiEnvironments } from '../core/environmentRules';
 import { PixiProjectManager } from '../core/projectManager';
 import { PixiEnvironmentInfo } from '../core/types';
 
@@ -47,13 +47,7 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
 
     private async handleUninstalledOrError(env: PixiEnvironmentInfo): Promise<boolean> {
         if (env.pixiStatus === 'uninstalled') {
-            const action = await window.showWarningMessage(
-                `Environment '${env.pixiEnvName}' is not installed yet on disk. Would you like to install it now?`,
-                'Install Environment',
-            );
-            if (action === 'Install Environment') {
-                await commands.executeCommand('pixi.install', env.projectPath, env.pixiEnvName);
-            }
+            await promptToInstallEnvironment(env.pixiEnvName, env.projectPath);
             return true;
         }
         if (env.pixiStatus === 'incompatible') {
