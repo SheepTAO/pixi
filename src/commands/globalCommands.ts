@@ -22,7 +22,7 @@ import {
     uninstallGlobalTool,
     updateGlobalTool,
 } from '../cli/globalCli';
-import { CONDA_CHANNEL_PRESETS } from '../cli/pixiCli';
+import { promptCondaChannel } from '../cli/pixiCli';
 
 export {
     clearGlobalManifestCache,
@@ -118,40 +118,13 @@ export async function handleGlobalInstall(initialTool?: string): Promise<void> {
         }
     }
 
-    const channelPick = await window.showQuickPick(
-        [
-            ...CONDA_CHANNEL_PRESETS.map((p) => ({
-                label: p.label,
-                description: p.description,
-                channel: p.channel === 'conda-forge' ? undefined : p.channel,
-            })),
-            {
-                label: '$(globe) Custom Channel...',
-                description: 'Specify a custom channel name or mirror URL',
-                channel: 'custom',
-            },
-        ],
-        {
-            title: 'Pixi Global: Select Channel',
-            placeHolder: 'Choose package channel for global installation',
-        },
-    );
-    if (!channelPick) {
+    const targetChannel = await promptCondaChannel({
+        title: 'Pixi Global: Select Channel',
+        placeHolder: 'Choose package channel for global installation',
+        defaultChannelValue: undefined,
+    });
+    if (targetChannel === null) {
         return;
-    }
-
-    let targetChannel = channelPick.channel;
-    if (channelPick.channel === 'custom') {
-        const input = await window.showInputBox({
-            title: 'Pixi Global: Enter Channel Name or URL',
-            prompt: 'Enter Conda channel name or URL',
-            placeHolder: 'e.g. bioconda or https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge',
-            ignoreFocusOut: true,
-        });
-        if (!input || !input.trim()) {
-            return;
-        }
-        targetChannel = input.trim();
     }
 
     const channelLabel = targetChannel ? `channel: ${targetChannel}` : 'channel: conda-forge';

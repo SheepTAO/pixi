@@ -19,7 +19,13 @@ import {
     workspace,
 } from 'vscode';
 
-import { CONDA_CHANNEL_PRESETS, PixiPackageSearchResult, runPixi, searchPixiPackages } from '../cli/pixiCli';
+import {
+    cleanGlobalCache,
+    PixiPackageSearchResult,
+    promptCondaChannel,
+    runPixi,
+    searchPixiPackages,
+} from '../cli/pixiCli';
 import { runPixiWithProgress } from '../cli/workspaceCli';
 import { escapeRegex, normalizeFolderPath } from '../common/execUtils';
 import { getEnvironmentStatusBadge } from '../core/environmentRules';
@@ -1012,13 +1018,26 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                     return;
                 }
 
-                await runPixiWithProgress(
-                    'Pixi: Cleaning global package cache...',
-                    [['clean', 'cache', '-y']],
-                    projectPath,
-                    manager,
-                    'Pixi: Global package cache cleaned.',
-                );
+                try {
+                    await window.withProgress(
+                        {
+                            location: ProgressLocation.Notification,
+                            title: 'Pixi: Cleaning global package cache...',
+                            cancellable: true,
+                        },
+                        async (_progress, token) => {
+                            await cleanGlobalCache(token, projectPath);
+                            await manager.refresh(Uri.file(projectPath));
+                            manager.clearPackagesCache(projectPath);
+                            window.showInformationMessage('Pixi: Global package cache cleaned.');
+                        },
+                    );
+                } catch (error) {
+                    if (error instanceof CancellationError) {
+                        return;
+                    }
+                    window.showErrorMessage(error instanceof Error ? error.message : String(error));
+                }
             }
         }),
     );
@@ -1576,42 +1595,10 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                 return;
             }
 
-            interface ChannelPresetItem extends QuickPickItem {
-                channel?: string;
-                isCustom?: boolean;
-            }
-
-            const presets: ChannelPresetItem[] = [
-                {
-                    label: '$(globe) Custom Channel Name or URL...',
-                    description: 'Enter a custom channel name, internal mirror, or URL',
-                    isCustom: true,
-                },
-                ...CONDA_CHANNEL_PRESETS,
-            ];
-
-            const pick = await window.showQuickPick(presets, {
+            const targetChannel = await promptCondaChannel({
                 title: 'Pixi: Add Channel',
                 placeHolder: 'Select a channel preset or enter a custom channel / mirror URL',
             });
-            if (!pick) {
-                return;
-            }
-
-            let targetChannel = pick.channel;
-            if (pick.isCustom) {
-                const input = await window.showInputBox({
-                    title: 'Pixi: Enter Channel Name or URL',
-                    prompt: 'Enter Conda channel name or URL (e.g. bioconda or https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge)',
-                    placeHolder: 'e.g. bioconda or https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge',
-                    ignoreFocusOut: true,
-                });
-                if (!input || !input.trim()) {
-                    return;
-                }
-                targetChannel = input.trim();
-            }
-
             if (!targetChannel) {
                 return;
             }

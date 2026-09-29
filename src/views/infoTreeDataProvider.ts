@@ -19,7 +19,7 @@ import {
 } from 'vscode';
 
 import { clearGlobalManifestCache } from '../cli/globalCli';
-import { clearPixiCache, clearSearchCache, runPixi } from '../cli/pixiCli';
+import { cleanGlobalCache, clearPixiCache, clearSearchCache, runPixi } from '../cli/pixiCli';
 import { safeJsonParse } from '../common/execUtils';
 import { traceError, traceVerbose } from '../common/logging';
 
@@ -472,9 +472,7 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
             },
             async () => {
                 try {
-                    await runPixi(['clean', 'cache', '-y']);
-                    clearPixiCache();
-                    clearSearchCache();
+                    await cleanGlobalCache();
                     this.refresh();
                     window.showInformationMessage('Pixi: Global package cache cleaned.');
                 } catch (err: unknown) {
