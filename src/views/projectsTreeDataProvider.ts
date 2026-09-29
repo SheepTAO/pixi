@@ -353,9 +353,7 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
             }
 
             if (displayMode === 'all') {
-                return [...explicit, ...transitive].map(
-                    (pkg) => new PixiPackageTreeItem(pkg, element.env, element.project),
-                );
+                return sorted.map((pkg) => new PixiPackageTreeItem(pkg, element.env, element.project));
             }
 
             // 'grouped' mode (default)

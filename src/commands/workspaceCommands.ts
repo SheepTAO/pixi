@@ -837,7 +837,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                 },
             ];
 
-            const directEnv = (folderUri as any)?.env?.pixiEnvName;
+            const directEnv = resolveEnvName(undefined, folderUri);
             let targetEnvName: string | undefined;
 
             if (directEnv) {
@@ -1492,7 +1492,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
             const packages = await manager.getPackagesForEnvironment(queryEnv, projectPath);
 
             const explicitPkgs = packages.filter((p) => p.is_explicit);
-            const candidates = explicitPkgs.length > 0 ? explicitPkgs : packages;
+            const candidates = sortPixiPackages(explicitPkgs.length > 0 ? explicitPkgs : packages);
 
             if (candidates.length === 0) {
                 window.showInformationMessage(`No packages found to remove in environment '${queryEnv}'.`);
@@ -1787,7 +1787,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                 return;
             }
 
-            // Case 4: Project item or Command Palette
+            // Case 3: Project item or Command Palette
             const projectPath = await pickPixiProject(
                 manager,
                 'Select Pixi project to view dependency tree for',
