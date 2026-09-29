@@ -44,6 +44,13 @@ export interface PixiTask {
     projectPath: string;
 }
 
+export interface PickTaskOptions {
+    title: string;
+    placeHolder: string;
+    targetProjectPath?: string;
+    formatEnvTag?: (env?: string) => string;
+}
+
 interface TaskQuickPickItem extends QuickPickItem {
     pixiTask: PixiTask;
 }
@@ -287,15 +294,15 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
         return task;
     }
 
-    private async promptAndRunTask(targetProjectPath?: string) {
+    public async pickTask(options: PickTaskOptions): Promise<PixiTask | undefined> {
         let projectPaths = this.projectManager.getProjectPaths();
-        if (targetProjectPath) {
-            const normalized = path.normalize(targetProjectPath);
+        if (options.targetProjectPath) {
+            const normalized = path.normalize(options.targetProjectPath);
             projectPaths = projectPaths.filter((p) => path.normalize(p) === normalized);
         }
         if (projectPaths.length === 0) {
             window.showWarningMessage('No Pixi projects found in the workspace.');
-            return;
+            return undefined;
         }
 
         const allTasks: PixiTask[] = [];
@@ -305,12 +312,14 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
 
         if (allTasks.length === 0) {
             window.showInformationMessage('No Pixi tasks found.');
-            return;
+            return undefined;
         }
 
-        const isMultiProject = !targetProjectPath && this.projectManager.getProjectPaths().length > 1;
+        const isMultiProject = !options.targetProjectPath && this.projectManager.getProjectPaths().length > 1;
+        const formatEnv = options.formatEnvTag || ((env?: string) => (env ? `[${env}]` : ''));
+
         const items: TaskQuickPickItem[] = allTasks.map((t) => {
-            const envTag = t.default_environment ? `[${t.default_environment}]` : '';
+            const envTag = formatEnv(t.default_environment);
             const projTag = isMultiProject ? `(${path.basename(t.projectPath)})` : '';
             let detail = t.description || t.cmd;
             if (!detail && t.depends_on && t.depends_on.length > 0) {
@@ -325,14 +334,24 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
         });
 
         const selected = await window.showQuickPick(items, {
-            title: 'Pixi: Run Task',
-            placeHolder: 'Select a Pixi task to run',
+            title: options.title,
+            placeHolder: options.placeHolder,
             matchOnDescription: true,
             matchOnDetail: true,
         });
 
+        return selected?.pixiTask;
+    }
+
+    private async promptAndRunTask(targetProjectPath?: string) {
+        const selected = await this.pickTask({
+            title: 'Pixi: Run Task',
+            placeHolder: 'Select a Pixi task to run',
+            targetProjectPath,
+        });
+
         if (selected) {
-            await this.executePixiTask(selected.pixiTask);
+            await this.executePixiTask(selected);
         }
     }
 
@@ -364,57 +383,17 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
     }
 
     public async promptAndRunTaskInEnvironment(presetTask?: PixiTask, targetProjectPath?: string): Promise<void> {
-        let selectedTask: PixiTask | undefined = presetTask;
+        const selectedTask =
+            presetTask ||
+            (await this.pickTask({
+                title: 'Pixi: Run Task in Environment',
+                placeHolder: 'Step 1: Select a Pixi task to run in a specific environment',
+                targetProjectPath,
+                formatEnvTag: (env) => (env ? `[default: ${env}]` : ''),
+            }));
 
         if (!selectedTask) {
-            let projectPaths = this.projectManager.getProjectPaths();
-            if (targetProjectPath) {
-                const normalized = path.normalize(targetProjectPath);
-                projectPaths = projectPaths.filter((p) => path.normalize(p) === normalized);
-            }
-            if (projectPaths.length === 0) {
-                window.showWarningMessage('No Pixi projects found in the workspace.');
-                return;
-            }
-
-            const allTasks: PixiTask[] = [];
-            for (const p of projectPaths) {
-                allTasks.push(...(await this.getTasksForProject(p)));
-            }
-
-            if (allTasks.length === 0) {
-                window.showInformationMessage('No Pixi tasks found.');
-                return;
-            }
-
-            const isMultiProject = !targetProjectPath && this.projectManager.getProjectPaths().length > 1;
-            const picked = await window.showQuickPick(
-                allTasks.map((t) => {
-                    const envTag = t.default_environment ? `[default: ${t.default_environment}]` : '';
-                    const projTag = isMultiProject ? `(${path.basename(t.projectPath)})` : '';
-                    let detail = t.description || t.cmd;
-                    if (!detail && t.depends_on && t.depends_on.length > 0) {
-                        detail = `depends: ${t.depends_on.map((d) => d.task_name).join(', ')}`;
-                    }
-                    return {
-                        label: t.name,
-                        description: [envTag, projTag].filter(Boolean).join(' '),
-                        detail,
-                        pixiTask: t,
-                    };
-                }),
-                {
-                    title: 'Pixi: Run Task in Environment',
-                    placeHolder: 'Step 1: Select a Pixi task to run in a specific environment',
-                    matchOnDescription: true,
-                    matchOnDetail: true,
-                },
-            );
-
-            if (!picked) {
-                return;
-            }
-            selectedTask = picked.pixiTask;
+            return;
         }
 
         const envs = this.projectManager.getEnvironmentsForProject(selectedTask.projectPath);

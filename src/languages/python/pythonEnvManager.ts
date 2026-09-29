@@ -21,7 +21,7 @@ import { getPixi } from '../../cli/pixiCli';
 import { createDeferred, Deferred } from '../../common/deferred';
 import { traceVerbose } from '../../common/logging';
 import { getWorkspacePersistentState } from '../../common/persistentState';
-import { getDefaultEnvironment, matchEnvironmentRule } from '../../core/environmentRules';
+import { getDefaultEnvironment, matchEnvironmentForUri } from '../../core/environmentRules';
 import { PixiProjectManager } from '../../core/projectManager';
 import { PIXI_MANAGER_ID } from './constants';
 import {
@@ -326,19 +326,10 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
             return this.globalEnv;
         }
 
-        if (scope.scheme === 'file') {
-            const relPath = path.relative(projectPath, scope.fsPath).replace(/\\/g, '/');
-            if (!relPath.startsWith('..')) {
-                const rules = workspace
-                    .getConfiguration('pixi', scope)
-                    .get<string[] | Record<string, string>>('environmentRules');
-                if (rules) {
-                    const matched = matchEnvironmentRule(rules, relPath, this.projectToEnvs.get(projectPath) || []);
-                    if (matched) {
-                        return matched;
-                    }
-                }
-            }
+        const projectEnvs = this.projectToEnvs.get(projectPath) || [];
+        const matched = matchEnvironmentForUri(scope, projectPath, projectEnvs);
+        if (matched) {
+            return matched;
         }
 
         const active = this.activeEnv.get(projectPath);
@@ -346,7 +337,6 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
             return active;
         }
 
-        const projectEnvs = this.projectToEnvs.get(projectPath) || [];
         return getDefaultEnvironment(projectEnvs) || this.globalEnv;
     }
 

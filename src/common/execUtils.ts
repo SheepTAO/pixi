@@ -115,3 +115,10 @@ export function normalizeFolderPath(target?: unknown): string | undefined {
               (target as any)?.fsPath;
     return typeof candidate === 'string' ? safeDir(candidate) : undefined;
 }
+
+/**
+ * Escapes characters with special meaning in regular expressions.
+ */
+export function escapeRegex(str: string): string {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}

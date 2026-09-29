@@ -20,7 +20,7 @@ import {
     workspace,
 } from 'vscode';
 
-import { findManifestPath } from '../core/projectDiscovery';
+import { escapeRegex } from '../common/execUtils';
 import { PixiProjectManager } from '../core/projectManager';
 import { PixiProject } from '../core/types';
 import { PixiTask, PixiTaskProvider } from '../providers/taskProvider';
@@ -246,65 +246,20 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
                 targetItem?.task || (targetItem?.name && targetItem?.projectPath ? targetItem : undefined);
 
             if (!task) {
-                let projectPaths = this.projectManager.getProjectPaths();
                 const targetProjectPath = targetItem?.project?.projectPath || targetItem?.projectPath;
-                if (targetProjectPath) {
-                    const normalized = path.normalize(targetProjectPath);
-                    projectPaths = projectPaths.filter((p) => path.normalize(p) === normalized);
-                }
-                if (projectPaths.length === 0) {
-                    window.showWarningMessage('No Pixi projects found in the workspace.');
+                task = await this.taskProvider.pickTask({
+                    title: 'Select Task to Reveal in Manifest',
+                    placeHolder: 'Select a task to jump to its definition in manifest',
+                    targetProjectPath,
+                });
+                if (!task) {
                     return;
                 }
-                const allTasks: PixiTask[] = [];
-                for (const p of projectPaths) {
-                    allTasks.push(...(await this.taskProvider.getTasksForProject(p)));
-                }
-                if (allTasks.length === 0) {
-                    window.showInformationMessage('No Pixi tasks found.');
-                    return;
-                }
-                const isMulti = !targetProjectPath && this.projectManager.getProjectPaths().length > 1;
-                const picked = await window.showQuickPick(
-                    allTasks.map((t) => {
-                        let detail = t.description || t.cmd;
-                        if (!detail && t.depends_on && t.depends_on.length > 0) {
-                            detail = `depends: ${t.depends_on.map((d) => d.task_name).join(', ')}`;
-                        }
-                        return {
-                            label: t.name,
-                            description: [
-                                t.default_environment ? `[${t.default_environment}]` : '',
-                                isMulti ? `(${path.basename(t.projectPath)})` : '',
-                            ]
-                                .filter(Boolean)
-                                .join(' '),
-                            detail,
-                            task: t,
-                        };
-                    }),
-                    {
-                        title: 'Select Task to Reveal in Manifest',
-                        placeHolder: 'Select a task to jump to its definition in manifest',
-                        matchOnDescription: true,
-                        matchOnDetail: true,
-                    },
-                );
-                if (!picked) {
-                    return;
-                }
-                task = picked.task;
             }
 
             const projectPath = task.projectPath;
-            let manifestPath = targetItem?.project?.manifestPath;
-            if (!manifestPath) {
-                const p = this.projectManager.getProjects().find((proj) => proj.projectPath === projectPath);
-                manifestPath = p?.manifestPath;
-            }
-            if (!manifestPath) {
-                manifestPath = findManifestPath(projectPath);
-            }
+            const manifestPath =
+                targetItem?.project?.manifestPath || this.projectManager.getManifestPath(projectPath);
 
             if (!manifestPath || !fs.existsSync(manifestPath)) {
                 window.showWarningMessage('Could not find manifest file for this project.');
@@ -316,7 +271,7 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
                 const editor = await window.showTextDocument(doc);
                 const text = doc.getText();
                 const lines = text.split(/\r?\n/);
-                const escapedName = task.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const escapedName = escapeRegex(task.name);
 
                 const keyRegex = new RegExp(`^\\s*["']?${escapedName}["']?\\s*=`, 'i');
                 const sectionRegex = new RegExp(`^\\s*\\[+.*tasks\\.(["']?)${escapedName}\\1\\]`, 'i');

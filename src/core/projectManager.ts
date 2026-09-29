@@ -15,7 +15,7 @@ import {
 import { runPixi } from '../cli/pixiCli';
 import { safeJsonParse } from '../common/execUtils';
 import { traceError, traceVerbose } from '../common/logging';
-import { getDefaultEnvironment, matchEnvironmentRule, sortPixiEnvironments } from './environmentRules';
+import { getDefaultEnvironment, matchEnvironmentForUri, sortPixiEnvironments } from './environmentRules';
 import { listPixiPackages, PixiPackage } from './packageManager';
 import { findManifestPath, isPixiProject, resolvePixiProjectPaths } from './projectDiscovery';
 import { scanEnvironmentToolchains } from './toolchains';
@@ -105,21 +105,21 @@ export class PixiProjectManager implements Disposable {
         return [...this.projectPaths];
     }
 
+    public getManifestPath(projectPath: string): string | undefined {
+        const envs = this.projectToEnvs.get(path.normalize(projectPath));
+        if (envs && envs.length > 0 && envs[0].manifestPath) {
+            return envs[0].manifestPath;
+        }
+        return findManifestPath(projectPath);
+    }
+
     public getProjects(): PixiProject[] {
         const projects = this.projectPaths.map((p) => {
             const envs = this.projectToEnvs.get(path.normalize(p));
-            if (envs && envs.length > 0) {
-                return {
-                    name: envs[0].projectName,
-                    projectPath: p,
-                    manifestPath: envs[0].manifestPath,
-                };
-            }
-            const manifestPath = findManifestPath(p) || path.join(p, 'pixi.toml');
             return {
-                name: path.basename(p),
+                name: envs && envs.length > 0 ? envs[0].projectName : path.basename(p),
                 projectPath: p,
-                manifestPath,
+                manifestPath: this.getManifestPath(p) || path.join(p, 'pixi.toml'),
             };
         });
         return projects.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
@@ -225,19 +225,9 @@ export class PixiProjectManager implements Disposable {
             return envs[0];
         }
 
-        if (uri.scheme === 'file') {
-            const relPath = path.relative(projectPath, uri.fsPath).replace(/\\/g, '/');
-            if (!relPath.startsWith('..')) {
-                const rules = workspace
-                    .getConfiguration('pixi', uri)
-                    .get<string[] | Record<string, string>>('environmentRules');
-                if (rules) {
-                    const matched = matchEnvironmentRule(rules, relPath, envs);
-                    if (matched) {
-                        return matched;
-                    }
-                }
-            }
+        const matched = matchEnvironmentForUri(uri, projectPath, envs);
+        if (matched) {
+            return matched;
         }
 
         return getDefaultEnvironment(envs);

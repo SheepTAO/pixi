@@ -1,8 +1,7 @@
-import * as path from 'path';
-import { Disposable, Event, EventEmitter, Uri, workspace } from 'vscode';
+import { Disposable, Event, EventEmitter, Uri } from 'vscode';
 
 import { getWorkspacePersistentState } from '../common/persistentState';
-import { getDefaultEnvironment, matchEnvironmentRule } from '../core/environmentRules';
+import { getDefaultEnvironment, matchEnvironmentForUri } from '../core/environmentRules';
 import { PixiProjectManager } from '../core/projectManager';
 import { ActiveEnvironmentChangeEvent, PixiEnvironmentInfo, PixiExtensionApi, PixiPackage, PixiProject } from './types';
 
@@ -98,19 +97,9 @@ export class PixiExtensionApiImpl implements PixiExtensionApi, Disposable {
         }
 
         // 1. Check file-level environment rules
-        if (uri.scheme === 'file') {
-            const relPath = path.relative(projectPath, uri.fsPath).replace(/\\/g, '/');
-            if (!relPath.startsWith('..')) {
-                const rules = workspace
-                    .getConfiguration('pixi', uri)
-                    .get<string[] | Record<string, string>>('environmentRules');
-                if (rules) {
-                    const matched = matchEnvironmentRule(rules, relPath, envs);
-                    if (matched) {
-                        return matched;
-                    }
-                }
-            }
+        const matched = matchEnvironmentForUri(uri, projectPath, envs);
+        if (matched) {
+            return matched;
         }
 
         // 2. Check active environment for this project

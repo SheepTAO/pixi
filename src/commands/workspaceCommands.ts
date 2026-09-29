@@ -21,7 +21,7 @@ import {
 
 import { CONDA_CHANNEL_PRESETS, PixiPackageSearchResult, runPixi, searchPixiPackages } from '../cli/pixiCli';
 import { runPixiWithProgress } from '../cli/workspaceCli';
-import { normalizeFolderPath } from '../common/execUtils';
+import { escapeRegex, normalizeFolderPath } from '../common/execUtils';
 import { getEnvironmentStatusBadge } from '../core/environmentRules';
 import { findManifestPath, getProjectConfiguredChannels, isPixiProject } from '../core/projectDiscovery';
 import { PixiProjectManager } from '../core/projectManager';
@@ -1713,7 +1713,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
     let treeOutputChannel: OutputChannel | undefined;
 
     function exactPackageRegex(name: string): string {
-        return `^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`;
+        return `^${escapeRegex(name)}$`;
     }
 
     function getTreeOutputChannel(): OutputChannel {
@@ -2123,8 +2123,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                 if (!projectPath) {
                     return;
                 }
-                const p = manager.getProjects().find((proj) => proj.projectPath === projectPath);
-                manifestPath = p?.manifestPath || findManifestPath(projectPath);
+                manifestPath = manager.getManifestPath(projectPath);
             }
 
             if (!manifestPath || !fs.existsSync(manifestPath)) {
@@ -2155,8 +2154,8 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                 }
             }
 
-            if (!manifestPath && projectPath) {
-                manifestPath = findManifestPath(projectPath);
+            if (!manifestPath) {
+                manifestPath = manager.getManifestPath(projectPath);
             }
 
             if (!manifestPath || !fs.existsSync(manifestPath)) {
@@ -2206,13 +2205,13 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
 
                 const text = doc.getText();
                 const lines = text.split(/\r?\n/);
-                const escapedName = pkgName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const escapedName = escapeRegex(pkgName);
                 const altName = pkgName.includes('-')
                     ? pkgName.replace(/-/g, '_')
                     : pkgName.includes('_')
                       ? pkgName.replace(/_/g, '-')
                       : undefined;
-                const escapedAlt = altName?.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const escapedAlt = altName ? escapeRegex(altName) : undefined;
                 const namePattern = escapedAlt ? `(?:${escapedName}|${escapedAlt})` : escapedName;
 
                 const exactKeyRegex = new RegExp(`^\\s*["']?${namePattern}["']?\\s*=`, 'i');

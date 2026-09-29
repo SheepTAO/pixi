@@ -1,5 +1,6 @@
 import * as path from 'path';
 import picomatch from 'picomatch';
+import { Uri, workspace } from 'vscode';
 
 const matcherCache = new Map<string, (input: string) => boolean>();
 
@@ -57,6 +58,28 @@ export function matchEnvironmentRule<T extends { pixiEnvName: string; displayNam
         envs.find((e) => e.pixiEnvName === target) ||
         envs.find((e) => (e.displayName && e.displayName.startsWith(`${target} `)) || e.name === target)
     );
+}
+
+/**
+ * Resolves the matching environment for a given document URI according to configured environment rules.
+ */
+export function matchEnvironmentForUri<T extends { pixiEnvName: string; displayName?: string; name?: string }>(
+    uri: Uri,
+    projectPath: string,
+    envs: T[],
+): T | undefined {
+    if (uri.scheme === 'file') {
+        const relPath = path.relative(projectPath, uri.fsPath).replace(/\\/g, '/');
+        if (!relPath.startsWith('..')) {
+            const rules = workspace
+                .getConfiguration('pixi', uri)
+                .get<string[] | Record<string, string>>('environmentRules');
+            if (rules) {
+                return matchEnvironmentRule(rules, relPath, envs);
+            }
+        }
+    }
+    return undefined;
 }
 
 /**
