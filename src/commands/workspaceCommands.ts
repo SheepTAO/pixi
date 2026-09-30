@@ -65,6 +65,10 @@ export async function pickManifestFormat(target?: Uri | string): Promise<'pixi' 
     return pick?.format;
 }
 
+function getManifestPathForFormat(folder: string, format: 'pixi' | 'pyproject'): string {
+    return path.join(folder, format === 'pyproject' ? 'pyproject.toml' : 'pixi.toml');
+}
+
 async function pickTargetEnvironment(
     envs: PixiEnvironmentInfo[],
     action: 'add' | 'remove' | 'inspect',
@@ -853,11 +857,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                 'Pixi: Project initialized successfully.',
             );
 
-            const createdManifest =
-                format === 'pyproject'
-                    ? path.join(targetFolder, 'pyproject.toml')
-                    : path.join(targetFolder, 'pixi.toml');
-            await openDocumentIfExists(createdManifest);
+            await openDocumentIfExists(getManifestPathForFormat(targetFolder, format));
         }),
     );
 
@@ -919,11 +919,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                     'Pixi: Project and default environment initialized successfully.',
                 );
 
-                const createdManifest =
-                    format === 'pyproject'
-                        ? path.join(targetFolder, 'pyproject.toml')
-                        : path.join(targetFolder, 'pixi.toml');
-                await openDocumentIfExists(createdManifest);
+                await openDocumentIfExists(getManifestPathForFormat(targetFolder, format));
             }
         }),
     );
@@ -963,21 +959,14 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                 },
             ];
 
-            const directEnv = resolveEnvName(undefined, folderUri);
-            let targetEnvName: string | undefined;
-
-            if (directEnv) {
-                targetEnvName = directEnv;
-            } else {
-                const selected = await window.showQuickPick(envItems, {
-                    title: 'Pixi: Delete Environment',
-                    placeHolder: 'Select an environment to delete or clean',
-                });
-                if (!selected) {
-                    return;
-                }
-                targetEnvName = selected.envName;
-            }
+            const targetEnvName =
+                resolveEnvName(undefined, folderUri) ??
+                (
+                    await window.showQuickPick(envItems, {
+                        title: 'Pixi: Delete Environment',
+                        placeHolder: 'Select an environment to delete or clean',
+                    })
+                )?.envName;
 
             if (!targetEnvName) {
                 return;
@@ -1324,19 +1313,19 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                 return;
             }
 
+            if (!isTargetEnvLocked) {
+                const picked = await pickTargetEnvironment(envs, 'add');
+                if (picked === null) {
+                    return;
+                }
+                targetEnv = picked;
+            }
+
             // Mode 1: User explicitly picked a search result -> Source is already known (Conda vs PyPI)
             if (promptResult.kind === 'selected') {
                 const pkg = promptResult.pkg;
                 const spec = promptResult.spec;
                 const isPypi = pkg.sourceType === 'pypi';
-
-                if (!isTargetEnvLocked) {
-                    const picked = await pickTargetEnvironment(envs, 'add');
-                    if (picked === null) {
-                        return;
-                    }
-                    targetEnv = picked;
-                }
 
                 const args = ['add'];
                 if (isPypi) {
@@ -1401,14 +1390,6 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
             );
             if (!source) {
                 return;
-            }
-
-            if (!isTargetEnvLocked) {
-                const picked = await pickTargetEnvironment(envs, 'add');
-                if (picked === null) {
-                    return;
-                }
-                targetEnv = picked;
             }
 
             const args = ['add'];
@@ -1725,6 +1706,17 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
         return `^${escapeRegex(name)}$`;
     }
 
+    function buildTreeArgs(envName?: string, isReverse?: boolean): string[] {
+        const args = ['tree', '--color', 'never'];
+        if (isReverse) {
+            args.push('-i');
+        }
+        if (envName && envName !== 'default') {
+            args.push('-e', envName);
+        }
+        return args;
+    }
+
     function getTreeOutputChannel(): OutputChannel {
         if (!treeOutputChannel) {
             treeOutputChannel = window.createOutputChannel('Pixi Tree');
@@ -1826,10 +1818,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                 const env: PixiEnvironmentInfo = item.env;
                 const projectPath: string = item.project?.projectPath || env.projectPath;
                 const envName = env.pixiEnvName;
-                const args = ['tree', '--color', 'never'];
-                if (envName && envName !== 'default') {
-                    args.push('-e', envName);
-                }
+                const args = buildTreeArgs(envName);
                 args.push(exactPackageRegex(pkg.name));
                 await displayTreeOutput(`package '${pkg.name}' in '${envName}'`, args, projectPath);
                 return;
@@ -1840,10 +1829,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                 const env: PixiEnvironmentInfo = item.env;
                 const projectPath: string = item.project.projectPath;
                 const envName = env.pixiEnvName;
-                const args = ['tree', '--color', 'never'];
-                if (envName && envName !== 'default') {
-                    args.push('-e', envName);
-                }
+                const args = buildTreeArgs(envName);
                 await displayTreeOutput(`environment '${envName}'`, args, projectPath);
                 return;
             }
@@ -1891,10 +1877,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                 return;
             }
 
-            const args = ['tree', '--color', 'never'];
-            if (targetEnv && targetEnv !== 'default') {
-                args.push('-e', targetEnv);
-            }
+            const args = buildTreeArgs(targetEnv);
 
             if (action.mode === 'filter') {
                 const pkgInput = await window.showInputBox({
@@ -1923,10 +1906,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                 const env: PixiEnvironmentInfo = item.env;
                 const projectPath: string = item.project?.projectPath || env.projectPath;
                 const envName = env.pixiEnvName;
-                const args = ['tree', '--color', 'never', '-i'];
-                if (envName && envName !== 'default') {
-                    args.push('-e', envName);
-                }
+                const args = buildTreeArgs(envName, true);
                 args.push(exactPackageRegex(pkg.name));
                 await displayTreeOutput(`package '${pkg.name}' in '${envName}'`, args, projectPath, true, pkg.name);
                 return;
@@ -2012,10 +1992,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                 targetPkgName = input.trim();
             }
 
-            const args = ['tree', '--color', 'never', '-i'];
-            if (targetEnv && targetEnv !== 'default') {
-                args.push('-e', targetEnv);
-            }
+            const args = buildTreeArgs(targetEnv, true);
             args.push(exactPackageRegex(targetPkgName));
             await displayTreeOutput(
                 `package '${targetPkgName}' in '${envLabel}'`,

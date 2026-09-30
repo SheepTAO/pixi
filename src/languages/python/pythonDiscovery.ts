@@ -20,17 +20,17 @@ export async function promptToInstallEnvironment(env: PixiPythonEnvironment, tar
     return promptCoreInstall(env.pixiEnvName, folder);
 }
 
+const PRIORITY_MAP: Record<string, number> = {
+    installed: 0,
+    uninstalled: 1,
+    incompatible: 2,
+};
+
 export function getEnvironmentPriority(env: PixiPythonEnvironment): number {
-    if (env.pixiStatus === 'installed') {
-        return 0;
+    if (env.error) {
+        return env.error.includes('not installed') ? 1 : 2;
     }
-    if (env.pixiStatus === 'uninstalled' || env.error?.includes('not installed')) {
-        return 1;
-    }
-    if (env.pixiStatus === 'incompatible' || env.error) {
-        return 2;
-    }
-    return 0;
+    return PRIORITY_MAP[env.pixiStatus] ?? 0;
 }
 
 export function sortEnvironments(envs: PixiPythonEnvironment[]): PixiPythonEnvironment[] {
