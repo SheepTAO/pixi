@@ -274,43 +274,43 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
         if (info.global_info) {
             const globalChildren: PixiInfoItem[] = [];
 
-            if (info.global_info.bin_dir) {
-                const binItem = new PixiInfoItem('Bin Directory', TreeItemCollapsibleState.None);
-                binItem.description = info.global_info.bin_dir;
-                binItem.iconPath = new ThemeIcon('folder');
-                binItem.tooltip = `Global Binaries: ${info.global_info.bin_dir}\nClick to open in terminal or copy path`;
-                binItem.command = {
-                    command: 'pixi.openLocation',
-                    title: 'Open Bin Directory',
-                    arguments: [info.global_info.bin_dir],
-                };
-                globalChildren.push(binItem);
-            }
+            const globalPathDescriptors = [
+                {
+                    label: 'Bin Directory',
+                    targetPath: info.global_info.bin_dir,
+                    icon: 'folder',
+                    tooltipPrefix: 'Global Binaries',
+                    actionHint: 'Click to open in terminal or copy path',
+                },
+                {
+                    label: 'Environments Directory',
+                    targetPath: info.global_info.env_dir,
+                    icon: 'folder',
+                    tooltipPrefix: 'Global Environments',
+                    actionHint: 'Click to open in terminal or copy path',
+                },
+                {
+                    label: 'Manifest',
+                    targetPath: info.global_info.manifest,
+                    icon: 'file-code',
+                    tooltipPrefix: 'Global Manifest',
+                    actionHint: 'Click to open in editor',
+                },
+            ];
 
-            if (info.global_info.env_dir) {
-                const envItem = new PixiInfoItem('Environments Directory', TreeItemCollapsibleState.None);
-                envItem.description = info.global_info.env_dir;
-                envItem.iconPath = new ThemeIcon('folder');
-                envItem.tooltip = `Global Environments: ${info.global_info.env_dir}\nClick to open in terminal or copy path`;
-                envItem.command = {
-                    command: 'pixi.openLocation',
-                    title: 'Open Environments Directory',
-                    arguments: [info.global_info.env_dir],
-                };
-                globalChildren.push(envItem);
-            }
-
-            if (info.global_info.manifest) {
-                const manifestItem = new PixiInfoItem('Manifest', TreeItemCollapsibleState.None);
-                manifestItem.description = info.global_info.manifest;
-                manifestItem.iconPath = new ThemeIcon('file-code');
-                manifestItem.tooltip = `Global Manifest: ${info.global_info.manifest}\nClick to open in editor`;
-                manifestItem.command = {
-                    command: 'pixi.openLocation',
-                    title: 'Open Global Manifest',
-                    arguments: [info.global_info.manifest],
-                };
-                globalChildren.push(manifestItem);
+            for (const desc of globalPathDescriptors) {
+                if (desc.targetPath) {
+                    const item = new PixiInfoItem(desc.label, TreeItemCollapsibleState.None);
+                    item.description = desc.targetPath;
+                    item.iconPath = new ThemeIcon(desc.icon);
+                    item.tooltip = `${desc.tooltipPrefix}: ${desc.targetPath}\n${desc.actionHint}`;
+                    item.command = {
+                        command: 'pixi.openLocation',
+                        title: `Open ${desc.label}`,
+                        arguments: [desc.targetPath],
+                    };
+                    globalChildren.push(item);
+                }
             }
 
             if (globalChildren.length > 0) {

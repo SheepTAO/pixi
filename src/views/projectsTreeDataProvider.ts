@@ -131,9 +131,10 @@ export class PixiEnvironmentTreeItem extends TreeItem {
                 shortName: 'Python',
             });
         }
+        let cppCompilerLabel: string | undefined;
         if (env.toolchains?.cpp?.compiler) {
             const cpp = env.toolchains.cpp;
-            const compilerName =
+            cppCompilerLabel =
                 cpp.compilerType === 'gcc'
                     ? 'GCC'
                     : cpp.compilerType === 'clang'
@@ -141,7 +142,11 @@ export class PixiEnvironmentTreeItem extends TreeItem {
                       : cpp.compilerType === 'msvc'
                         ? 'MSVC'
                         : 'C++';
-            const label = cpp.version ? `${compilerName} ${cpp.version}` : cpp.compilerType ? compilerName : 'C++';
+            const label = cpp.version
+                ? `${cppCompilerLabel} ${cpp.version}`
+                : cpp.compilerType
+                  ? cppCompilerLabel
+                  : 'C++';
             toolchains.push({
                 label,
                 shortName: 'C++',
@@ -203,16 +208,10 @@ export class PixiEnvironmentTreeItem extends TreeItem {
         }
         if (env.toolchains?.cpp?.compiler) {
             const cpp = env.toolchains.cpp;
-            const cppLabel =
-                cpp.compilerType === 'gcc'
-                    ? 'GCC'
-                    : cpp.compilerType === 'clang'
-                      ? 'Clang'
-                      : cpp.compilerType === 'msvc'
-                        ? 'MSVC'
-                        : 'C/C++';
             lines.push(
-                cpp.version ? `C/C++ (${cppLabel}): ${cpp.version} (${cpp.compiler})` : `C/C++: ${cpp.compiler}`,
+                cpp.version
+                    ? `C/C++ (${cppCompilerLabel}): ${cpp.version} (${cpp.compiler})`
+                    : `C/C++: ${cpp.compiler}`,
             );
         }
         if (env.toolchains?.cpp?.cmake) {

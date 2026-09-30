@@ -25,7 +25,7 @@ export interface PixiGlobalEnvironment {
 const _onDidChangeGlobalEnvironments = new EventEmitter<void>();
 export const onDidChangeGlobalEnvironments = _onDidChangeGlobalEnvironments.event;
 
-export function fireGlobalEnvironmentsChanged(): void {
+export function refreshGlobalEnvironments(): void {
     _onDidChangeGlobalEnvironments.fire();
 }
 
@@ -79,7 +79,7 @@ export async function installGlobalTools(
     }
     args.push(...tools);
     const output = await runPixi(args, undefined, token);
-    _onDidChangeGlobalEnvironments.fire();
+    refreshGlobalEnvironments();
     return output;
 }
 
@@ -89,20 +89,20 @@ export async function updateGlobalTool(toolName?: string, token?: CancellationTo
         args.push(toolName);
     }
     const output = await runPixi(args, undefined, token);
-    _onDidChangeGlobalEnvironments.fire();
+    refreshGlobalEnvironments();
     return output;
 }
 
 export async function uninstallGlobalTool(toolName: string, token?: CancellationToken): Promise<string> {
     const args = ['global', 'uninstall', toolName];
     const output = await runPixi(args, undefined, token);
-    _onDidChangeGlobalEnvironments.fire();
+    refreshGlobalEnvironments();
     return output;
 }
 
 export async function syncGlobalEnvironments(token?: CancellationToken): Promise<string> {
     const args = ['global', 'sync'];
     const output = await runPixi(args, undefined, token);
-    _onDidChangeGlobalEnvironments.fire();
+    refreshGlobalEnvironments();
     return output;
 }

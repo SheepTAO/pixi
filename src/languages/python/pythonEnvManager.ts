@@ -238,11 +238,11 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
                 const found = envs.find((e) => e.envId.id === targetId);
                 if (found) {
                     this.activeEnv.set(projectPath, found);
-                } else if (envs.length > 0) {
+                } else {
                     this.activeEnv.delete(projectPath);
-                    await storage.set(`projectEnvId:${projectPath}`, undefined);
-                } else if (!savedId) {
-                    this.activeEnv.delete(projectPath);
+                    if (savedId) {
+                        await storage.set(`projectEnvId:${projectPath}`, undefined);
+                    }
                 }
             }
         }

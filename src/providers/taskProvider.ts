@@ -277,31 +277,15 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
 
                         const existing = taskMap.get(t.name);
                         if (existing) {
-                            if (!existing.cmd && cmdStr) {
-                                existing.cmd = cmdStr;
-                            }
-                            if (!existing.description && t.description) {
-                                existing.description = t.description;
-                            }
-                            if (!existing.default_environment && t.default_environment) {
-                                existing.default_environment = t.default_environment;
-                            }
-                            if (
-                                (!existing.depends_on || existing.depends_on.length === 0) &&
-                                dependsOn &&
-                                dependsOn.length > 0
-                            ) {
+                            existing.cmd ??= cmdStr;
+                            existing.description ??= t.description;
+                            existing.default_environment ??= t.default_environment;
+                            if (!existing.depends_on?.length && dependsOn?.length) {
                                 existing.depends_on = dependsOn;
                             }
-                            if (!existing.inputs && inputs) {
-                                existing.inputs = inputs;
-                            }
-                            if (!existing.outputs && outputs) {
-                                existing.outputs = outputs;
-                            }
-                            if (existing.clean_env === undefined && cleanEnv !== undefined) {
-                                existing.clean_env = cleanEnv;
-                            }
+                            existing.inputs ??= inputs;
+                            existing.outputs ??= outputs;
+                            existing.clean_env ??= cleanEnv;
                         } else {
                             taskMap.set(t.name, {
                                 name: t.name,

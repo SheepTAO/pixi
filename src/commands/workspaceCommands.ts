@@ -223,6 +223,56 @@ async function pickPackageFromEnvironment(
     return { pkg: pick.pkg, pkgName: pick.pkgName, envLabel, targetEnv: resolvedEnv };
 }
 
+async function executeRemovePackage(
+    manager: PixiProjectManager,
+    projectPath: string,
+    pkg: Pick<PixiPackage, 'name' | 'kind'>,
+    targetEnv?: string,
+): Promise<void> {
+    const isPypi = pkg.kind === 'pypi';
+    const args = ['remove'];
+    if (isPypi) {
+        args.push('--pypi');
+    }
+    if (targetEnv && targetEnv !== 'default') {
+        args.push('-e', targetEnv);
+    }
+    args.push(pkg.name);
+
+    const projectName = path.basename(projectPath);
+    const displayEnv = targetEnv || 'default';
+    const sourceLabel = isPypi ? 'PyPI' : 'Conda';
+    await runPixiWithProgress(
+        `Pixi: Removing '${pkg.name}' (${sourceLabel}) from environment '${displayEnv}' in '${projectName}'...`,
+        args,
+        projectPath,
+        manager,
+        `Pixi: Successfully removed '${pkg.name}' (${sourceLabel}) from environment '${displayEnv}' in '${projectName}'.`,
+    );
+}
+
+async function executeUpdatePackage(
+    manager: PixiProjectManager,
+    projectPath: string,
+    pkgName: string,
+    targetEnv?: string,
+): Promise<void> {
+    const projectName = path.basename(projectPath);
+    const args = ['update'];
+    if (targetEnv && targetEnv !== 'default') {
+        args.push('-e', targetEnv);
+    }
+    args.push(pkgName);
+    const displayEnv = targetEnv || 'default';
+    await runPixiWithProgress(
+        `Pixi: Updating package '${pkgName}' in '${displayEnv}' (${projectName})...`,
+        args,
+        projectPath,
+        manager,
+        `Pixi: Package '${pkgName}' updated successfully in '${displayEnv}'.`,
+    );
+}
+
 async function resolveTargetFolder(folderUri?: unknown, placeHolder?: string): Promise<string | undefined> {
     const direct = normalizeFolderPath(folderUri);
     if (direct) {
@@ -1513,26 +1563,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                     return;
                 }
 
-                const isPypi = pkg.kind === 'pypi';
-                const args = ['remove'];
-                if (isPypi) {
-                    args.push('--pypi');
-                }
-                if (envName && envName !== 'default') {
-                    args.push('-e', envName);
-                }
-                args.push(pkg.name);
-
-                const projectName = path.basename(projectPath);
-                const sourceLabel = isPypi ? 'PyPI' : 'Conda';
-                await runPixiWithProgress(
-                    `Pixi: Removing '${pkg.name}' (${sourceLabel}) from environment '${envName}' in '${projectName}'...`,
-                    args,
-                    projectPath,
-                    manager,
-                    `Pixi: Successfully removed '${pkg.name}' (${sourceLabel}) from environment '${envName}' in '${projectName}'.`,
-                );
-                return;
+                return executeRemovePackage(manager, projectPath, pkg, envName);
             }
 
             // Case 2: Invoked on an environment item, project item, or from Command Palette
@@ -1576,26 +1607,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                 }
             }
 
-            const isPypi = picked.pkg.kind === 'pypi';
-            const args = ['remove'];
-            if (isPypi) {
-                args.push('--pypi');
-            }
-            if (picked.targetEnv) {
-                args.push('-e', picked.targetEnv);
-            }
-            args.push(picked.pkg.name);
-
-            const projectName = path.basename(projectPath);
-            const displayEnv = picked.targetEnv || 'default';
-            const sourceLabel = isPypi ? 'PyPI' : 'Conda';
-            await runPixiWithProgress(
-                `Pixi: Removing '${picked.pkg.name}' (${sourceLabel}) from environment '${displayEnv}' in '${projectName}'...`,
-                args,
-                projectPath,
-                manager,
-                `Pixi: Successfully removed '${picked.pkg.name}' (${sourceLabel}) from environment '${displayEnv}' in '${projectName}'.`,
-            );
+            return executeRemovePackage(manager, projectPath, picked.pkg, picked.targetEnv);
         }),
     );
 
@@ -2021,24 +2033,8 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
             const item = targetItem as PackageItemContextCandidate | undefined;
             // Case 1: Package item in tree view
             if (item?.pkg && item?.env) {
-                const pkg: PixiPackage = item.pkg;
-                const env: PixiEnvironmentInfo = item.env;
-                const projectPath: string = item.project?.projectPath || env.projectPath;
-                const envName = env.pixiEnvName;
-                const projectName = path.basename(projectPath);
-                const args = ['update'];
-                if (envName) {
-                    args.push('-e', envName);
-                }
-                args.push(pkg.name);
-                await runPixiWithProgress(
-                    `Pixi: Updating package '${pkg.name}' in '${envName}' (${projectName})...`,
-                    args,
-                    projectPath,
-                    manager,
-                    `Pixi: Package '${pkg.name}' updated successfully in '${envName}'.`,
-                );
-                return;
+                const projectPath: string = item.project?.projectPath || item.env.projectPath;
+                return executeUpdatePackage(manager, projectPath, item.pkg.name, item.env.pixiEnvName);
             }
 
             // Case 2: Project item or Command Palette
@@ -2066,19 +2062,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                 return;
             }
 
-            const projectName = path.basename(projectPath);
-            const args = ['update'];
-            if (picked.targetEnv) {
-                args.push('-e', picked.targetEnv);
-            }
-            args.push(picked.pkgName);
-            await runPixiWithProgress(
-                `Pixi: Updating package '${picked.pkgName}' in '${picked.envLabel}' (${projectName})...`,
-                args,
-                projectPath,
-                manager,
-                `Pixi: Package '${picked.pkgName}' updated successfully in '${picked.envLabel}'.`,
-            );
+            return executeUpdatePackage(manager, projectPath, picked.pkgName, picked.targetEnv);
         }),
     );
 

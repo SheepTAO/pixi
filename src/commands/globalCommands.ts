@@ -12,12 +12,12 @@ import {
 
 import {
     clearGlobalManifestCache,
-    fireGlobalEnvironmentsChanged,
     getGlobalManifestPath,
     installGlobalTools,
     listGlobalEnvironments,
     onDidChangeGlobalEnvironments,
     PixiGlobalEnvironment,
+    refreshGlobalEnvironments,
     syncGlobalEnvironments,
     uninstallGlobalTool,
     updateGlobalTool,
@@ -279,7 +279,7 @@ export function registerGlobalCommands(): Disposable {
 
     disposables.push(
         commands.registerCommand('pixi.refreshGlobal', () => {
-            fireGlobalEnvironmentsChanged();
+            refreshGlobalEnvironments();
         }),
         commands.registerCommand('pixi.global.install', async (target?: unknown) => {
             const initialTool = typeof target === 'string' ? target : undefined;

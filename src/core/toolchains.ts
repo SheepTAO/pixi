@@ -57,6 +57,12 @@ const CLANG_VERSION_REGEX = /^(?:clang|clangxx|llvm)(?:_[a-zA-Z0-9_]+-[a-zA-Z0-9
 const MSVC_VERSION_REGEX =
     /^(?:vs(?:2015|2017|2019|2022)(?:_[a-zA-Z0-9_]+-[a-zA-Z0-9_]+)?|msvc-tools)-(\d[^-]*)-.*\.json$/;
 
+const COMPILER_REGEX_MAP: Record<'gcc' | 'clang' | 'msvc', RegExp> = {
+    gcc: GCC_VERSION_REGEX,
+    clang: CLANG_VERSION_REGEX,
+    msvc: MSVC_VERSION_REGEX,
+};
+
 /**
  * Extracts a package version from a list of conda-meta filenames.
  * e.g. python-3.11.8-h123_0.json -> "3.11.8"
@@ -170,13 +176,7 @@ export async function scanCppToolchain(envPath: string, metaFiles?: string[]): P
     let version: string | undefined;
     if (compilerType) {
         const files = metaFiles ?? (await readCondaMetaFiles(envPath));
-        if (compilerType === 'gcc') {
-            version = findPackageVersionFromFiles(files, GCC_VERSION_REGEX);
-        } else if (compilerType === 'clang') {
-            version = findPackageVersionFromFiles(files, CLANG_VERSION_REGEX);
-        } else if (compilerType === 'msvc') {
-            version = findPackageVersionFromFiles(files, MSVC_VERSION_REGEX);
-        }
+        version = findPackageVersionFromFiles(files, COMPILER_REGEX_MAP[compilerType]);
     }
 
     return {
