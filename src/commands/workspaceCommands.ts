@@ -129,28 +129,29 @@ interface PackageItemContextCandidate extends EnvironmentContextCandidate {
     name?: string;
 }
 
-function extractEnvironmentName(target?: unknown): string | undefined {
-    if (!target) {
-        return undefined;
-    }
-    if (typeof target === 'string') {
-        const trimmed = target.trim();
-        return trimmed || undefined;
-    }
-    if (typeof target === 'object') {
-        const item = target as EnvironmentContextCandidate;
-        const name =
-            (typeof item.env?.pixiEnvName === 'string' && item.env.pixiEnvName.trim()) ||
-            (typeof item.envName === 'string' && item.envName.trim()) ||
-            (typeof item.pixiEnvName === 'string' && item.pixiEnvName.trim()) ||
-            undefined;
-        return name;
+function extractEnvironmentName(...targets: unknown[]): string | undefined {
+    for (const target of targets) {
+        if (!target) {
+            continue;
+        }
+        if (typeof target === 'string') {
+            const trimmed = target.trim();
+            if (trimmed) {
+                return trimmed;
+            }
+        } else if (typeof target === 'object') {
+            const item = target as EnvironmentContextCandidate;
+            const name =
+                (typeof item.env?.pixiEnvName === 'string' && item.env.pixiEnvName.trim()) ||
+                (typeof item.envName === 'string' && item.envName.trim()) ||
+                (typeof item.pixiEnvName === 'string' && item.pixiEnvName.trim()) ||
+                undefined;
+            if (name) {
+                return name;
+            }
+        }
     }
     return undefined;
-}
-
-function resolveEnvName(envName?: string, target?: unknown): string | undefined {
-    return extractEnvironmentName(envName) || extractEnvironmentName(target);
 }
 
 async function resolveTargetEnvironment(
@@ -960,7 +961,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
             ];
 
             const targetEnvName =
-                resolveEnvName(undefined, folderUri) ??
+                extractEnvironmentName(folderUri) ??
                 (
                     await window.showQuickPick(envItems, {
                         title: 'Pixi: Delete Environment',
@@ -1153,7 +1154,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
             }
 
             const projectName = path.basename(projectPath);
-            const validEnvName = resolveEnvName(envName, folderUri);
+            const validEnvName = extractEnvironmentName(envName, folderUri);
             const args = ['install'];
             if (validEnvName) {
                 args.push('-e', validEnvName);
@@ -1185,7 +1186,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
             }
 
             const projectName = path.basename(projectPath);
-            const validEnvName = resolveEnvName(envName, folderUri);
+            const validEnvName = extractEnvironmentName(envName, folderUri);
 
             const runReinstall = async (target?: string, isAll?: boolean) => {
                 const title = target
@@ -1257,7 +1258,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
             }
 
             const projectName = path.basename(projectPath);
-            const validEnvName = resolveEnvName(envName, folderUri);
+            const validEnvName = extractEnvironmentName(envName, folderUri);
             const args = ['update'];
             if (validEnvName) {
                 args.push('-e', validEnvName);

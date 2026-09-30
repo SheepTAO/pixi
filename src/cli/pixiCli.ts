@@ -91,22 +91,23 @@ export type PixiRunOptions = ch.SpawnOptions & {
     includeStderr?: boolean;
 };
 
-async function _runPixi(
-    pixi: string,
-    args: string[],
-    options?: PixiRunOptions,
-    token?: CancellationToken,
-): Promise<string> {
-    const deferred = createDeferred<string>();
+export async function runPixi(args: string[], options?: PixiRunOptions, token?: CancellationToken): Promise<string> {
+    const pixi = await getPixi();
+    const defaultCwd = workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const spawnOptions: PixiRunOptions = {
+        ...(defaultCwd ? { cwd: defaultCwd } : {}),
+        ...options,
+    };
 
     const isWindows = process.platform === 'win32';
     const useShell = isWindows && !pixi.toLowerCase().endsWith('.exe');
     const finalArgs = useShell ? quoteArgs(args) : args;
 
+    const deferred = createDeferred<string>();
     const proc = ch.spawn(pixi, finalArgs, {
         shell: useShell,
         windowsHide: true,
-        ...options,
+        ...spawnOptions,
     });
 
     const cancelDisposable = token?.onCancellationRequested(() => {
@@ -148,16 +149,6 @@ async function _runPixi(
     });
 
     return deferred.promise;
-}
-
-export async function runPixi(args: string[], options?: PixiRunOptions, token?: CancellationToken): Promise<string> {
-    const pixi = await getPixi();
-    const defaultCwd = workspace.workspaceFolders?.[0]?.uri.fsPath;
-    const spawnOptions: PixiRunOptions = {
-        ...(defaultCwd ? { cwd: defaultCwd } : {}),
-        ...options,
-    };
-    return _runPixi(pixi, args, spawnOptions, token);
 }
 
 export const MINIMUM_PIXI_VERSION = '0.53.0';

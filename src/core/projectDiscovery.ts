@@ -77,8 +77,8 @@ export async function resolvePixiProjectPaths(): Promise<string[]> {
     }
 
     // 2. Glob-based search for nested or external projects
-    const workspacePaths = getWorkspaceSearchPaths();
-    const globalPaths = getGlobalSearchPaths();
+    const workspacePaths = getSearchPaths('workspaceSearchPaths');
+    const globalPaths = getSearchPaths('globalSearchPaths');
 
     const resolvedWorkspace = resolveWorkspacePaths(workspacePaths);
     const resolvedGlobal = globalPaths.map(untildify);
@@ -98,36 +98,21 @@ export async function resolvePixiProjectPaths(): Promise<string[]> {
     return uniqueRoots.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
 }
 
-function getWorkspaceSearchPaths(): string[] {
+function getSearchPaths(key: 'workspaceSearchPaths' | 'globalSearchPaths'): string[] {
     try {
         const config = workspace.getConfiguration('pixi');
-        const pixiSearchPaths = config.get<string[]>('workspaceSearchPaths');
-        if (pixiSearchPaths && pixiSearchPaths.length > 0) {
-            return pixiSearchPaths;
+        const paths = config.get<string[]>(key);
+        if (paths && paths.length > 0) {
+            return paths;
         }
         // Fallback to python-envs if configured there
         const pyConfig = workspace.getConfiguration('python-envs');
-        const inspection = pyConfig.inspect<string[]>('workspaceSearchPaths');
-        return inspection?.workspaceFolderValue ?? inspection?.workspaceValue ?? inspection?.defaultValue ?? [];
+        const inspection = pyConfig.inspect<string[]>(key);
+        return key === 'workspaceSearchPaths'
+            ? (inspection?.workspaceFolderValue ?? inspection?.workspaceValue ?? inspection?.defaultValue ?? [])
+            : (inspection?.globalValue ?? []);
     } catch (error) {
-        traceError('Error reading workspaceSearchPaths:', error);
-        return [];
-    }
-}
-
-function getGlobalSearchPaths(): string[] {
-    try {
-        const config = workspace.getConfiguration('pixi');
-        const pixiGlobalPaths = config.get<string[]>('globalSearchPaths');
-        if (pixiGlobalPaths && pixiGlobalPaths.length > 0) {
-            return pixiGlobalPaths;
-        }
-        // Fallback to python-envs if configured there
-        const pyConfig = workspace.getConfiguration('python-envs');
-        const inspection = pyConfig.inspect<string[]>('globalSearchPaths');
-        return inspection?.globalValue ?? [];
-    } catch (error) {
-        traceError('Error reading globalSearchPaths:', error);
+        traceError(`Error reading ${key}:`, error);
         return [];
     }
 }
