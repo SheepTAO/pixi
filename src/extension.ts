@@ -70,7 +70,7 @@ export async function activate(context: ExtensionContext): Promise<PixiExtension
     );
 
     // 3. Initialize Public Extension API
-    const extensionVersion = context.extension?.packageJSON?.version;
+    const extensionVersion: string = context.extension.packageJSON.version;
     const pixiApi = createPixiApi(projectManager, extensionVersion);
     context.subscriptions.push(pixiApi);
 

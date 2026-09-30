@@ -6,7 +6,6 @@ import { PixiProjectManager } from '../core/projectManager';
 import { ActiveEnvironmentChangeEvent, PixiEnvironmentInfo, PixiExtensionApi, PixiPackage, PixiProject } from './types';
 
 export class PixiExtensionApiImpl implements PixiExtensionApi, Disposable {
-    readonly version: string;
     private readonly activeEnvNames = new Map<string, string>(); // projectPath -> envName
     private globalActiveEnvName?: string;
     private readonly disposables: Disposable[] = [];
@@ -17,10 +16,8 @@ export class PixiExtensionApiImpl implements PixiExtensionApi, Disposable {
 
     constructor(
         private readonly projectManager: PixiProjectManager,
-        version?: string,
+        public readonly version: string,
     ) {
-        this.version = version || '1.0.1';
-
         this.disposables.push(
             this._onDidChangeActiveEnvironment,
             this.projectManager.onDidProjectsChanged(async () => {
@@ -279,6 +276,6 @@ export class PixiExtensionApiImpl implements PixiExtensionApi, Disposable {
     }
 }
 
-export function createPixiApi(projectManager: PixiProjectManager, version?: string): PixiExtensionApi & Disposable {
+export function createPixiApi(projectManager: PixiProjectManager, version: string): PixiExtensionApi & Disposable {
     return new PixiExtensionApiImpl(projectManager, version);
 }
