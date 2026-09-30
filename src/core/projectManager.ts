@@ -74,23 +74,13 @@ export class PixiProjectManager implements Disposable {
             }, 500);
         };
 
-        const pixiWatcher = workspace.createFileSystemWatcher('**/pixi.toml');
-        const pyprojectWatcher = workspace.createFileSystemWatcher('**/pyproject.toml');
-        const lockWatcher = workspace.createFileSystemWatcher('**/pixi.lock');
+        const watcher = workspace.createFileSystemWatcher('**/{pixi.toml,pyproject.toml,pixi.lock}');
 
         this.disposables.push(
-            pixiWatcher,
-            pixiWatcher.onDidChange(scheduleRefresh),
-            pixiWatcher.onDidCreate(scheduleRefresh),
-            pixiWatcher.onDidDelete(scheduleRefresh),
-            pyprojectWatcher,
-            pyprojectWatcher.onDidChange(scheduleRefresh),
-            pyprojectWatcher.onDidCreate(scheduleRefresh),
-            pyprojectWatcher.onDidDelete(scheduleRefresh),
-            lockWatcher,
-            lockWatcher.onDidChange(scheduleRefresh),
-            lockWatcher.onDidCreate(scheduleRefresh),
-            lockWatcher.onDidDelete(scheduleRefresh),
+            watcher,
+            watcher.onDidChange(scheduleRefresh),
+            watcher.onDidCreate(scheduleRefresh),
+            watcher.onDidDelete(scheduleRefresh),
         );
     }
 
@@ -140,16 +130,12 @@ export class PixiProjectManager implements Disposable {
             const isWindows = process.platform === 'win32';
             const targetPrefix = isWindows ? (normalized + ':').toLowerCase() : normalized + ':';
 
-            for (const key of this.packagesCache.keys()) {
-                const compKey = isWindows ? key.toLowerCase() : key;
-                if (compKey.startsWith(targetPrefix)) {
-                    this.packagesCache.delete(key);
-                }
-            }
-            for (const key of this.packagesInFlight.keys()) {
-                const compKey = isWindows ? key.toLowerCase() : key;
-                if (compKey.startsWith(targetPrefix)) {
-                    this.packagesInFlight.delete(key);
+            for (const map of [this.packagesCache, this.packagesInFlight]) {
+                for (const key of map.keys()) {
+                    const compKey = isWindows ? key.toLowerCase() : key;
+                    if (compKey.startsWith(targetPrefix)) {
+                        map.delete(key);
+                    }
                 }
             }
         } else {

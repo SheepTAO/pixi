@@ -55,10 +55,7 @@ export function matchEnvironmentRule<T extends { pixiEnvName: string; displayNam
     if (!target) {
         return undefined;
     }
-    return (
-        envs.find((e) => e.pixiEnvName === target) ||
-        envs.find((e) => (e.displayName && e.displayName.startsWith(`${target} `)) || e.name === target)
-    );
+    return envs.find((e) => e.pixiEnvName === target || e.displayName?.startsWith(`${target} `) || e.name === target);
 }
 
 /**
@@ -83,19 +80,19 @@ export function matchEnvironmentForUri<T extends { pixiEnvName: string; displayN
     return undefined;
 }
 
+const STATUS_PRIORITY: Record<string, number> = {
+    installed: 0,
+    uninstalled: 1,
+    incompatible: 2,
+};
+
 /**
  * Deterministically sorts Pixi environments: installed first, default first, then alphabetically by envName.
  */
 export function sortPixiEnvironments<T extends { pixiEnvName: string; pixiStatus: string }>(envs: T[]): T[] {
-    const statusPriority: Record<string, number> = {
-        installed: 0,
-        uninstalled: 1,
-        incompatible: 2,
-    };
-
     return [...envs].sort((a, b) => {
-        const prioA = statusPriority[a.pixiStatus] ?? 99;
-        const prioB = statusPriority[b.pixiStatus] ?? 99;
+        const prioA = STATUS_PRIORITY[a.pixiStatus] ?? 99;
+        const prioB = STATUS_PRIORITY[b.pixiStatus] ?? 99;
         if (prioA !== prioB) {
             return prioA - prioB;
         }

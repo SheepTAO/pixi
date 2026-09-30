@@ -390,6 +390,15 @@ async function fetchPypiPackage(
             res.on('error', () => safeResolve(null));
         };
 
+        const sendGet = (agent?: https.Agent) => {
+            const req = https.get(targetUrl, agent ? { agent } : {}, onResponse);
+            req.setTimeout(timeoutMs, () => {
+                req.destroy();
+                safeResolve(null);
+            });
+            req.on('error', () => safeResolve(null));
+        };
+
         if (proxy && parsedUrl.protocol === 'https:') {
             try {
                 const p = new URL(proxy);
@@ -404,13 +413,7 @@ async function fetchPypiPackage(
                     safeResolve(null);
                 });
                 connectReq.on('connect', (_res, socket) => {
-                    const agent = new https.Agent({ socket });
-                    const req = https.get(targetUrl, { agent }, onResponse);
-                    req.setTimeout(timeoutMs, () => {
-                        req.destroy();
-                        safeResolve(null);
-                    });
-                    req.on('error', () => safeResolve(null));
+                    sendGet(new https.Agent({ socket }));
                 });
                 connectReq.on('error', () => safeResolve(null));
                 connectReq.end();
@@ -419,12 +422,7 @@ async function fetchPypiPackage(
             }
         } else {
             try {
-                const req = https.get(targetUrl, onResponse);
-                req.setTimeout(timeoutMs, () => {
-                    req.destroy();
-                    safeResolve(null);
-                });
-                req.on('error', () => safeResolve(null));
+                sendGet();
             } catch {
                 safeResolve(null);
             }
