@@ -115,25 +115,50 @@ async function pickTargetEnvironment(
     return selected.envName;
 }
 
+interface EnvironmentContextCandidate {
+    pixiEnvName?: string;
+    envName?: string;
+    env?: { pixiEnvName?: string; projectPath?: string; manifestPath?: string };
+}
+
+interface PackageItemContextCandidate extends EnvironmentContextCandidate {
+    pkg?: PixiPackage;
+    env?: PixiEnvironmentInfo;
+    project?: { projectPath?: string; manifestPath?: string };
+    manifestPath?: string;
+    name?: string;
+}
+
+function extractEnvironmentName(target?: unknown): string | undefined {
+    if (!target) {
+        return undefined;
+    }
+    if (typeof target === 'string') {
+        const trimmed = target.trim();
+        return trimmed || undefined;
+    }
+    if (typeof target === 'object') {
+        const item = target as EnvironmentContextCandidate;
+        const name =
+            (typeof item.env?.pixiEnvName === 'string' && item.env.pixiEnvName.trim()) ||
+            (typeof item.envName === 'string' && item.envName.trim()) ||
+            (typeof item.pixiEnvName === 'string' && item.pixiEnvName.trim()) ||
+            undefined;
+        return name;
+    }
+    return undefined;
+}
+
 function resolveEnvName(envName?: string, target?: unknown): string | undefined {
-    const raw =
-        (typeof envName === 'string' && envName.trim()) ||
-        (target as any)?.pixiEnvName ||
-        (target as any)?.env?.pixiEnvName;
-    return typeof raw === 'string' && raw.trim() ? raw.trim() : undefined;
+    return extractEnvironmentName(envName) || extractEnvironmentName(target);
 }
 
 async function resolveTargetEnvironment(
     envs: PixiEnvironmentInfo[],
-    targetItem?: any,
+    targetItem?: unknown,
     placeholder?: string,
 ): Promise<string | undefined | null> {
-    const directEnvName =
-        (typeof targetItem?.env?.pixiEnvName === 'string' && targetItem.env.pixiEnvName.trim()) ||
-        (typeof targetItem?.envName === 'string' && targetItem.envName.trim()) ||
-        (typeof targetItem?.pixiEnvName === 'string' && targetItem.pixiEnvName.trim()) ||
-        undefined;
-
+    const directEnvName = extractEnvironmentName(targetItem);
     if (directEnvName) {
         return directEnvName;
     }
@@ -147,7 +172,59 @@ async function resolveTargetEnvironment(
     return undefined;
 }
 
-async function resolveTargetFolder(folderUri?: Uri, placeHolder?: string): Promise<string | undefined> {
+interface PickPackageOptions {
+    title: string;
+    placeHolder: string;
+    emptyWarning?: string;
+    preferExplicit?: boolean;
+}
+
+async function pickPackageFromEnvironment(
+    manager: PixiProjectManager,
+    projectPath: string,
+    targetEnvName: string | undefined | null,
+    options: PickPackageOptions,
+): Promise<{ pkgName: string; envLabel: string } | undefined> {
+    const envs = manager.getEnvironmentsForProject(projectPath);
+    const resolvedEnv =
+        targetEnvName !== undefined
+            ? targetEnvName
+            : await resolveTargetEnvironment(envs, undefined, options.placeHolder);
+    if (resolvedEnv === null) {
+        return undefined;
+    }
+    const envLabel = resolvedEnv || (envs.length > 0 ? envs[0].pixiEnvName : 'default');
+    const packages = await manager.getPackagesForEnvironment(envLabel, projectPath);
+    let candidates = packages;
+    if (options.preferExplicit) {
+        const explicit = packages.filter((p) => p.is_explicit);
+        if (explicit.length > 0) {
+            candidates = explicit;
+        }
+    }
+    if (candidates.length === 0) {
+        window.showInformationMessage(options.emptyWarning || `No packages found in environment '${envLabel}'.`);
+        return undefined;
+    }
+    const pick = await window.showQuickPick(
+        candidates.map((p) => ({
+            label: p.name,
+            description: p.version ? `v${p.version}` : undefined,
+            pkgName: p.name,
+        })),
+        {
+            title: options.title,
+            placeHolder: options.placeHolder,
+            matchOnDescription: true,
+        },
+    );
+    if (!pick) {
+        return undefined;
+    }
+    return { pkgName: pick.pkgName, envLabel };
+}
+
+async function resolveTargetFolder(folderUri?: unknown, placeHolder?: string): Promise<string | undefined> {
     const direct = normalizeFolderPath(folderUri);
     if (direct) {
         return direct;
@@ -170,9 +247,9 @@ async function resolveTargetFolder(folderUri?: Uri, placeHolder?: string): Promi
 async function pickPixiProject(
     manager: PixiProjectManager,
     placeHolder: string,
-    folderUri?: Uri,
+    context?: unknown,
 ): Promise<string | undefined> {
-    const direct = normalizeFolderPath(folderUri);
+    const direct = normalizeFolderPath(context);
     const projectPaths = manager.getProjectPaths();
 
     if (direct) {
@@ -923,9 +1000,9 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
 
     // Pixi: Clean...
     disposables.push(
-        commands.registerCommand('pixi.clean', async (target?: Uri | any) => {
-            const envName = target?.pixiEnvName || target?.env?.pixiEnvName;
-            const targetProjectPath = target?.projectPath || target?.env?.projectPath;
+        commands.registerCommand('pixi.clean', async (target?: unknown) => {
+            const envName = extractEnvironmentName(target);
+            const targetProjectPath = normalizeFolderPath(target);
             if (envName && targetProjectPath) {
                 const confirmed = await window.showWarningMessage(
                     `Are you sure you want to clean installed environment '${envName}' on disk?`,
@@ -1163,7 +1240,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
 
     // Pixi: Search Packages...
     disposables.push(
-        commands.registerCommand('pixi.searchPackages', async (folderUri?: Uri | any) => {
+        commands.registerCommand('pixi.searchPackages', async (folderUri?: unknown) => {
             const targetProjectPath = normalizeFolderPath(folderUri);
             await showPackageSearchPicker(manager, undefined, targetProjectPath);
         }),
@@ -1171,7 +1248,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
 
     // Pixi: Add Package...
     disposables.push(
-        commands.registerCommand('pixi.addPackage', async (targetItem?: any, presetEnv?: string) => {
+        commands.registerCommand('pixi.addPackage', async (targetItem?: unknown, presetEnv?: string) => {
             const projectPath = await pickPixiProject(manager, 'Select Pixi project to add package to', targetItem);
             if (!projectPath) {
                 return;
@@ -1184,10 +1261,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
             // 1. If invoked directly on an Environment tree item (or explicit presetEnv), lock to that environment and skip picking.
             // 2. If invoked on Project tree item, title bar, or Command Palette, targetItem.env is undefined, so prompt for environment if needed.
             const directEnvName =
-                (typeof presetEnv === 'string' && presetEnv.trim()) ||
-                (typeof targetItem?.env?.pixiEnvName === 'string' && targetItem.env.pixiEnvName.trim()) ||
-                (typeof targetItem?.envName === 'string' && targetItem.envName.trim()) ||
-                undefined;
+                (typeof presetEnv === 'string' && presetEnv.trim()) || extractEnvironmentName(targetItem);
 
             let targetEnv: string | undefined;
             let isTargetEnvLocked = false;
@@ -1409,12 +1483,13 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
 
     // Pixi: Remove Package...
     disposables.push(
-        commands.registerCommand('pixi.removePackage', async (targetItem?: any) => {
+        commands.registerCommand('pixi.removePackage', async (targetItem?: unknown) => {
+            const item = targetItem as PackageItemContextCandidate | undefined;
             // Case 1: Invoked directly on a package item in the tree view
-            if (targetItem?.pkg && targetItem?.env) {
-                const pkg: PixiPackage = targetItem.pkg;
-                const env: PixiEnvironmentInfo = targetItem.env;
-                const projectPath: string = targetItem.project?.projectPath || env.projectPath;
+            if (item?.pkg && item?.env) {
+                const pkg: PixiPackage = item.pkg;
+                const env: PixiEnvironmentInfo = item.env;
+                const projectPath: string = item.project?.projectPath || env.projectPath;
                 const envName = env.pixiEnvName;
 
                 if (!pkg.is_explicit) {
@@ -1472,10 +1547,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
             }
 
             const envs = manager.getEnvironmentsForProject(projectPath);
-            const directEnvName =
-                (typeof targetItem?.env?.pixiEnvName === 'string' && targetItem.env.pixiEnvName.trim()) ||
-                (typeof targetItem?.envName === 'string' && targetItem.envName.trim()) ||
-                undefined;
+            const directEnvName = extractEnvironmentName(targetItem);
 
             let targetEnv: string | undefined;
             if (directEnvName) {
@@ -1758,12 +1830,13 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
 
     // Pixi: Show Dependency Tree
     disposables.push(
-        commands.registerCommand('pixi.showDependencyTree', async (targetItem?: any) => {
+        commands.registerCommand('pixi.showDependencyTree', async (targetItem?: unknown) => {
+            const item = targetItem as PackageItemContextCandidate | undefined;
             // Case 1: Package item
-            if (targetItem?.pkg && targetItem?.env) {
-                const pkg: PixiPackage = targetItem.pkg;
-                const env: PixiEnvironmentInfo = targetItem.env;
-                const projectPath: string = targetItem.project?.projectPath || env.projectPath;
+            if (item?.pkg && item?.env) {
+                const pkg: PixiPackage = item.pkg;
+                const env: PixiEnvironmentInfo = item.env;
+                const projectPath: string = item.project?.projectPath || env.projectPath;
                 const envName = env.pixiEnvName;
                 const args = ['tree', '--color', 'never'];
                 if (envName && envName !== 'default') {
@@ -1775,9 +1848,9 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
             }
 
             // Case 2: Environment item or transitive group item
-            if (targetItem?.env && targetItem?.project) {
-                const env: PixiEnvironmentInfo = targetItem.env;
-                const projectPath: string = targetItem.project.projectPath;
+            if (item?.env && item?.project?.projectPath) {
+                const env: PixiEnvironmentInfo = item.env;
+                const projectPath: string = item.project.projectPath;
                 const envName = env.pixiEnvName;
                 const args = ['tree', '--color', 'never'];
                 if (envName && envName !== 'default') {
@@ -1854,12 +1927,13 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
 
     // Pixi: Why is This Package Installed? (Reverse Tree)
     disposables.push(
-        commands.registerCommand('pixi.whyPackage', async (targetItem?: any) => {
+        commands.registerCommand('pixi.whyPackage', async (targetItem?: unknown) => {
+            const item = targetItem as PackageItemContextCandidate | undefined;
             // Case 1: Package item in tree view
-            if (targetItem?.pkg && targetItem?.env) {
-                const pkg: PixiPackage = targetItem.pkg;
-                const env: PixiEnvironmentInfo = targetItem.env;
-                const projectPath: string = targetItem.project?.projectPath || env.projectPath;
+            if (item?.pkg && item?.env) {
+                const pkg: PixiPackage = item.pkg;
+                const env: PixiEnvironmentInfo = item.env;
+                const projectPath: string = item.project?.projectPath || env.projectPath;
                 const envName = env.pixiEnvName;
                 const args = ['tree', '--color', 'never', '-i'];
                 if (envName && envName !== 'default') {
@@ -1967,12 +2041,13 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
 
     // Pixi: Update Package
     disposables.push(
-        commands.registerCommand('pixi.updatePackage', async (targetItem?: any) => {
+        commands.registerCommand('pixi.updatePackage', async (targetItem?: unknown) => {
+            const item = targetItem as PackageItemContextCandidate | undefined;
             // Case 1: Package item in tree view
-            if (targetItem?.pkg && targetItem?.env) {
-                const pkg: PixiPackage = targetItem.pkg;
-                const env: PixiEnvironmentInfo = targetItem.env;
-                const projectPath: string = targetItem.project?.projectPath || env.projectPath;
+            if (item?.pkg && item?.env) {
+                const pkg: PixiPackage = item.pkg;
+                const env: PixiEnvironmentInfo = item.env;
+                const projectPath: string = item.project?.projectPath || env.projectPath;
                 const envName = env.pixiEnvName;
                 const projectName = path.basename(projectPath);
                 const args = ['update'];
@@ -2055,9 +2130,10 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
 
     // Pixi: Open Manifest (pixi.toml / pyproject.toml)
     disposables.push(
-        commands.registerCommand('pixi.openManifest', async (targetItem?: any) => {
+        commands.registerCommand('pixi.openManifest', async (targetItem?: unknown) => {
+            const item = targetItem as PackageItemContextCandidate | undefined;
             let manifestPath: string | undefined =
-                targetItem?.manifestPath || targetItem?.project?.manifestPath || targetItem?.env?.manifestPath;
+                item?.manifestPath || item?.project?.manifestPath || item?.env?.manifestPath;
 
             if (!manifestPath) {
                 const projectPath = await pickPixiProject(manager, 'Select Pixi project to open manifest', targetItem);
@@ -2083,10 +2159,11 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
 
     // Pixi: Reveal Package in Manifest (pixi.toml / pyproject.toml)
     disposables.push(
-        commands.registerCommand('pixi.revealPackageInManifest', async (targetItem?: any) => {
-            let pkgName: string | undefined = targetItem?.pkg?.name;
-            let projectPath: string | undefined = targetItem?.project?.projectPath || targetItem?.env?.projectPath;
-            let manifestPath: string | undefined = targetItem?.project?.manifestPath || targetItem?.env?.manifestPath;
+        commands.registerCommand('pixi.revealPackageInManifest', async (targetItem?: unknown) => {
+            const item = targetItem as PackageItemContextCandidate | undefined;
+            let pkgName: string | undefined = item?.pkg?.name;
+            let projectPath: string | undefined = item?.project?.projectPath || item?.env?.projectPath;
+            let manifestPath: string | undefined = item?.project?.manifestPath || item?.env?.manifestPath;
 
             if (!projectPath) {
                 projectPath = await pickPixiProject(manager, 'Select Pixi project', targetItem);
@@ -2105,39 +2182,16 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
             }
 
             if (!pkgName) {
-                const envs = manager.getEnvironmentsForProject(projectPath);
-                const targetEnv = await resolveTargetEnvironment(
-                    envs,
-                    targetItem,
-                    'Select environment to reveal package from',
-                );
-                if (targetEnv === null) {
+                const picked = await pickPackageFromEnvironment(manager, projectPath, undefined, {
+                    title: 'Select Package to Reveal in Manifest',
+                    placeHolder: 'Select a package to jump to its definition',
+                    emptyWarning: 'No packages found to reveal in manifest.',
+                    preferExplicit: true,
+                });
+                if (!picked) {
                     return;
                 }
-                const envLabel = targetEnv || (envs.length > 0 ? envs[0].pixiEnvName : 'default');
-                const packages = await manager.getPackagesForEnvironment(envLabel, projectPath);
-                const explicit = packages.filter((p) => p.is_explicit);
-                const candidates = explicit.length > 0 ? explicit : packages;
-                if (candidates.length === 0) {
-                    window.showInformationMessage('No packages found to reveal in manifest.');
-                    return;
-                }
-                const pick = await window.showQuickPick(
-                    candidates.map((p) => ({
-                        label: p.name,
-                        description: p.version ? `v${p.version}` : undefined,
-                        pkgName: p.name,
-                    })),
-                    {
-                        title: 'Select Package to Reveal in Manifest',
-                        placeHolder: 'Select a package to jump to its definition',
-                        matchOnDescription: true,
-                    },
-                );
-                if (!pick) {
-                    return;
-                }
-                pkgName = pick.pkgName;
+                pkgName = picked.pkgName;
             }
 
             await revealDefinitionInManifest({
@@ -2150,10 +2204,11 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
 
     // Pixi: Copy Package Name
     disposables.push(
-        commands.registerCommand('pixi.copyPackageName', async (targetItem?: any) => {
+        commands.registerCommand('pixi.copyPackageName', async (targetItem?: unknown) => {
+            const item = targetItem as PackageItemContextCandidate | undefined;
             let pkgName =
-                targetItem?.pkg?.name ||
-                (typeof targetItem?.name === 'string' ? targetItem.name : undefined) ||
+                item?.pkg?.name ||
+                (typeof item?.name === 'string' ? item.name : undefined) ||
                 (typeof targetItem === 'string' ? targetItem : undefined);
 
             if (!pkgName) {
@@ -2165,37 +2220,14 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                 if (!projectPath) {
                     return;
                 }
-                const envs = manager.getEnvironmentsForProject(projectPath);
-                const targetEnv = await resolveTargetEnvironment(
-                    envs,
-                    targetItem,
-                    'Select environment to copy package name from',
-                );
-                if (targetEnv === null) {
+                const picked = await pickPackageFromEnvironment(manager, projectPath, undefined, {
+                    title: 'Select Package to Copy Name',
+                    placeHolder: 'Select a package to copy its name to clipboard',
+                });
+                if (!picked) {
                     return;
                 }
-                const envLabel = targetEnv || (envs.length > 0 ? envs[0].pixiEnvName : 'default');
-                const packages = await manager.getPackagesForEnvironment(envLabel, projectPath);
-                if (packages.length === 0) {
-                    window.showInformationMessage(`No packages found in environment '${envLabel}'.`);
-                    return;
-                }
-                const pick = await window.showQuickPick(
-                    packages.map((p) => ({
-                        label: p.name,
-                        description: p.version ? `v${p.version}` : undefined,
-                        pkgName: p.name,
-                    })),
-                    {
-                        title: 'Select Package to Copy Name',
-                        placeHolder: 'Select a package to copy its name to clipboard',
-                        matchOnDescription: true,
-                    },
-                );
-                if (!pick) {
-                    return;
-                }
-                pkgName = pick.pkgName;
+                pkgName = picked.pkgName;
             }
 
             await vscodeEnv.clipboard.writeText(pkgName);

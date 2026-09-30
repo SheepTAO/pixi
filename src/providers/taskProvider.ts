@@ -56,6 +56,22 @@ interface TaskQuickPickItem extends QuickPickItem {
     pixiTask: PixiTask;
 }
 
+interface RawPixiTask {
+    name?: string;
+    cmd?: string | string[];
+    description?: string;
+    default_environment?: string;
+    depends_on?: { task_name: string }[];
+    inputs?: string[];
+    outputs?: string[];
+    clean_env?: boolean;
+}
+
+interface RawPixiTaskEnvironment {
+    tasks?: RawPixiTask[];
+    features?: { tasks?: RawPixiTask[] }[];
+}
+
 export class PixiTaskProvider implements TaskProvider, Disposable {
     private readonly disposables: Disposable[] = [];
     private taskCache = new Map<string, PixiTask[]>();
@@ -237,7 +253,7 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
     private parsePixiTasksJson(jsonStr: string, projectPath: string): PixiTask[] {
         const taskMap = new Map<string, PixiTask>();
         try {
-            const raw = safeJsonParse<any[]>(jsonStr, []);
+            const raw = safeJsonParse<RawPixiTaskEnvironment[]>(jsonStr, []);
             if (Array.isArray(raw)) {
                 for (const envObj of raw) {
                     const all = [...(envObj.tasks || [])];

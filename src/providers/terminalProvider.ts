@@ -32,11 +32,12 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
         public readonly log?: LogOutputChannel,
     ) {
         this.disposables.push(window.registerTerminalProfileProvider('pixi.terminal', this));
-        this.disposables.push(
-            commands.registerCommand('pixi.openTerminal', async (target?: any) => {
-                await this.openTerminal(target);
-            }),
-        );
+    }
+
+    public registerCommands(): Disposable {
+        return commands.registerCommand('pixi.openTerminal', async (target?: unknown) => {
+            await this.openTerminal(target);
+        });
     }
 
     dispose() {
@@ -179,13 +180,15 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
         }
     }
 
-    async openTerminal(target?: any): Promise<void> {
+    async openTerminal(target?: unknown): Promise<void> {
         try {
             let env: PixiEnvironmentInfo | undefined;
-            if (target && 'pixiEnvName' in target) {
-                env = target as PixiEnvironmentInfo;
-            } else if (target && 'env' in target && target.env) {
-                env = target.env;
+            if (target && typeof target === 'object') {
+                if ('pixiEnvName' in target && typeof (target as { pixiEnvName?: unknown }).pixiEnvName === 'string') {
+                    env = target as PixiEnvironmentInfo;
+                } else if ('env' in target && (target as { env?: unknown }).env) {
+                    env = (target as { env: PixiEnvironmentInfo }).env;
+                }
             }
 
             const folder = normalizeFolderPath(target);

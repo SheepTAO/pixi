@@ -270,6 +270,10 @@ export async function handleOpenGlobalManifest(): Promise<void> {
     await window.showTextDocument(doc);
 }
 
+interface GlobalToolCommandArg {
+    tool?: { name?: string };
+}
+
 export function registerGlobalCommands(): Disposable {
     const disposables: Disposable[] = [];
 
@@ -277,19 +281,19 @@ export function registerGlobalCommands(): Disposable {
         commands.registerCommand('pixi.refreshGlobal', () => {
             fireGlobalEnvironmentsChanged();
         }),
-        commands.registerCommand('pixi.global.install', async (target?: any) => {
+        commands.registerCommand('pixi.global.install', async (target?: unknown) => {
             const initialTool = typeof target === 'string' ? target : undefined;
             await handleGlobalInstall(initialTool);
         }),
         commands.registerCommand('pixi.global.sync', async () => {
             await executeGlobalSync();
         }),
-        commands.registerCommand('pixi.global.updateTool', async (item?: any) => {
-            const toolName = typeof item === 'string' ? item : item?.tool?.name;
+        commands.registerCommand('pixi.global.updateTool', async (item?: unknown) => {
+            const toolName = typeof item === 'string' ? item : (item as GlobalToolCommandArg | undefined)?.tool?.name;
             await executeGlobalUpdate(toolName);
         }),
-        commands.registerCommand('pixi.global.uninstallTool', async (item?: any) => {
-            const toolName = typeof item === 'string' ? item : item?.tool?.name;
+        commands.registerCommand('pixi.global.uninstallTool', async (item?: unknown) => {
+            const toolName = typeof item === 'string' ? item : (item as GlobalToolCommandArg | undefined)?.tool?.name;
             if (toolName) {
                 await executeGlobalUninstall(toolName);
             } else {
