@@ -236,7 +236,7 @@
             },
             {
                 "command": "pixi.revealPackageInManifest",
-                "title": "Go to Definition in Manifest",
+                "title": "Go to Package Definition in Manifest",
                 "category": "Pixi",
                 "icon": "$(go-to-file)"
             },
@@ -253,20 +253,8 @@
                 "icon": "$(refresh)"
             },
             {
-                "command": "pixi.tasks.run",
-                "title": "Run Task",
-                "category": "Pixi",
-                "icon": "$(play)"
-            },
-            {
-                "command": "pixi.tasks.runInEnvironment",
-                "title": "Run Task in Environment ...",
-                "category": "Pixi",
-                "icon": "$(layers)"
-            },
-            {
                 "command": "pixi.tasks.revealInManifest",
-                "title": "Go to Definition in Manifest",
+                "title": "Go to Task Definition in Manifest",
                 "category": "Pixi",
                 "icon": "$(go-to-file)"
             }
@@ -283,10 +271,15 @@
                     "command": "pixi.refreshInfo"
                 },
                 {
-                    "command": "pixi.cleanCache"
+                    "command": "pixi.cleanCache",
+                    "when": "false"
                 },
                 {
                     "command": "pixi.openLocation",
+                    "when": "false"
+                },
+                {
+                    "command": "pixi.measureCacheSize",
                     "when": "false"
                 },
                 {
@@ -384,12 +377,28 @@
                     "when": "pixi.hasPixiProject"
                 },
                 {
-                    "command": "pixi.tasks.run",
+                    "command": "pixi.refreshProjects",
+                    "when": "pixi.hasPixiProject"
+                },
+                {
+                    "command": "pixi.refreshGlobal"
+                },
+                {
+                    "command": "pixi.global.install"
+                },
+                {
+                    "command": "pixi.global.sync"
+                },
+                {
+                    "command": "pixi.global.updateTool",
                     "when": "false"
                 },
                 {
-                    "command": "pixi.tasks.runInEnvironment",
+                    "command": "pixi.global.uninstallTool",
                     "when": "false"
+                },
+                {
+                    "command": "pixi.global.openManifest"
                 }
             ],
             "editor/title": [
@@ -623,12 +632,12 @@
                     "group": "inline@2"
                 },
                 {
-                    "command": "pixi.tasks.run",
+                    "command": "pixi.runTask",
                     "when": "view == pixi.views.tasks && viewItem == pixiTaskItem",
                     "group": "inline@1"
                 },
                 {
-                    "command": "pixi.tasks.runInEnvironment",
+                    "command": "pixi.runTaskInEnvironment",
                     "when": "view == pixi.views.tasks && viewItem == pixiTaskItem",
                     "group": "inline@2"
                 },
@@ -638,12 +647,12 @@
                     "group": "inline@3"
                 },
                 {
-                    "command": "pixi.tasks.run",
+                    "command": "pixi.runTask",
                     "when": "view == pixi.views.tasks && viewItem == pixiTaskItem",
                     "group": "1_run@1"
                 },
                 {
-                    "command": "pixi.tasks.runInEnvironment",
+                    "command": "pixi.runTaskInEnvironment",
                     "when": "view == pixi.views.tasks && viewItem == pixiTaskItem",
                     "group": "1_run@2"
                 },

@@ -132,12 +132,14 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
     }
 
     public registerCommands(): Disposable {
-        const d1 = commands.registerCommand('pixi.selfUpdate', () => this.selfUpdate());
-        const d2 = commands.registerCommand('pixi.refreshInfo', () => this.refresh());
-        const d3 = commands.registerCommand('pixi.cleanCache', () => this.cleanCache());
-        const d4 = commands.registerCommand('pixi.openLocation', (targetPath: string) => this.openLocation(targetPath));
-        const d5 = commands.registerCommand('pixi.measureCacheSize', () => this.measureCacheSize());
-        return Disposable.from(d1, d2, d3, d4, d5);
+        const disposables: Disposable[] = [
+            commands.registerCommand('pixi.selfUpdate', () => this.selfUpdate()),
+            commands.registerCommand('pixi.refreshInfo', () => this.refresh()),
+            commands.registerCommand('pixi.cleanCache', () => this.cleanCache()),
+            commands.registerCommand('pixi.openLocation', (targetPath: string) => this.openLocation(targetPath)),
+            commands.registerCommand('pixi.measureCacheSize', () => this.measureCacheSize()),
+        ];
+        return Disposable.from(...disposables);
     }
 
     public async measureCacheSize(): Promise<void> {

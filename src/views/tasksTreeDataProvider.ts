@@ -103,7 +103,7 @@ export class PixiTaskTreeItem extends TreeItem {
         this.tooltip = lines.join('\n');
 
         this.command = {
-            command: 'pixi.tasks.run',
+            command: 'pixi.runTask',
             title: 'Run Task',
             arguments: [this],
         };
@@ -217,130 +217,116 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
     }
 
     public registerCommands(): Disposable {
-        const d1 = commands.registerCommand('pixi.tasks.refresh', () => this.refresh());
+        const disposables: Disposable[] = [
+            commands.registerCommand('pixi.tasks.refresh', () => this.refresh()),
+            commands.registerCommand('pixi.tasks.revealInManifest', async (targetItem?: any) => {
+                let task: PixiTask | undefined =
+                    targetItem?.task || (targetItem?.name && targetItem?.projectPath ? targetItem : undefined);
 
-        const d2 = commands.registerCommand('pixi.tasks.run', async (targetItem?: any) => {
-            const task: PixiTask | undefined =
-                targetItem?.task || (targetItem?.name && targetItem?.projectPath ? targetItem : undefined);
-            if (task) {
-                await this.taskProvider.executePixiTask(task);
-            } else {
-                const projectPath = targetItem?.project?.projectPath || targetItem?.projectPath;
-                await commands.executeCommand('pixi.runTask', projectPath);
-            }
-        });
-
-        const d3 = commands.registerCommand('pixi.tasks.runInEnvironment', async (targetItem?: any) => {
-            const task: PixiTask | undefined =
-                targetItem?.task || (targetItem?.name && targetItem?.projectPath ? targetItem : undefined);
-            const projectPath = targetItem?.project?.projectPath || targetItem?.projectPath;
-            await this.taskProvider.promptAndRunTaskInEnvironment(task, projectPath);
-        });
-
-        const d4 = commands.registerCommand('pixi.tasks.revealInManifest', async (targetItem?: any) => {
-            let task: PixiTask | undefined =
-                targetItem?.task || (targetItem?.name && targetItem?.projectPath ? targetItem : undefined);
-
-            if (!task) {
-                const targetProjectPath = targetItem?.project?.projectPath || targetItem?.projectPath;
-                task = await this.taskProvider.pickTask({
-                    title: 'Select Task to Reveal in Manifest',
-                    placeHolder: 'Select a task to jump to its definition in manifest',
-                    targetProjectPath,
-                });
                 if (!task) {
+                    const targetProjectPath = targetItem?.project?.projectPath || targetItem?.projectPath;
+                    task = await this.taskProvider.pickTask({
+                        title: 'Select Task to Reveal in Manifest',
+                        placeHolder: 'Select a task to jump to its definition in manifest',
+                        targetProjectPath,
+                    });
+                    if (!task) {
+                        return;
+                    }
+                }
+
+                const projectPath = task.projectPath;
+                const manifestPath =
+                    targetItem?.project?.manifestPath || this.projectManager.getManifestPath(projectPath);
+
+                if (!manifestPath || !fs.existsSync(manifestPath)) {
+                    window.showWarningMessage('Could not find manifest file for this project.');
                     return;
                 }
-            }
 
-            const projectPath = task.projectPath;
-            const manifestPath = targetItem?.project?.manifestPath || this.projectManager.getManifestPath(projectPath);
+                try {
+                    const doc = await workspace.openTextDocument(Uri.file(manifestPath));
+                    const editor = await window.showTextDocument(doc);
+                    const text = doc.getText();
+                    const lines = text.split(/\r?\n/);
+                    const escapedName = escapeRegex(task.name);
 
-            if (!manifestPath || !fs.existsSync(manifestPath)) {
-                window.showWarningMessage('Could not find manifest file for this project.');
-                return;
-            }
+                    const keyRegex = new RegExp(`^\\s*["']?${escapedName}["']?\\s*=`, 'i');
+                    const sectionRegex = new RegExp(`^\\s*\\[+.*tasks\\.(["']?)${escapedName}\\1\\]`, 'i');
 
-            try {
-                const doc = await workspace.openTextDocument(Uri.file(manifestPath));
-                const editor = await window.showTextDocument(doc);
-                const text = doc.getText();
-                const lines = text.split(/\r?\n/);
-                const escapedName = escapeRegex(task.name);
-
-                const keyRegex = new RegExp(`^\\s*["']?${escapedName}["']?\\s*=`, 'i');
-                const sectionRegex = new RegExp(`^\\s*\\[+.*tasks\\.(["']?)${escapedName}\\1\\]`, 'i');
-
-                let targetLine = -1;
-                let currentSection = '';
-                let matchedViaSection = false;
-                // First pass: locate within a tasks table or section header
-                for (let i = 0; i < lines.length; i++) {
-                    const line = lines[i];
-                    const sectionMatch = line.match(/^\s*\[+([^\]]+)\]+/);
-                    if (sectionMatch) {
-                        currentSection = sectionMatch[1].trim();
-                    }
-
-                    if (sectionRegex.test(line)) {
-                        targetLine = i;
-                        matchedViaSection = true;
-                        break;
-                    }
-
-                    const isTasksSection = /(^|\.)tasks(\.|$)/i.test(currentSection);
-                    if (isTasksSection && keyRegex.test(line)) {
-                        targetLine = i;
-                        break;
-                    }
-                }
-
-                // Fallback pass: if not found in recognized tasks section, match any key
-                if (targetLine < 0) {
+                    let targetLine = -1;
+                    let currentSection = '';
+                    let matchedViaSection = false;
+                    // First pass: locate within a tasks table or section header
                     for (let i = 0; i < lines.length; i++) {
-                        if (keyRegex.test(lines[i])) {
+                        const line = lines[i];
+                        const sectionMatch = line.match(/^\s*\[+([^\]]+)\]+/);
+                        if (sectionMatch) {
+                            currentSection = sectionMatch[1].trim();
+                        }
+
+                        if (sectionRegex.test(line)) {
+                            targetLine = i;
+                            matchedViaSection = true;
+                            break;
+                        }
+
+                        const isTasksSection = /(^|\.)tasks(\.|$)/i.test(currentSection);
+                        if (isTasksSection && keyRegex.test(line)) {
                             targetLine = i;
                             break;
                         }
                     }
-                }
 
-                if (targetLine >= 0) {
-                    const lineText = lines[targetLine];
-                    let startCol = 0;
-                    let endCol = lineText.length;
-
-                    if (matchedViaSection) {
-                        const lastTasksIdx = lineText.toLowerCase().lastIndexOf('tasks.');
-                        const searchPart = lastTasksIdx >= 0 ? lineText.slice(lastTasksIdx) : lineText;
-                        const m = searchPart.match(new RegExp(`(["']?)(${escapedName})\\1`, 'i'));
-                        if (m && m.index !== undefined) {
-                            const quoteOffset = m[1] ? m[1].length : 0;
-                            startCol = (lastTasksIdx >= 0 ? lastTasksIdx : 0) + m.index + quoteOffset;
-                            endCol = startCol + task.name.length;
-                        }
-                    } else {
-                        const eqIdx = lineText.indexOf('=');
-                        const searchPart = eqIdx >= 0 ? lineText.slice(0, eqIdx) : lineText;
-                        const m = searchPart.match(new RegExp(`(["']?)(${escapedName})\\1`, 'i'));
-                        if (m && m.index !== undefined) {
-                            const quoteOffset = m[1] ? m[1].length : 0;
-                            startCol = m.index + quoteOffset;
-                            endCol = startCol + task.name.length;
+                    // Fallback pass: if not found in recognized tasks section, match any key
+                    if (targetLine < 0) {
+                        for (let i = 0; i < lines.length; i++) {
+                            if (keyRegex.test(lines[i])) {
+                                targetLine = i;
+                                break;
+                            }
                         }
                     }
 
-                    revealRangeInEditor(editor, targetLine, startCol, endCol);
-                } else {
-                    window.showInformationMessage(
-                        `Could not locate task definition for '${task.name}' in ${path.basename(manifestPath)}.`,
+                    if (targetLine >= 0) {
+                        const lineText = lines[targetLine];
+                        let startCol = 0;
+                        let endCol = lineText.length;
+
+                        if (matchedViaSection) {
+                            const lastTasksIdx = lineText.toLowerCase().lastIndexOf('tasks.');
+                            const searchPart = lastTasksIdx >= 0 ? lineText.slice(lastTasksIdx) : lineText;
+                            const m = searchPart.match(new RegExp(`(["']?)(${escapedName})\\1`, 'i'));
+                            if (m && m.index !== undefined) {
+                                const quoteOffset = m[1] ? m[1].length : 0;
+                                startCol = (lastTasksIdx >= 0 ? lastTasksIdx : 0) + m.index + quoteOffset;
+                                endCol = startCol + task.name.length;
+                            }
+                        } else {
+                            const eqIdx = lineText.indexOf('=');
+                            const searchPart = eqIdx >= 0 ? lineText.slice(0, eqIdx) : lineText;
+                            const m = searchPart.match(new RegExp(`(["']?)(${escapedName})\\1`, 'i'));
+                            if (m && m.index !== undefined) {
+                                const quoteOffset = m[1] ? m[1].length : 0;
+                                startCol = m.index + quoteOffset;
+                                endCol = startCol + task.name.length;
+                            }
+                        }
+
+                        revealRangeInEditor(editor, targetLine, startCol, endCol);
+                    } else {
+                        window.showInformationMessage(
+                            `Could not locate task definition for '${task.name}' in ${path.basename(manifestPath)}.`,
+                        );
+                    }
+                } catch (err) {
+                    window.showErrorMessage(
+                        `Failed to open manifest: ${err instanceof Error ? err.message : String(err)}`,
                     );
                 }
-            } catch (err) {
-                window.showErrorMessage(`Failed to open manifest: ${err instanceof Error ? err.message : String(err)}`);
-            }
-        });
+            }),
+        ];
 
-        return Disposable.from(d1, d2, d3, d4);
+        return Disposable.from(...disposables);
     }
 }

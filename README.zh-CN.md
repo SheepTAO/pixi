@@ -75,35 +75,36 @@
 
 ## ⌨️ 命令列表
 
-| 命令名称                                  | 命令 ID                        | 功能说明                                                                                                           |
-| :---------------------------------------- | :----------------------------- | :----------------------------------------------------------------------------------------------------------------- |
-| **Pixi: Search Packages ...**             | `pixi.searchPackages`          | 交互式搜索 Conda 与 PyPI 软件包，支持实时自动补全、版本查看与一键添加/全局安装。                                   |
-| **Pixi: Lock Dependencies**               | `pixi.lock`                    | 求解并更新锁文件（`pixi.lock`），不修改现有环境。                                                                  |
-| **Pixi: Install (Sync Environments)**     | `pixi.install`                 | 安装所有依赖并同步工程的所有环境。                                                                                 |
-| **Pixi: Reinstall Environment...**        | `pixi.reinstall`               | 从头重新安装指定环境或所有环境。                                                                                   |
-| **Pixi: Update Dependencies**             | `pixi.update`                  | 依据工程约束更新依赖并刷新锁文件。                                                                                 |
-| **Pixi: Clean...**                        | `pixi.clean`                   | 清理指定环境、项目所有环境，或清理系统级全局包缓存。                                                               |
-| **Pixi: Create Environment...**           | `pixi.createEnvironment`       | 在当前项目中新建环境（或在空白文件夹中初始化项目）。                                                               |
-| **Pixi: Delete Environment...**           | `pixi.deleteEnvironment`       | 从磁盘清理或从清单中移除 Pixi 环境（具备安全确认弹窗）。                                                           |
-| **Pixi: Initialize Project...**           | `pixi.init`                    | 在当前文件夹初始化 Pixi 项目（可选择 `pixi.toml` 或 `pyproject.toml`）。                                           |
-| **Pixi: Open Manifest**                   | `pixi.openManifest`            | 在编辑器中打开项目清单（`pixi.toml` 或 `pyproject.toml`）；支持在侧边栏项目节点上一键直接打开。                    |
-| **Pixi: Add Package...**                  | `pixi.addPackage`              | 交互式添加依赖（支持实时搜索与多源选择）；支持在侧边栏项目和环境节点上一键点击 `+`，自动继承上下文并跳过冗余选择。 |
-| **Pixi: Remove Package...**               | `pixi.removePackage`           | 交互式选择并移除已安装包（自动识别 Conda 或 PyPI 渠道）；支持在侧边栏显式依赖包上一键点击垃圾桶图标直接移除。      |
-| **Pixi: Update Package...**               | `pixi.updatePackage`           | 交互式选择并更新单个依赖包至最新兼容版本（`pixi update <pkg>`）；支持在显式依赖包上一键点击向上箭头图标直接更新。  |
-| **Pixi: Go to Definition in Manifest**    | `pixi.revealPackageInManifest` | 在 `pixi.toml` 或 `pyproject.toml` 清单文件中快速定位并高亮对应依赖包声明行。                                      |
-| **Pixi: Copy Package Name**               | `pixi.copyPackageName`         | 通过右键菜单或命令面板快速复制所选软件包名称至剪贴板。                                                             |
-| **Pixi: Show Dependency Tree**            | `pixi.showDependencyTree`      | 在专用输出面板/编辑器视图中查看完整环境或指定包的依赖树（支持在环境与包节点上一键查看）。                          |
-| **Pixi: Why is This Installed?**          | `pixi.whyPackage`              | 诊断包引入来源，生成反向依赖链路树（`pixi tree -i`）；在侧边栏间接依赖项上悬停即可一键点击排查。                   |
-| **Pixi: Add Channel...**                  | `pixi.addChannel`              | 为项目清单添加 Conda 渠道或镜像 URL，并支持指定优先级顺序。                                                        |
-| **Pixi: Remove Channel...**               | `pixi.removeChannel`           | 交互式选择并从项目清单中移除已配置的 Conda 渠道。                                                                  |
-| **Pixi: Run Task**                        | `pixi.runTask`                 | 快速搜索并运行当前工程中定义的任意 Pixi task。                                                                     |
-| **Pixi: Run Task in Environment...**      | `pixi.runTaskInEnvironment`    | 选择一个 task 并指定在特定 Pixi 环境中运行。                                                                       |
-| **Pixi: Open Terminal in Environment...** | `pixi.openTerminal`            | 在指定的 Pixi 环境中打开一个预激活终端。                                                                           |
-| **Pixi: Global Tools ...**                | `pixi.global`                  | 交互式管理全局 CLI 工具（安装、列表查看、同步、更新、卸载及编辑全局清单配置）。                                    |
-| **Pixi: Update Pixi CLI ...**             | `pixi.selfUpdate`              | 检查更新并自动升级系统上的 Pixi CLI 命令行工具至最新版本。                                                         |
-| **Pixi: Refresh Pixi Info**               | `pixi.refreshInfo`             | 刷新 Pixi Info 视图中的系统环境与版本信息。                                                                        |
-| **Pixi: Clean Package Cache ...**         | `pixi.cleanCache`              | 清理 Pixi 系统级全局包缓存（`pixi clean cache -y`），支持在 Pixi Info 视图中一键点击垃圾桶图标清理并展示占用体积。 |
-| **Pixi: Measure Cache Size**              | `pixi.measureCacheSize`        | 按需计算并刷新 Pixi Info 视图中全局包缓存的磁盘占用体积。                                                          |
+| 命令名称                                       | 命令 ID                        | 功能说明                                                                                                           |
+| :--------------------------------------------- | :----------------------------- | :----------------------------------------------------------------------------------------------------------------- |
+| **Pixi: Search Packages ...**                  | `pixi.searchPackages`          | 交互式搜索 Conda 与 PyPI 软件包，支持实时自动补全、版本查看与一键添加/全局安装。                                   |
+| **Pixi: Lock Dependencies**                    | `pixi.lock`                    | 求解并更新锁文件（`pixi.lock`），不修改现有环境。                                                                  |
+| **Pixi: Install (Sync Environments)**          | `pixi.install`                 | 安装所有依赖并同步工程的所有环境。                                                                                 |
+| **Pixi: Reinstall Environment...**             | `pixi.reinstall`               | 从头重新安装指定环境或所有环境。                                                                                   |
+| **Pixi: Update Dependencies**                  | `pixi.update`                  | 依据工程约束更新依赖并刷新锁文件。                                                                                 |
+| **Pixi: Clean...**                             | `pixi.clean`                   | 清理指定环境、项目所有环境，或清理系统级全局包缓存。                                                               |
+| **Pixi: Create Environment...**                | `pixi.createEnvironment`       | 在当前项目中新建环境（或在空白文件夹中初始化项目）。                                                               |
+| **Pixi: Delete Environment...**                | `pixi.deleteEnvironment`       | 从磁盘清理或从清单中移除 Pixi 环境（具备安全确认弹窗）。                                                           |
+| **Pixi: Initialize Project...**                | `pixi.init`                    | 在当前文件夹初始化 Pixi 项目（可选择 `pixi.toml` 或 `pyproject.toml`）。                                           |
+| **Pixi: Open Manifest**                        | `pixi.openManifest`            | 在编辑器中打开项目清单（`pixi.toml` 或 `pyproject.toml`）；支持在侧边栏项目节点上一键直接打开。                    |
+| **Pixi: Add Package...**                       | `pixi.addPackage`              | 交互式添加依赖（支持实时搜索与多源选择）；支持在侧边栏项目和环境节点上一键点击 `+`，自动继承上下文并跳过冗余选择。 |
+| **Pixi: Remove Package...**                    | `pixi.removePackage`           | 交互式选择并移除已安装包（自动识别 Conda 或 PyPI 渠道）；支持在侧边栏显式依赖包上一键点击垃圾桶图标直接移除。      |
+| **Pixi: Update Package...**                    | `pixi.updatePackage`           | 交互式选择并更新单个依赖包至最新兼容版本（`pixi update <pkg>`）；支持在显式依赖包上一键点击向上箭头图标直接更新。  |
+| **Pixi: Go to Package Definition in Manifest** | `pixi.revealPackageInManifest` | 在 `pixi.toml` 或 `pyproject.toml` 清单文件中快速定位并高亮对应依赖包声明行。                                      |
+| **Pixi: Copy Package Name**                    | `pixi.copyPackageName`         | 通过右键菜单或命令面板快速复制所选软件包名称至剪贴板。                                                             |
+| **Pixi: Show Dependency Tree**                 | `pixi.showDependencyTree`      | 在专用输出面板/编辑器视图中查看完整环境或指定包的依赖树（支持在环境与包节点上一键查看）。                          |
+| **Pixi: Why is This Installed?**               | `pixi.whyPackage`              | 诊断包引入来源，生成反向依赖链路树（`pixi tree -i`）；在侧边栏间接依赖项上悬停即可一键点击排查。                   |
+| **Pixi: Add Channel...**                       | `pixi.addChannel`              | 为项目清单添加 Conda 渠道或镜像 URL，并支持指定优先级顺序。                                                        |
+| **Pixi: Remove Channel...**                    | `pixi.removeChannel`           | 交互式选择并从项目清单中移除已配置的 Conda 渠道。                                                                  |
+| **Pixi: Run Task**                             | `pixi.runTask`                 | 快速搜索并运行当前工程中定义的任意 Pixi task。                                                                     |
+| **Pixi: Run Task in Environment...**           | `pixi.runTaskInEnvironment`    | 选择一个 task 并指定在特定 Pixi 环境中运行。                                                                       |
+| **Pixi: Go to Task Definition in Manifest**    | `pixi.tasks.revealInManifest`  | 在 `pixi.toml` 或 `pyproject.toml` 清单文件中快速定位并高亮对应任务定义行。                                        |
+| **Pixi: Open Terminal in Environment...**      | `pixi.openTerminal`            | 在指定的 Pixi 环境中打开一个预激活终端。                                                                           |
+| **Pixi: Global Tools ...**                     | `pixi.global`                  | 交互式管理全局 CLI 工具（安装、列表查看、同步、更新、卸载及编辑全局清单配置）。                                    |
+| **Pixi: Update Pixi CLI ...**                  | `pixi.selfUpdate`              | 检查更新并自动升级系统上的 Pixi CLI 命令行工具至最新版本。                                                         |
+| **Pixi: Refresh Pixi Info**                    | `pixi.refreshInfo`             | 刷新 Pixi Info 视图中的系统环境与版本信息。                                                                        |
+| **Pixi: Clean Package Cache ...**              | `pixi.cleanCache`              | 清理 Pixi 系统级全局包缓存（`pixi clean cache -y`），支持在 Pixi Info 视图中一键点击垃圾桶图标清理并展示占用体积。 |
+| **Pixi: Measure Cache Size**                   | `pixi.measureCacheSize`        | 按需计算并刷新 Pixi Info 视图中全局包缓存的磁盘占用体积。                                                          |
 
 ---
 

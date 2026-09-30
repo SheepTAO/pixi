@@ -100,25 +100,27 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
     }
 
     registerCommands(): Disposable {
-        const d1 = commands.registerCommand('pixi.runTask', (arg?: any) => {
-            const targetTask = arg?.task || (arg?.name && arg?.projectPath ? arg : undefined);
-            if (targetTask) {
-                return this.executePixiTask(targetTask);
-            }
-            const projectPath =
-                typeof arg === 'string' ? arg : arg?.project?.projectPath || arg?.projectPath || undefined;
-            return this.promptAndRunTask(projectPath);
-        });
-        const d2 = commands.registerCommand('pixi.runTaskInEnvironment', (arg?: any) => {
-            const targetTask = arg?.task || (arg?.name && arg?.projectPath ? arg : undefined);
-            const projectPath = !targetTask
-                ? typeof arg === 'string'
-                    ? arg
-                    : arg?.project?.projectPath || arg?.projectPath || undefined
-                : undefined;
-            return this.promptAndRunTaskInEnvironment(targetTask, projectPath);
-        });
-        return Disposable.from(d1, d2);
+        const disposables: Disposable[] = [
+            commands.registerCommand('pixi.runTask', (arg?: any) => {
+                const targetTask = arg?.task || (arg?.name && arg?.projectPath ? arg : undefined);
+                if (targetTask) {
+                    return this.executePixiTask(targetTask);
+                }
+                const projectPath =
+                    typeof arg === 'string' ? arg : arg?.project?.projectPath || arg?.projectPath || undefined;
+                return this.promptAndRunTask(projectPath);
+            }),
+            commands.registerCommand('pixi.runTaskInEnvironment', (arg?: any) => {
+                const targetTask = arg?.task || (arg?.name && arg?.projectPath ? arg : undefined);
+                const projectPath = !targetTask
+                    ? typeof arg === 'string'
+                        ? arg
+                        : arg?.project?.projectPath || arg?.projectPath || undefined
+                    : arg?.project?.projectPath || arg?.projectPath || targetTask.projectPath;
+                return this.promptAndRunTaskInEnvironment(targetTask, projectPath);
+            }),
+        ];
+        return Disposable.from(...disposables);
     }
 
     async provideTasks(): Promise<Task[]> {
