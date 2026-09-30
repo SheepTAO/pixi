@@ -350,12 +350,12 @@ export async function showPackageSearchPicker(
                 } else {
                     quickPick.items = results.map(createPackageQuickPickItem);
                 }
-            } catch (err: any) {
+            } catch (err: unknown) {
                 if (!token.isCancellationRequested) {
                     quickPick.items = [
                         {
                             label: '$(warning) Search failed',
-                            description: err?.message || String(err),
+                            description: err instanceof Error ? err.message : String(err),
                             alwaysShow: true,
                         },
                     ];

@@ -544,8 +544,9 @@ export async function searchPixiPackages(
             }
 
             return results;
-        } catch (err: any) {
-            if (err?.message?.includes('No packages found')) {
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : String(err);
+            if (msg.includes('No packages found')) {
                 return [];
             }
             traceError(`Conda package search failed for '${cleanQuery}':`, err);
