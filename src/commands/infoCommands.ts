@@ -16,7 +16,15 @@ import { cleanGlobalCache, clearPixiCache, clearSearchCache, runPixi } from '../
 import { traceError, traceVerbose } from '../common/logging';
 import { PixiInfoTreeDataProvider } from '../views/infoTreeDataProvider';
 
-export async function openLocation(targetPath: string): Promise<void> {
+export async function openLocation(target?: unknown): Promise<void> {
+    const targetPath =
+        typeof target === 'string'
+            ? target
+            : target instanceof Uri
+              ? target.fsPath
+              : target && typeof target === 'object' && 'fsPath' in target
+                ? String((target as { fsPath: unknown }).fsPath)
+                : undefined;
     if (!targetPath) {
         return;
     }
@@ -174,8 +182,8 @@ export function registerInfoCommands(infoProvider: PixiInfoTreeDataProvider): Di
                 },
             );
         }),
-        commands.registerCommand('pixi.openLocation', (targetPath: string) => {
-            return openLocation(targetPath);
+        commands.registerCommand('pixi.openLocation', (target?: unknown) => {
+            return openLocation(target);
         }),
         commands.registerCommand('pixi.measureCacheSize', () => {
             return infoProvider.measureCacheSize();

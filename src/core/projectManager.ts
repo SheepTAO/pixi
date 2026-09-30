@@ -131,11 +131,7 @@ export class PixiProjectManager implements Disposable {
     }
 
     public getAllEnvironments(): PixiEnvironmentInfo[] {
-        const result: PixiEnvironmentInfo[] = [];
-        for (const envs of this.projectToEnvs.values()) {
-            result.push(...envs);
-        }
-        return result;
+        return Array.from(this.projectToEnvs.values()).flat();
     }
 
     public clearPackagesCache(projectPath?: string): void {
