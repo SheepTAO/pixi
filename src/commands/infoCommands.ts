@@ -22,8 +22,8 @@ export async function openLocation(target?: unknown): Promise<void> {
             ? target
             : target instanceof Uri
               ? target.fsPath
-              : target && typeof target === 'object' && 'fsPath' in target
-                ? String((target as { fsPath: unknown }).fsPath)
+              : typeof (target as { fsPath?: unknown })?.fsPath === 'string'
+                ? (target as { fsPath: string }).fsPath
                 : undefined;
     if (!targetPath) {
         return;

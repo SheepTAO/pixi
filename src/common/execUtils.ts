@@ -3,6 +3,9 @@ import * as os from 'os';
 import * as path from 'path';
 import { Position, Range, Selection, TextEditor, TextEditorRevealType, Uri, window, workspace } from 'vscode';
 
+const SINGLE_OPERATOR_REGEX = /^[&|<>;()[\]{}]$/;
+const SHELL_SPECIAL_CHARS_REGEX = /[\s&|<>;'"`()\[\]{}$]/;
+
 export function quoteStringIfNecessary(arg: string): string {
     // Always return if already quoted to avoid double-quoting
     if (arg.startsWith('"') && arg.endsWith('"')) {
@@ -10,15 +13,13 @@ export function quoteStringIfNecessary(arg: string): string {
     }
 
     // Don't quote single shell operators/special characters
-    if (arg.length === 1 && /[&|<>;()[\]{}$]/.test(arg)) {
+    if (SINGLE_OPERATOR_REGEX.test(arg)) {
         return arg;
     }
 
     // Quote if contains common shell special characters that are problematic across multiple shells
     // Includes: space, &, |, <, >, ;, ', ", `, (, ), [, ], {, }, $
-    const needsQuoting = /[\s&|<>;'"`()\[\]{}$]/.test(arg);
-
-    return needsQuoting ? `"${arg}"` : arg;
+    return SHELL_SPECIAL_CHARS_REGEX.test(arg) ? `"${arg}"` : arg;
 }
 
 export function quoteArgs(args: string[]): string[] {

@@ -16,18 +16,19 @@ import { runPixi } from '../cli/pixiCli';
 import { safeJsonParse } from '../common/execUtils';
 import { traceError } from '../common/logging';
 
+const BYTE_UNITS = ['KB', 'MB', 'GB', 'TB'] as const;
+
 export function formatBytes(bytes: number): string {
     if (bytes < 1024) {
         return `${bytes} B`;
     }
-    const units = ['KB', 'MB', 'GB', 'TB'];
     let u = -1;
     let size = bytes;
     do {
         size /= 1024;
         u++;
-    } while (size >= 1024 && u < units.length - 1);
-    return `${size.toFixed(1)} ${units[u]}`;
+    } while (size >= 1024 && u < BYTE_UNITS.length - 1);
+    return `${size.toFixed(1)} ${BYTE_UNITS[u]}`;
 }
 
 export async function computeDirectorySize(dirPath: string): Promise<number | null> {
@@ -200,13 +201,11 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
         const items: PixiInfoItem[] = [];
 
         // 1. Version
-        const rawVersion = info.version || 'unknown';
-        const cleanVersion = rawVersion.startsWith('v') ? rawVersion.slice(1) : rawVersion;
+        const cleanVersion = info.version?.replace(/^v/, '');
         const versionItem = new PixiInfoItem('Version', TreeItemCollapsibleState.None);
-        versionItem.description = cleanVersion === 'unknown' ? 'unknown' : `v${cleanVersion}`;
+        versionItem.description = cleanVersion ? `v${cleanVersion}` : 'unknown';
         versionItem.iconPath = new ThemeIcon('tag');
-        versionItem.tooltip =
-            cleanVersion === 'unknown' ? 'Pixi CLI version unknown' : `Pixi CLI version: ${cleanVersion}`;
+        versionItem.tooltip = cleanVersion ? `Pixi CLI version: ${cleanVersion}` : 'Pixi CLI version unknown';
         items.push(versionItem);
 
         // 2. Platform & TLS Backend
@@ -225,10 +224,8 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
                 this.cachedCacheSize ||
                 (this.isCalculatingCacheSize
                     ? 'Calculating...'
-                    : autoMeasure
-                      ? info.cache_size
-                          ? String(info.cache_size)
-                          : null
+                    : autoMeasure && info.cache_size
+                      ? String(info.cache_size)
                       : null);
             cacheItem.description = sizeStr ? `${sizeStr} (${info.cache_dir})` : info.cache_dir;
             cacheItem.iconPath = new ThemeIcon('database');

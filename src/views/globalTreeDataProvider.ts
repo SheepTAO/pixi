@@ -30,7 +30,7 @@ export class PixiGlobalToolTreeItem extends TreeItem {
                 .join(', ');
             lines.push(`Extra dependencies: ${extraDeps}`);
         }
-        if (tool.exposed && tool.exposed.length > 0) {
+        if (tool.exposed?.length) {
             lines.push(`Exposed commands: ${tool.exposed.map((e) => e.exposed_name).join(', ')}`);
         }
         this.tooltip = lines.join('\n');
@@ -66,10 +66,7 @@ export class PixiGlobalTreeDataProvider implements TreeDataProvider<PixiGlobalTr
     public async getChildren(element?: PixiGlobalTreeItem): Promise<PixiGlobalTreeItem[]> {
         if (!element) {
             const tools = await listGlobalEnvironments();
-            if (!tools || tools.length === 0) {
-                return [];
-            }
-            return tools.map((tool) => new PixiGlobalToolTreeItem(tool));
+            return tools?.map((tool) => new PixiGlobalToolTreeItem(tool)) ?? [];
         }
 
         return [];

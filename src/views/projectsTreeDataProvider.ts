@@ -337,9 +337,11 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
             const displayMode = config.get<'grouped' | 'explicitOnly' | 'all'>('packages.displayMode', 'grouped');
 
             const sorted = sortPixiPackages(packages);
-            const explicit = sorted.filter((p) => p.is_explicit);
-            const transitive = sorted.filter((p) => !p.is_explicit);
+            if (displayMode === 'all') {
+                return sorted.map((pkg) => new PixiPackageTreeItem(pkg, element.env, element.project));
+            }
 
+            const explicit = sorted.filter((p) => p.is_explicit);
             if (displayMode === 'explicitOnly') {
                 if (explicit.length === 0) {
                     return [new PixiEmptyTreeItem('No explicit packages found', element.project, element.env)];
@@ -347,11 +349,8 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
                 return explicit.map((pkg) => new PixiPackageTreeItem(pkg, element.env, element.project));
             }
 
-            if (displayMode === 'all') {
-                return sorted.map((pkg) => new PixiPackageTreeItem(pkg, element.env, element.project));
-            }
-
             // 'grouped' mode (default)
+            const transitive = sorted.filter((p) => !p.is_explicit);
             const result: PixiProjectsTreeItem[] = explicit.map(
                 (pkg) => new PixiPackageTreeItem(pkg, element.env, element.project),
             );

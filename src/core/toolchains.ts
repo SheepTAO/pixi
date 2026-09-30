@@ -56,6 +56,9 @@ const GCC_VERSION_REGEX = /^(?:gcc|gxx)(?:_[a-zA-Z0-9_]+-[a-zA-Z0-9_]+)?-(\d[^-]
 const CLANG_VERSION_REGEX = /^(?:clang|clangxx|llvm)(?:_[a-zA-Z0-9_]+-[a-zA-Z0-9_]+)?-(\d[^-]*)-.*\.json$/;
 const MSVC_VERSION_REGEX =
     /^(?:vs(?:2015|2017|2019|2022)(?:_[a-zA-Z0-9_]+-[a-zA-Z0-9_]+)?|msvc-tools)-(\d[^-]*)-.*\.json$/;
+const PYTHON_VERSION_REGEX = /^python-(\d[^-]*)-.*\.json$/;
+const R_BASE_VERSION_REGEX = /^r-base-(\d[^-]*)-.*\.json$/;
+const RUST_VERSION_REGEX = /^rust-(\d[^-]*)-.*\.json$/;
 
 const COMPILER_REGEX_MAP: Record<'gcc' | 'clang' | 'msvc', RegExp> = {
     gcc: GCC_VERSION_REGEX,
@@ -63,12 +66,26 @@ const COMPILER_REGEX_MAP: Record<'gcc' | 'clang' | 'msvc', RegExp> = {
     msvc: MSVC_VERSION_REGEX,
 };
 
+const pkgRegexCache = new Map<string, RegExp>();
+
+function getPackageRegex(pkgPattern: string | RegExp): RegExp {
+    if (typeof pkgPattern !== 'string') {
+        return pkgPattern;
+    }
+    let regex = pkgRegexCache.get(pkgPattern);
+    if (!regex) {
+        regex = new RegExp(`^${pkgPattern}-(\\d[^-]*)-.*\\.json$`);
+        pkgRegexCache.set(pkgPattern, regex);
+    }
+    return regex;
+}
+
 /**
  * Extracts a package version from a list of conda-meta filenames.
  * e.g. python-3.11.8-h123_0.json -> "3.11.8"
  */
 function findPackageVersionFromFiles(files: string[], pkgPattern: string | RegExp): string | undefined {
-    const regex = typeof pkgPattern === 'string' ? new RegExp(`^${pkgPattern}-(\\d[^-]*)-.*\\.json$`) : pkgPattern;
+    const regex = getPackageRegex(pkgPattern);
     for (const file of files) {
         const match = file.match(regex);
         if (match) {
@@ -83,11 +100,11 @@ function findPackageVersionFromFiles(files: string[], pkgPattern: string | RegEx
  */
 async function findPackageVersionFromMeta(
     envPath: string,
-    pkgPrefix: string,
+    pkgPattern: string | RegExp,
     metaFiles?: string[],
 ): Promise<string | undefined> {
     const files = metaFiles ?? (await readCondaMetaFiles(envPath));
-    return findPackageVersionFromFiles(files, pkgPrefix);
+    return findPackageVersionFromFiles(files, pkgPattern);
 }
 
 /**
@@ -113,7 +130,7 @@ export async function scanPythonToolchain(
         return undefined;
     }
 
-    const version = await findPackageVersionFromMeta(envPath, 'python', metaFiles);
+    const version = await findPackageVersionFromMeta(envPath, PYTHON_VERSION_REGEX, metaFiles);
     return {
         executable,
         version,
@@ -207,7 +224,7 @@ export async function scanRToolchain(envPath: string, metaFiles?: string[]): Pro
         win32: ['bin/Rscript.exe', 'bin/x64/Rscript.exe'],
     });
 
-    const version = await findPackageVersionFromMeta(envPath, 'r-base', metaFiles);
+    const version = await findPackageVersionFromMeta(envPath, R_BASE_VERSION_REGEX, metaFiles);
 
     return {
         executable,
@@ -234,7 +251,7 @@ export async function scanRustToolchain(envPath: string, metaFiles?: string[]): 
         return undefined;
     }
 
-    const version = await findPackageVersionFromMeta(envPath, 'rust', metaFiles);
+    const version = await findPackageVersionFromMeta(envPath, RUST_VERSION_REGEX, metaFiles);
 
     return {
         rustc: rustc ?? undefined,
