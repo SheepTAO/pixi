@@ -363,9 +363,6 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
             if (transitive.length > 0) {
                 result.push(new PixiTransitiveGroupTreeItem(transitive, element.env, element.project));
             }
-            if (result.length === 0) {
-                return [new PixiEmptyTreeItem('No packages found', element.project, element.env)];
-            }
             return result;
         }
 

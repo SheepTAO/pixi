@@ -10,19 +10,7 @@ import { traceError, traceVerbose } from '../common/logging';
  * Checks if a directory is a Pixi project.
  */
 export function isPixiProject(folderPath: string): boolean {
-    if (fs.existsSync(path.join(folderPath, 'pixi.toml')) || fs.existsSync(path.join(folderPath, '.pixi'))) {
-        return true;
-    }
-    const pyprojectPath = path.join(folderPath, 'pyproject.toml');
-    if (fs.existsSync(pyprojectPath)) {
-        try {
-            const content = fs.readFileSync(pyprojectPath, 'utf8');
-            return /(?:^|\n)\s*\[tool\.pixi/.test(content);
-        } catch {
-            return false;
-        }
-    }
-    return false;
+    return fs.existsSync(path.join(folderPath, '.pixi')) || findManifestPath(folderPath) !== undefined;
 }
 
 /**

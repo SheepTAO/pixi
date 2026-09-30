@@ -133,23 +133,29 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
                 // ignore
             }
         }
-        if (!this.cachedSystemInfo?.cache_dir || this.isCalculatingCacheSize) {
+        if (this.cachedSystemInfo?.cache_dir) {
+            await this.calculateCacheSize(this.cachedSystemInfo.cache_dir);
+        }
+    }
+
+    private async calculateCacheSize(cacheDir: string): Promise<void> {
+        if (this.isCalculatingCacheSize) {
             return;
         }
         this.isCalculatingCacheSize = true;
         this._onDidChangeTreeData.fire();
         const currentEpoch = this.cacheCalculationEpoch;
         try {
-            const bytes = await computeDirectorySize(this.cachedSystemInfo.cache_dir);
+            const bytes = await computeDirectorySize(cacheDir);
             if (this.cacheCalculationEpoch !== currentEpoch) {
                 return;
             }
-            this.isCalculatingCacheSize = false;
             if (bytes !== null) {
                 this.cachedCacheSize = formatBytes(bytes);
             }
-            this._onDidChangeTreeData.fire();
         } catch {
+            // ignore
+        } finally {
             if (this.cacheCalculationEpoch === currentEpoch) {
                 this.isCalculatingCacheSize = false;
                 this._onDidChangeTreeData.fire();
@@ -246,25 +252,7 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
             items.push(cacheItem);
 
             if (!this.cachedCacheSize && !this.isCalculatingCacheSize && autoMeasure) {
-                this.isCalculatingCacheSize = true;
-                const currentEpoch = this.cacheCalculationEpoch;
-                computeDirectorySize(info.cache_dir)
-                    .then((bytes) => {
-                        if (this.cacheCalculationEpoch !== currentEpoch) {
-                            return;
-                        }
-                        this.isCalculatingCacheSize = false;
-                        if (bytes !== null) {
-                            this.cachedCacheSize = formatBytes(bytes);
-                        }
-                        this._onDidChangeTreeData.fire();
-                    })
-                    .catch(() => {
-                        if (this.cacheCalculationEpoch === currentEpoch) {
-                            this.isCalculatingCacheSize = false;
-                            this._onDidChangeTreeData.fire();
-                        }
-                    });
+                void this.calculateCacheSize(info.cache_dir);
             }
         }
 

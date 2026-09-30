@@ -86,10 +86,10 @@ export class PixiPythonPackageManager implements PackageManager, Disposable {
             return;
         }
 
-        const installList = 'install' in options ? options.install : [];
-        const uninstallList = 'uninstall' in options && options.uninstall ? options.uninstall : [];
+        const installList = options.install ?? [];
+        const uninstallList = options.uninstall ?? [];
 
-        if (installList && installList.length > 0) {
+        if (installList.length > 0) {
             const channel = await window.showQuickPick(
                 [
                     {
@@ -130,7 +130,7 @@ export class PixiPythonPackageManager implements PackageManager, Disposable {
                     await this.refresh(environment);
                 },
             );
-        } else if (uninstallList && uninstallList.length > 0) {
+        } else if (uninstallList.length > 0) {
             let cached = this.packagesCache.get(environment.envId.id);
             if (!cached || cached.length === 0) {
                 cached = (await this.getPackages(environment)) || [];
@@ -176,6 +176,11 @@ export class PixiPythonPackageManager implements PackageManager, Disposable {
     }
 
     private resolveEnvDetails(environment: PythonEnvironment): { envName: string; projectPath: string } | undefined {
+        const pyEnv = environment as Partial<PixiPythonEnvironment>;
+        if (pyEnv.pixiEnvName && pyEnv.projectPath) {
+            return { envName: pyEnv.pixiEnvName, projectPath: pyEnv.projectPath };
+        }
+
         const envId = environment.envId.id;
         const pixiEnv = this.envManager?.getPixiEnvironment(envId);
 

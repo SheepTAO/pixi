@@ -113,7 +113,14 @@ export class PixiExtensionApiImpl implements PixiExtensionApi, Disposable {
             return matched;
         }
 
-        // 2. Check active environment for this project
+        // 2. Fallback to active or default environment for this project
+        return this.resolveProjectActiveOrDefault(projectPath, envs);
+    }
+
+    private resolveProjectActiveOrDefault(
+        projectPath: string,
+        envs: PixiEnvironmentInfo[],
+    ): PixiEnvironmentInfo | undefined {
         const activeName = this.activeEnvNames.get(projectPath);
         if (activeName) {
             const match = envs.find((e) => e.pixiEnvName === activeName);
@@ -121,8 +128,6 @@ export class PixiExtensionApiImpl implements PixiExtensionApi, Disposable {
                 return match;
             }
         }
-
-        // 3. Fallback to default/installed environment in this project
         return getDefaultEnvironment(envs);
     }
 
@@ -172,14 +177,7 @@ export class PixiExtensionApiImpl implements PixiExtensionApi, Disposable {
                 }
             }
             const envs = this.projectManager.getEnvironmentsForProject(projectPath);
-            const activeName = this.activeEnvNames.get(projectPath);
-            if (activeName) {
-                const match = envs.find((e) => e.pixiEnvName === activeName);
-                if (match) {
-                    return match;
-                }
-            }
-            return getDefaultEnvironment(envs);
+            return this.resolveProjectActiveOrDefault(projectPath, envs);
         }
 
         return undefined;
