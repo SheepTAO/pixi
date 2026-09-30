@@ -154,15 +154,6 @@ function resolveWorkspacePaths(searchPaths: string[]): string[] {
     return resolved;
 }
 
-const DEFAULT_SEARCH_IGNORE_PATTERNS = [
-    '**/node_modules/**',
-    '**/.git/**',
-    '**/dist/**',
-    '**/build/**',
-    '**/.venv/**',
-    '**/.pixi/*/**',
-];
-
 function getSearchIgnorePatterns(): string[] {
     try {
         const config = workspace.getConfiguration('pixi');
@@ -173,7 +164,7 @@ function getSearchIgnorePatterns(): string[] {
     } catch (error) {
         traceError('Error reading pixi.searchIgnorePatterns:', error);
     }
-    return DEFAULT_SEARCH_IGNORE_PATTERNS;
+    return ['**/node_modules/**', '**/.git/**', '**/dist/**', '**/build/**', '**/.venv/**', '**/.pixi/*/**'];
 }
 
 async function findPixiDirectories(patterns: string[]): Promise<string[]> {
