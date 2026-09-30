@@ -212,28 +212,20 @@ export async function revealDefinitionInManifest(options: RevealDefinitionOption
 
             if (targetLine >= 0) {
                 const lineText = lines[targetLine];
-                if (matchedViaSection) {
-                    const lastTasksIdx = lineText.toLowerCase().lastIndexOf('tasks.');
-                    const searchPart = lastTasksIdx >= 0 ? lineText.slice(lastTasksIdx) : lineText;
-                    const m = searchPart.match(new RegExp(`(["']?)(${escapedName})\\1`, 'i'));
-                    if (m && m.index !== undefined) {
-                        const quoteOffset = m[1] ? m[1].length : 0;
-                        startCol = (lastTasksIdx >= 0 ? lastTasksIdx : 0) + m.index + quoteOffset;
-                        endCol = startCol + targetName.length;
-                    } else {
-                        endCol = lineText.length;
-                    }
+                const baseOffset = matchedViaSection ? Math.max(0, lineText.toLowerCase().lastIndexOf('tasks.')) : 0;
+                const searchPart = matchedViaSection
+                    ? lineText.slice(baseOffset)
+                    : lineText.indexOf('=') >= 0
+                      ? lineText.slice(0, lineText.indexOf('='))
+                      : lineText;
+
+                const m = searchPart.match(new RegExp(`(["']?)(${escapedName})\\1`, 'i'));
+                if (m && m.index !== undefined) {
+                    const quoteOffset = m[1] ? m[1].length : 0;
+                    startCol = baseOffset + m.index + quoteOffset;
+                    endCol = startCol + targetName.length;
                 } else {
-                    const eqIdx = lineText.indexOf('=');
-                    const searchPart = eqIdx >= 0 ? lineText.slice(0, eqIdx) : lineText;
-                    const m = searchPart.match(new RegExp(`(["']?)(${escapedName})\\1`, 'i'));
-                    if (m && m.index !== undefined) {
-                        const quoteOffset = m[1] ? m[1].length : 0;
-                        startCol = m.index + quoteOffset;
-                        endCol = startCol + targetName.length;
-                    } else {
-                        endCol = lineText.length;
-                    }
+                    endCol = lineText.length;
                 }
                 revealRangeInEditor(editor, targetLine, startCol, endCol);
                 return true;
@@ -286,15 +278,14 @@ export async function revealDefinitionInManifest(options: RevealDefinitionOption
 
             if (targetLine >= 0) {
                 const lineText = lines[targetLine];
-                const nameRegex = new RegExp(`(\\b|["'])${namePattern}(\\b|["'])`, 'i');
+                const nameRegex = new RegExp(`(?:\\b|["'])(${namePattern})(?:\\b|["'])`, 'i');
                 const match = nameRegex.exec(lineText);
                 startCol = 0;
                 endCol = lineText.length;
                 if (match && match.index !== undefined) {
-                    const innerIdx = match[0].search(new RegExp(namePattern, 'i'));
+                    const innerIdx = match[0].indexOf(match[1]);
                     startCol = match.index + (innerIdx >= 0 ? innerIdx : 0);
-                    const matchedWord = match[0].match(new RegExp(namePattern, 'i'));
-                    endCol = startCol + (matchedWord ? matchedWord[0].length : targetName.length);
+                    endCol = startCol + match[1].length;
                 }
                 revealRangeInEditor(editor, targetLine, startCol, endCol);
                 return true;

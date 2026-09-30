@@ -94,23 +94,22 @@ export async function enrichLocalPackages(packages: PixiPackage[], projectPath: 
  * Executes 'pixi list' and returns all packages for the specified environment.
  */
 export async function listPixiPackages(envName: string, projectPath: string): Promise<PixiPackage[]> {
-    let packages: PixiPackage[] = [];
+    const baseArgs = ['list', '--no-install', '--json', '--environment', envName];
+    let stdout: string;
     try {
-        const stdout = await runPixi(['list', '--no-install', '--frozen', '--json', '--environment', envName], {
+        stdout = await runPixi(['list', '--no-install', '--frozen', '--json', '--environment', envName], {
             cwd: projectPath,
         });
-        packages = safeJsonParse<PixiPackage[]>(stdout, []);
     } catch {
         try {
-            const stdout = await runPixi(['list', '--no-install', '--json', '--environment', envName], {
-                cwd: projectPath,
-            });
-            packages = safeJsonParse<PixiPackage[]>(stdout, []);
+            stdout = await runPixi(baseArgs, { cwd: projectPath });
         } catch (error) {
             traceError(`Failed to list packages for environment '${envName}' in ${projectPath}:`, error);
             return [];
         }
     }
+
+    const packages = safeJsonParse<PixiPackage[]>(stdout, []);
 
     if (packages.length > 0) {
         await enrichLocalPackages(packages, projectPath);

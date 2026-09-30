@@ -51,11 +51,15 @@ export function sortEnvironments(envs: PixiPythonEnvironment[]): PixiPythonEnvir
 
 export function formatDisplayName(template: string, projectName: string, envName: string, version?: string): string {
     const defaultName = projectName ? `${projectName}:${envName}` : envName || 'default';
-    const raw = (template || '${project}:${env}')
-        .replace(/(\$\{|\{\{)project(\}|\}\})/g, projectName || '')
-        .replace(/(\$\{|\{\{)env(\}|\}\})/g, envName || '')
-        .replace(/(\$\{|\{\{)version(\}|\}\})/g, version || '')
-        .replace(/(\$\{|\{\{)[^}]+(\}|\}\})/g, '');
+    const vars: Record<string, string | undefined> = {
+        project: projectName,
+        env: envName,
+        version: version,
+    };
+    const raw = (template || '${project}:${env}').replace(
+        /(?:\$\{|\{\{)\s*([^}]+?)\s*(?:\}|\}\})/g,
+        (_, key) => vars[key] || '',
+    );
 
     const cleaned = raw
         .replace(/\(\s*v?\s*\)/gi, '')

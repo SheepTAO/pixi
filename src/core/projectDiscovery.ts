@@ -188,9 +188,7 @@ async function findPixiDirectories(patterns: string[]): Promise<string[]> {
         } else if (lastSegment.startsWith('.')) {
             continue;
         } else {
-            pixiPatterns.push(`${normalized}/**/.pixi`);
-            pixiPatterns.push(`${normalized}/**/pixi.toml`);
-            pixiPatterns.push(`${normalized}/**/pyproject.toml`);
+            pixiPatterns.push(`${normalized}/**/{.pixi,pixi.toml,pyproject.toml}`);
         }
     }
 

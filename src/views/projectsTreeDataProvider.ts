@@ -142,11 +142,7 @@ export class PixiEnvironmentTreeItem extends TreeItem {
                       : cpp.compilerType === 'msvc'
                         ? 'MSVC'
                         : 'C++';
-            const label = cpp.version
-                ? `${cppCompilerLabel} ${cpp.version}`
-                : cpp.compilerType
-                  ? cppCompilerLabel
-                  : 'C++';
+            const label = cpp.version ? `${cppCompilerLabel} ${cpp.version}` : cppCompilerLabel;
             toolchains.push({
                 label,
                 shortName: 'C++',
