@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import * as path from 'path';
 import {
     commands,
@@ -19,7 +20,7 @@ import {
 } from 'vscode';
 
 import { getPixi, runPixi } from '../cli/pixiCli';
-import { safeJsonParse } from '../common/execUtils';
+import { revealDefinitionInManifest, safeJsonParse } from '../common/execUtils';
 import { traceError, traceVerbose } from '../common/logging';
 import { getEnvironmentStatusBadge, promptToInstallEnvironment } from '../core/environmentRules';
 import { PixiProjectManager } from '../core/projectManager';
@@ -100,24 +101,67 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
     }
 
     registerCommands(): Disposable {
+        interface TaskCommandArg {
+            task?: PixiTask;
+            name?: string;
+            projectPath?: string;
+            project?: { projectPath?: string; manifestPath?: string };
+        }
+
         const disposables: Disposable[] = [
-            commands.registerCommand('pixi.runTask', (arg?: any) => {
-                const targetTask = arg?.task || (arg?.name && arg?.projectPath ? arg : undefined);
+            commands.registerCommand('pixi.runTask', (arg?: unknown) => {
+                const item = arg as TaskCommandArg | undefined;
+                const targetTask = item?.task || (item?.name && item?.projectPath ? (item as PixiTask) : undefined);
                 if (targetTask) {
                     return this.executePixiTask(targetTask);
                 }
                 const projectPath =
-                    typeof arg === 'string' ? arg : arg?.project?.projectPath || arg?.projectPath || undefined;
+                    typeof arg === 'string' ? arg : item?.project?.projectPath || item?.projectPath || undefined;
                 return this.promptAndRunTask(projectPath);
             }),
-            commands.registerCommand('pixi.runTaskInEnvironment', (arg?: any) => {
-                const targetTask = arg?.task || (arg?.name && arg?.projectPath ? arg : undefined);
+            commands.registerCommand('pixi.runTaskInEnvironment', (arg?: unknown) => {
+                const item = arg as TaskCommandArg | undefined;
+                const targetTask = item?.task || (item?.name && item?.projectPath ? (item as PixiTask) : undefined);
                 const projectPath = !targetTask
                     ? typeof arg === 'string'
                         ? arg
-                        : arg?.project?.projectPath || arg?.projectPath || undefined
-                    : arg?.project?.projectPath || arg?.projectPath || targetTask.projectPath;
+                        : item?.project?.projectPath || item?.projectPath || undefined
+                    : item?.project?.projectPath || item?.projectPath || targetTask.projectPath;
                 return this.promptAndRunTaskInEnvironment(targetTask, projectPath);
+            }),
+            commands.registerCommand('pixi.tasks.refresh', () => {
+                this.refresh();
+            }),
+            commands.registerCommand('pixi.tasks.revealInManifest', async (arg?: unknown) => {
+                const item = arg as TaskCommandArg | undefined;
+                let task: PixiTask | undefined =
+                    item?.task || (item?.name && item?.projectPath ? (item as PixiTask) : undefined);
+
+                if (!task) {
+                    const targetProjectPath = item?.project?.projectPath || item?.projectPath;
+                    task = await this.pickTask({
+                        title: 'Select Task to Reveal in Manifest',
+                        placeHolder: 'Select a task to jump to its definition in manifest',
+                        targetProjectPath,
+                    });
+                    if (!task) {
+                        return;
+                    }
+                }
+
+                const projectPath = task.projectPath;
+                const manifestPath = item?.project?.manifestPath || this.projectManager.getManifestPath(projectPath);
+
+                if (!manifestPath || !fs.existsSync(manifestPath)) {
+                    window.showWarningMessage('Could not find manifest file for this project.');
+                    return;
+                }
+
+                await revealDefinitionInManifest({
+                    manifestPath,
+                    targetName: task.name,
+                    kind: 'task',
+                });
             }),
         ];
         return Disposable.from(...disposables);

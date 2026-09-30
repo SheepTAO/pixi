@@ -17,7 +17,7 @@ import {
 
 import { PixiPackageSearchResult, promptCondaChannel, runPixi, searchPixiPackages } from '../cli/pixiCli';
 import { runPixiWithProgress } from '../cli/workspaceCli';
-import { escapeRegex, normalizeFolderPath, revealRangeInEditor } from '../common/execUtils';
+import { escapeRegex, normalizeFolderPath, revealDefinitionInManifest } from '../common/execUtils';
 import { getEnvironmentStatusBadge } from '../core/environmentRules';
 import { sortPixiPackages } from '../core/packageManager';
 import { findManifestPath, getProjectConfiguredChannels, isPixiProject } from '../core/projectDiscovery';
@@ -2140,75 +2140,11 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                 pkgName = pick.pkgName;
             }
 
-            try {
-                const doc = await workspace.openTextDocument(Uri.file(manifestPath));
-                const editor = await window.showTextDocument(doc);
-
-                const text = doc.getText();
-                const lines = text.split(/\r?\n/);
-                const escapedName = escapeRegex(pkgName);
-                const altName = pkgName.includes('-')
-                    ? pkgName.replace(/-/g, '_')
-                    : pkgName.includes('_')
-                      ? pkgName.replace(/_/g, '-')
-                      : undefined;
-                const escapedAlt = altName ? escapeRegex(altName) : undefined;
-                const namePattern = escapedAlt ? `(?:${escapedName}|${escapedAlt})` : escapedName;
-
-                const exactKeyRegex = new RegExp(`^\\s*["']?${namePattern}["']?\\s*=`, 'i');
-                const pyprojectDepRegex = new RegExp(`["']${namePattern}(?:\\s*[\\[><=~!^;@]|["'])`, 'i');
-
-                let targetLine = -1;
-                let currentSection = '';
-                // Pass 1: search inside recognized dependency tables
-                for (let i = 0; i < lines.length; i++) {
-                    const line = lines[i];
-                    const sectionMatch = line.match(/^\s*\[+([^\]]+)\]+/);
-                    if (sectionMatch) {
-                        currentSection = sectionMatch[1].trim();
-                    }
-
-                    const isDepSection =
-                        /(^|\.)(?:dependencies|pypi-dependencies|build-dependencies|host-dependencies|optional-dependencies)(\.|$)/i.test(
-                            currentSection,
-                        );
-                    if (isDepSection && (exactKeyRegex.test(line) || pyprojectDepRegex.test(line))) {
-                        targetLine = i;
-                        break;
-                    }
-                }
-
-                // Pass 2: fallback search across entire file
-                if (targetLine < 0) {
-                    for (let i = 0; i < lines.length; i++) {
-                        if (exactKeyRegex.test(lines[i]) || pyprojectDepRegex.test(lines[i])) {
-                            targetLine = i;
-                            break;
-                        }
-                    }
-                }
-
-                if (targetLine >= 0) {
-                    const lineText = lines[targetLine];
-                    const nameRegex = new RegExp(`(\\b|["'])${namePattern}(\\b|["'])`, 'i');
-                    const match = nameRegex.exec(lineText);
-                    let startCol = 0;
-                    let endCol = lineText.length;
-                    if (match && match.index !== undefined) {
-                        const innerIdx = match[0].search(new RegExp(namePattern, 'i'));
-                        startCol = match.index + (innerIdx >= 0 ? innerIdx : 0);
-                        const matchedWord = match[0].match(new RegExp(namePattern, 'i'));
-                        endCol = startCol + (matchedWord ? matchedWord[0].length : pkgName.length);
-                    }
-                    revealRangeInEditor(editor, targetLine, startCol, endCol);
-                } else {
-                    window.showInformationMessage(
-                        `Could not locate definition for '${pkgName}' in ${path.basename(manifestPath)}.`,
-                    );
-                }
-            } catch (err) {
-                window.showErrorMessage(`Failed to open manifest: ${err instanceof Error ? err.message : String(err)}`);
-            }
+            await revealDefinitionInManifest({
+                manifestPath,
+                targetName: pkgName,
+                kind: 'package',
+            });
         }),
     );
 

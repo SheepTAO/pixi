@@ -4,6 +4,7 @@ import { createPixiApi, PixiExtensionApi } from './api';
 import { clearGlobalManifestCache } from './cli/globalCli';
 import { clearPixiCache, validatePixiCli } from './cli/pixiCli';
 import { registerGlobalCommands } from './commands/globalCommands';
+import { registerInfoCommands } from './commands/infoCommands';
 import { registerWorkspaceCommands } from './commands/workspaceCommands';
 import { registerLogger } from './common/logging';
 import { setPersistentState } from './common/persistentState';
@@ -54,7 +55,7 @@ export async function activate(context: ExtensionContext): Promise<PixiExtension
     });
     tasksTreeDataProvider.bindView(tasksTreeView);
 
-    context.subscriptions.push(tasksTreeDataProvider, tasksTreeView, tasksTreeDataProvider.registerCommands());
+    context.subscriptions.push(tasksTreeDataProvider, tasksTreeView);
 
     const globalTreeDataProvider = new PixiGlobalTreeDataProvider();
     context.subscriptions.push(
@@ -66,7 +67,7 @@ export async function activate(context: ExtensionContext): Promise<PixiExtension
     context.subscriptions.push(
         infoTreeDataProvider,
         window.registerTreeDataProvider('pixi.views.info', infoTreeDataProvider),
-        infoTreeDataProvider.registerCommands(),
+        registerInfoCommands(infoTreeDataProvider),
     );
 
     // 3. Initialize Public Extension API
