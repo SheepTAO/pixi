@@ -52,12 +52,17 @@ async function readCondaMetaFiles(envPath: string): Promise<string[]> {
     return [];
 }
 
+const GCC_VERSION_REGEX = /^(?:gcc|gxx)(?:_[a-zA-Z0-9_]+-[a-zA-Z0-9_]+)?-(\d[^-]*)-.*\.json$/;
+const CLANG_VERSION_REGEX = /^(?:clang|clangxx|llvm)(?:_[a-zA-Z0-9_]+-[a-zA-Z0-9_]+)?-(\d[^-]*)-.*\.json$/;
+const MSVC_VERSION_REGEX =
+    /^(?:vs(?:2015|2017|2019|2022)(?:_[a-zA-Z0-9_]+-[a-zA-Z0-9_]+)?|msvc-tools)-(\d[^-]*)-.*\.json$/;
+
 /**
  * Extracts a package version from a list of conda-meta filenames.
  * e.g. python-3.11.8-h123_0.json -> "3.11.8"
  */
-function findPackageVersionFromFiles(files: string[], pkgPrefix: string): string | undefined {
-    const regex = new RegExp(`^${pkgPrefix}-(\\d[^-]*)-.*\\.json$`);
+function findPackageVersionFromFiles(files: string[], pkgPattern: string | RegExp): string | undefined {
+    const regex = typeof pkgPattern === 'string' ? new RegExp(`^${pkgPattern}-(\\d[^-]*)-.*\\.json$`) : pkgPattern;
     for (const file of files) {
         const match = file.match(regex);
         if (match) {
@@ -163,24 +168,15 @@ export async function scanCppToolchain(envPath: string, metaFiles?: string[]): P
     }
 
     let version: string | undefined;
-    if (compilerType === 'gcc') {
+    if (compilerType) {
         const files = metaFiles ?? (await readCondaMetaFiles(envPath));
-        version =
-            findPackageVersionFromFiles(files, '(?:gcc|gxx)(?:_[a-zA-Z0-9_]+-[a-zA-Z0-9_]+)?') ||
-            findPackageVersionFromFiles(files, 'gcc') ||
-            findPackageVersionFromFiles(files, 'gxx');
-    } else if (compilerType === 'clang') {
-        const files = metaFiles ?? (await readCondaMetaFiles(envPath));
-        version =
-            findPackageVersionFromFiles(files, '(?:clang|clangxx|llvm)(?:_[a-zA-Z0-9_]+-[a-zA-Z0-9_]+)?') ||
-            findPackageVersionFromFiles(files, 'clang') ||
-            findPackageVersionFromFiles(files, 'clangxx') ||
-            findPackageVersionFromFiles(files, 'llvm');
-    } else if (compilerType === 'msvc') {
-        const files = metaFiles ?? (await readCondaMetaFiles(envPath));
-        version =
-            findPackageVersionFromFiles(files, 'vs(?:2015|2017|2019|2022)(?:_[a-zA-Z0-9_]+-[a-zA-Z0-9_]+)?') ||
-            findPackageVersionFromFiles(files, 'msvc-tools');
+        if (compilerType === 'gcc') {
+            version = findPackageVersionFromFiles(files, GCC_VERSION_REGEX);
+        } else if (compilerType === 'clang') {
+            version = findPackageVersionFromFiles(files, CLANG_VERSION_REGEX);
+        } else if (compilerType === 'msvc') {
+            version = findPackageVersionFromFiles(files, MSVC_VERSION_REGEX);
+        }
     }
 
     return {

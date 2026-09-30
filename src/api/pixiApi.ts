@@ -24,10 +24,12 @@ export class PixiExtensionApiImpl implements PixiExtensionApi, Disposable {
                 await this.loadSavedActiveEnvironments();
             }),
             this.projectManager.onDidChangeEnvironments(async () => {
+                const storage = await getWorkspacePersistentState().catch(() => undefined);
                 for (const [projectPath, envName] of this.activeEnvNames) {
                     const envs = this.projectManager.getEnvironmentsForProject(projectPath);
-                    if (!envs.some((e) => e.pixiEnvName === envName)) {
+                    if (envs.length > 0 && !envs.some((e) => e.pixiEnvName === envName)) {
                         this.activeEnvNames.delete(projectPath);
+                        await storage?.set(`projectEnvName:${projectPath}`, undefined);
                     }
                 }
                 await this.loadSavedActiveEnvironments();
@@ -43,12 +45,24 @@ export class PixiExtensionApiImpl implements PixiExtensionApi, Disposable {
             for (const projectPath of this.projectManager.getProjectPaths()) {
                 const savedEnv = await storage.get<string>(`projectEnvName:${projectPath}`);
                 if (savedEnv) {
-                    this.activeEnvNames.set(projectPath, savedEnv);
+                    const envs = this.projectManager.getEnvironmentsForProject(projectPath);
+                    if (envs.length === 0 || envs.some((e) => e.pixiEnvName === savedEnv)) {
+                        this.activeEnvNames.set(projectPath, savedEnv);
+                    } else {
+                        await storage.set(`projectEnvName:${projectPath}`, undefined);
+                        this.activeEnvNames.delete(projectPath);
+                    }
                 }
             }
             const globalSaved = await storage.get<string>('globalEnvName');
             if (globalSaved) {
-                this.globalActiveEnvName = globalSaved;
+                const allEnvs = this.projectManager.getAllEnvironments();
+                if (allEnvs.length === 0 || allEnvs.some((e) => e.pixiEnvName === globalSaved)) {
+                    this.globalActiveEnvName = globalSaved;
+                } else {
+                    await storage.set('globalEnvName', undefined);
+                    this.globalActiveEnvName = undefined;
+                }
             }
         } catch {
             // ignore

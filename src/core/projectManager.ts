@@ -234,7 +234,7 @@ export class PixiProjectManager implements Disposable {
             const projectPath = this.findProjectForUri(scope);
             if (projectPath && isPixiProject(projectPath)) {
                 const normalized = path.normalize(projectPath);
-                if (!this.projectPaths.map(path.normalize).includes(normalized)) {
+                if (!this.projectPaths.includes(normalized)) {
                     this.projectPaths.push(normalized);
                     this.projectPaths.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
                     await this.updateHasPixiProjectContext();

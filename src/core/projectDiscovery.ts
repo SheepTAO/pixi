@@ -29,7 +29,22 @@ export function isPixiProject(folderPath: string): boolean {
  * Resolves the path to the manifest file ('pixi.toml' or 'pyproject.toml') for a given folder if it exists.
  */
 export function findManifestPath(folderPath: string): string | undefined {
-    return [path.join(folderPath, 'pixi.toml'), path.join(folderPath, 'pyproject.toml')].find(fs.existsSync);
+    const pixiToml = path.join(folderPath, 'pixi.toml');
+    if (fs.existsSync(pixiToml)) {
+        return pixiToml;
+    }
+    const pyprojectToml = path.join(folderPath, 'pyproject.toml');
+    if (fs.existsSync(pyprojectToml)) {
+        try {
+            const content = fs.readFileSync(pyprojectToml, 'utf8');
+            if (/(?:^|\n)\s*\[tool\.pixi/.test(content)) {
+                return pyprojectToml;
+            }
+        } catch {
+            return undefined;
+        }
+    }
+    return undefined;
 }
 
 /**
@@ -180,13 +195,14 @@ async function findPixiDirectories(patterns: string[]): Promise<string[]> {
         const normalized = pattern.replace(/\\/g, '/').replace(/\/$/, '');
         const lastSegment = path.posix.basename(normalized);
 
-        if (lastSegment === '.pixi' || lastSegment === 'pixi.toml') {
+        if (lastSegment === '.pixi' || lastSegment === 'pixi.toml' || lastSegment === 'pyproject.toml') {
             pixiPatterns.push(normalized);
         } else if (lastSegment.startsWith('.')) {
             continue;
         } else {
             pixiPatterns.push(`${normalized}/**/.pixi`);
             pixiPatterns.push(`${normalized}/**/pixi.toml`);
+            pixiPatterns.push(`${normalized}/**/pyproject.toml`);
         }
     }
 

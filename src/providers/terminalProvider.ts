@@ -184,10 +184,16 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
         try {
             let env: PixiEnvironmentInfo | undefined;
             if (target && typeof target === 'object') {
-                if ('pixiEnvName' in target && typeof (target as { pixiEnvName?: unknown }).pixiEnvName === 'string') {
+                if ('env' in target && (target as { env?: unknown }).env) {
+                    const candidate = (target as { env: unknown }).env;
+                    if (candidate && typeof candidate === 'object' && 'pixiEnvName' in candidate) {
+                        env = candidate as PixiEnvironmentInfo;
+                    }
+                } else if (
+                    'pixiEnvName' in target &&
+                    typeof (target as { pixiEnvName?: unknown }).pixiEnvName === 'string'
+                ) {
                     env = target as PixiEnvironmentInfo;
-                } else if ('env' in target && (target as { env?: unknown }).env) {
-                    env = (target as { env: PixiEnvironmentInfo }).env;
                 }
             }
 
