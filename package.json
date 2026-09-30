@@ -4,7 +4,11 @@
     "description": "Pixi package manager and polyglot workspace integration for Visual Studio Code",
     "icon": "assets/icon.png",
     "license": "MIT",
-    "version": "1.0.1",
+    "version": "1.0.0",
+    "galleryBanner": {
+        "color": "#0F172A",
+        "theme": "dark"
+    },
     "homepage": "https://github.com/SheepTAO/pixi#readme",
     "repository": {
         "type": "git",
@@ -22,7 +26,7 @@
         "workspace"
     ],
     "engines": {
-        "vscode": "^1.118.0"
+        "vscode": "^1.110.0"
     },
     "categories": [
         "Data Science",
@@ -913,7 +917,7 @@
         "@types/node": "24.x",
         "@types/picomatch": "^4.0.3",
         "@types/semver": "^7.7.1",
-        "@types/vscode": "^1.118.0",
+        "@types/vscode": "^1.110.0",
         "@types/which": "^3.0.4",
         "@typescript-eslint/eslint-plugin": "^8.59.1",
         "@typescript-eslint/parser": "^8.59.1",

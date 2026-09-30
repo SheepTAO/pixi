@@ -18,45 +18,100 @@
 
 ---
 
-**Pixi** brings seamless [Pixi](https://pixi.sh) package management and environment workflows to Visual Studio Code. Built upon a decoupled, language-agnostic core architecture, it provides unified project discovery, task execution, terminal profiles, manifest actions, and automatic multi-language toolchain scanning.
+**Pixi** brings fast, reproducible package management and polyglot workspace workflows to Visual Studio Code. Built upon a decoupled, language-agnostic core architecture, it provides unified project discovery, task execution, terminal profiles, manifest actions, and automatic multi-language toolchain scanning.
 
 > [!NOTE]
-> **Language Adapter Status**: Currently, **Python** is fully supported with first-class environment integration via `@vscode/python-environments` (interpreter resolution, dynamic file-level environment routing, and package tree management). Automatic toolchain detection is also available for **C/C++**, **R**, and **Rust**, with additional language integrations planned.
+> **Language Adapter Status**: **Python** is fully supported with first-class environment integration via `@vscode/python-environments` (interpreter resolution, dynamic file-level environment routing, and package tree management). Automatic toolchain detection is also available for **C/C++**, **R**, and **Rust**, with additional language integrations planned.
 
 ---
 
-## ✨ Features
+## Pixi Explorer Side Panel
 
-- **Language-Agnostic Core Architecture**: Cleanly decouples Pixi core workspace operations (manifest lifecycle, environments, dependencies, tasks, terminals) from specific language adapters.
-- **First-Class Python Integration**: Seamlessly integrates with `@vscode/python-environments`, providing interpreter switching, native status bar indicators, and package inspection.
-- **Polyglot Toolchain Detection**: Automatically scans installed environments for multi-language toolchains (Python, C/C++ compilers and header paths, R, Rust) to power language tooling and extension workflows.
-- **Automatic Workspace Discovery**: Instantly detects Pixi projects with `pixi.toml` or `pyproject.toml`, discovering and diagnosing all declared environments.
-- **Manifest Lifecycle & Editor Actions**: One-click action buttons in the editor title bar for `pixi.toml` and `pyproject.toml` (Lock 🔒, Install ⬇️, Update 🔄, Reinstall 🔁).
-- **Aggregated Package Search & Discovery**: High-performance real-time search across Conda repositories (`conda-forge`, etc.) accessible via the view title bar button (`$(search)`), Command Palette, and interactive QuickPick palette. Instantly inspect versions, platform architectures, licenses, descriptions, or open on prefix.dev.
-- **Environment & Dependency Management**: Create and delete environments (`pixi workspace environment add/remove`, `pixi clean`), sync environments (`pixi install`), solve dependencies (`pixi lock`), and add/remove packages with real-time search suggestions and full Conda and PyPI channel support.
-- **Native Pixi Tasks Integration**: Auto-discovers Pixi tasks as native VS Code Tasks (`Terminal: Run Task...`) and provides a QuickPick runner (`Pixi: Run Task`).
-- **Unified Terminal Profiles**: Launch interactive terminals pre-activated in any Pixi environment directly from the terminal profile menu or Command Palette.
-- **Dedicated Activity Bar & Tree Views**: Built-in `Pixi Explorer` side panel with `Environments` (expandable to inspect installed packages and core dependencies, 1-click package update and removal, jump to manifest definition, diagnose environment status, 1-click terminal/sync/reinstall), `Tasks` (visual tree view of all Pixi tasks with 1-click execution, run in custom environment, and jump to manifest definition), `Global Tools` (cleanly inspect installed global CLI apps, versions, and exposed commands with inline update/uninstall), and `Pixi Info` (inspect Pixi version, platform, cache size measurement and 1-click cache cleanup, credentials paths, global directories, virtual packages, config files, and 1-click CLI self-update).
-- **Global Tools Management**: Integrated secondary QuickPick router (`Pixi: Global Tools ...`) to install, list, sync, update, and uninstall user-level CLI packages into `~/.pixi/bin`.
-- **Extensible Public Extension API**: Exports `PixiExtensionApi` for third-party extensions to query Pixi projects, environments, active environment state, toolchains, and packages, with bi-directional environment switching and change event subscriptions.
-- **Lifecycle Status Diagnostics**: Categorizes environments into Installed (ready & executable), Uninstalled (declared in manifest, 1-click installable), and Incompatible (platform mismatch).
+A dedicated Activity Bar container providing complete visibility and control over your Pixi workspace:
+
+```text
+┌────────────────────────────────────────────────────────────────────────┐
+│                             PIXI EXPLORER                              │
+├────────────────────────────────────────────────────────────────────────┤
+│ ENVIRONMENTS     │ Installed / Uninstalled / Incompatible              │
+│                  │ ├── Explicit vs Transitive Dependencies             │
+│                  │ └── 1-click Install, Reinstall, Lock & Terminal     │
+├──────────────────┼─────────────────────────────────────────────────────┤
+│ TASKS            │ Native Pixi Tasks Runner                            │
+│                  │ ├── 1-click Run & Run in Custom Environment         │
+│                  │ └── Jump to Task Definition in Manifest             │
+├──────────────────┼─────────────────────────────────────────────────────┤
+│ GLOBAL TOOLS     │ User-level CLI Apps (~/.pixi/bin)                   │
+│                  │ └── Inspect, Install, Sync, Update & Uninstall      │
+├──────────────────┼─────────────────────────────────────────────────────┤
+│ PIXI INFO        │ CLI Version, System Platform, Virtual Packages      │
+│                  │ └── Cache Disk Measurement & 1-click Cleanup        │
+└────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
-## ⚙️ Extension Settings
+## Key Features
 
-| Setting                            | Type       | Default                       | Scope    | Description                                                                                                     |
-| :--------------------------------- | :--------- | :---------------------------- | :------- | :-------------------------------------------------------------------------------------------------------------- |
-| `pixi.executablePath`              | `string`   | `""`                          | Machine  | Path to the Pixi binary. Supports `${workspaceFolder}` and relative paths. Uses `PATH` discovery if empty.      |
-| `pixi.displayNameFormat`           | `string`   | `"${project}:${env}"`         | Resource | Template for environment names. Placeholders: `${project}`, `${env}`, `${version}`.                             |
-| `pixi.defaultManifestFormat`       | `string`   | `"ask"`                       | Resource | Default manifest format when initializing a new Pixi project (`"ask"`, `"pixi"`, or `"pyproject"`).             |
-| `pixi.autoInstallOnOpen`           | `string`   | `"prompt"`                    | Resource | Behavior when opening projects with uninstalled environments (`"prompt"`, `"always"`, or `"never"`).            |
-| `pixi.terminal.defaultEnvironment` | `string`   | `""`                          | Resource | Default environment to activate in Pixi terminal. If empty, prompts when multiple environments exist.           |
-| `pixi.packageSearch.includePypi`   | `boolean`  | `true`                        | Resource | Whether to include PyPI packages in interactive package search results.                                         |
-| `pixi.packages.displayMode`        | `string`   | `"grouped"`                   | Resource | How installed packages are displayed in the Environments tree view (`"grouped"`, `"explicitOnly"`, or `"all"`). |
-| `pixi.cache.autoMeasureSize`       | `boolean`  | `true`                        | Window   | Whether to automatically compute the disk size of Pixi/Rattler cache directories in Pixi Info.                  |
-| `pixi.environmentRules`            | `string[]` | `[]`                          | Resource | Map glob patterns to Pixi environment names (e.g. `tests/**=dev`). Also supports object format in JSON.         |
-| `pixi.searchIgnorePatterns`        | `string[]` | `["**/node_modules/**", ...]` | Resource | Glob patterns to exclude when scanning the workspace for Pixi projects.                                         |
+### Workspace & Environment Lifecycle
+
+- **Automatic Project Discovery**: Instantly detects `pixi.toml` and `pyproject.toml` manifests across single-root and multi-root workspaces.
+- **Manifest Editor Actions**: 1-click title bar buttons for manifest files to Lock, Install, Update, or Reinstall dependencies.
+- **File-Level Environment Routing**: Map glob patterns directly to specific Pixi environments via `pixi.environmentRules` (e.g. `tests/**=dev`).
+- **Lifecycle Diagnostics**: Categorizes environments into Installed (ready & executable), Uninstalled (declared in manifest, 1-click installable), and Incompatible (platform mismatch).
+
+### Aggregated Package Search & Discovery
+
+- **Dual-Source Search**: High-performance real-time search across Conda repositories (`conda-forge`, etc.) and PyPI with live autocompletion.
+- **Rich Package Inspection**: View package versions, target platforms, licenses, descriptions, and jump directly to package pages on [prefix.dev](https://prefix.dev).
+- **Dependency Diagnostics**: Inspect full dependency trees and diagnose package origin with reverse dependency tree inspection (_"Why is this package installed?"_).
+
+### Python & Multi-Language Toolchains
+
+- **Deep Python Integration**: Connects with `@vscode/python-environments` for seamless interpreter switching, status bar indicators, and package inspection.
+- **Multi-Language Toolchain Scanner**: Automatically scans installed environments for Python, C/C++ compilers (GCC, Clang, MSVC, CMake, Ninja, header paths), R (`R`, `Rscript`), and Rust (`rustc`, `cargo`).
+
+### Native Tasks, Terminals & Global Tools
+
+- **Native VS Code Tasks**: Auto-registers Pixi tasks as native VS Code tasks (`Terminal: Run Task...`) with a dedicated QuickPick runner.
+- **Pre-Configured Terminals**: Launch interactive terminal sessions with the target Pixi environment pre-activated.
+- **Global Tools Management**: Easily inspect, install, update, and uninstall user-level CLI packages installed in `~/.pixi/bin`.
+
+---
+
+## Essential Commands
+
+Launch any command via the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) by typing `Pixi:`:
+
+| Command                                   | Identifier            | Description                                                                |
+| :---------------------------------------- | :-------------------- | :------------------------------------------------------------------------- |
+| **Pixi: Search Packages ...**             | `pixi.searchPackages` | Search Conda & PyPI packages with autocompletion and 1-click install.      |
+| **Pixi: Install (Sync Environments)**     | `pixi.install`        | Install dependencies and synchronize all project environments.             |
+| **Pixi: Add Package...**                  | `pixi.addPackage`     | Add packages to the project with interactive channel and version picking.  |
+| **Pixi: Update Dependencies**             | `pixi.update`         | Update dependencies and refresh `pixi.lock`.                               |
+| **Pixi: Lock Dependencies**               | `pixi.lock`           | Solve dependencies and update the lockfile without modifying environments. |
+| **Pixi: Run Task**                        | `pixi.runTask`        | QuickPick menu to search and run any task defined in the project.          |
+| **Pixi: Open Terminal in Environment...** | `pixi.openTerminal`   | Open an integrated terminal pre-activated in a selected environment.       |
+| **Pixi: Global Tools ...**                | `pixi.global`         | Interactive menu to install, list, update, and uninstall global CLI tools. |
+| **Pixi: Clean Package Cache ...**         | `pixi.cleanCache`     | Clean global Pixi package cache directory with disk space reclamation.     |
+
+> [!TIP]
+> Contextual actions (such as removing packages, jumping to manifest declarations, running tasks in custom environments, and inspecting dependency trees) are also directly available via inline icon buttons in the Pixi Explorer tree views and editor title bar.
+
+---
+
+## Extension Settings
+
+| Setting                      | Type       | Default                       | Scope    | Description                                                                                       |
+| :--------------------------- | :--------- | :---------------------------- | :------- | :------------------------------------------------------------------------------------------------ |
+| `pixi.executablePath`        | `string`   | `""`                          | Machine  | Path to the Pixi binary. Discovered from system `PATH` if empty.                                  |
+| `pixi.displayNameFormat`     | `string`   | `"${project}:${env}"`         | Resource | Display format for environments. Placeholders: `${project}`, `${env}`, `${version}`.              |
+| `pixi.defaultManifestFormat` | `string`   | `"ask"`                       | Resource | Default manifest format for project initialization (`"ask"`, `"pixi"`, or `"pyproject"`).         |
+| `pixi.autoInstallOnOpen`     | `string`   | `"prompt"`                    | Resource | Behavior when opening projects with uninstalled environments (`"prompt"`, `"always"`, `"never"`). |
+| `pixi.environmentRules`      | `string[]` | `[]`                          | Resource | Map glob patterns to environment names (e.g. `tests/**=dev`, `train/**=gpu`).                     |
+| `pixi.packages.displayMode`  | `string`   | `"grouped"`                   | Resource | Package tree display mode (`"grouped"`, `"explicitOnly"`, or `"all"`).                            |
+| `pixi.cache.autoMeasureSize` | `boolean`  | `true`                        | Window   | Automatically compute Pixi cache disk usage in Pixi Info.                                         |
+| `pixi.searchIgnorePatterns`  | `string[]` | `["**/node_modules/**", ...]` | Resource | Glob patterns to ignore when scanning workspace for Pixi projects.                                |
 
 ### Example Configuration
 
@@ -73,44 +128,9 @@ Add this to your project's `.vscode/settings.json`:
 
 ---
 
-## ⌨️ Commands
+## Public Extension API
 
-| Command                                        | Identifier                     | Description                                                                                                                                                   |
-| :--------------------------------------------- | :----------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Pixi: Search Packages ...**                  | `pixi.searchPackages`          | Interactively search Conda & PyPI packages with real-time autocompletion, version inspection, and 1-click actions.                                            |
-| **Pixi: Lock Dependencies**                    | `pixi.lock`                    | Solve and update lockfile (`pixi.lock`) without modifying environments.                                                                                       |
-| **Pixi: Install (Sync Environments)**          | `pixi.install`                 | Install all dependencies and sync environments for the selected Pixi project.                                                                                 |
-| **Pixi: Reinstall Environment...**             | `pixi.reinstall`               | Re-install a specific environment or all environments from scratch.                                                                                           |
-| **Pixi: Update Dependencies**                  | `pixi.update`                  | Update dependencies and lockfile according to project constraints.                                                                                            |
-| **Pixi: Clean...**                             | `pixi.clean`                   | Clean specific environments, all environments in project, or global package cache.                                                                            |
-| **Pixi: Create Environment...**                | `pixi.createEnvironment`       | Create a new Pixi environment in the project (or initialize a new project).                                                                                   |
-| **Pixi: Delete Environment...**                | `pixi.deleteEnvironment`       | Delete or clean a Pixi environment from disk and manifest with safety confirmation.                                                                           |
-| **Pixi: Initialize Project...**                | `pixi.init`                    | Initialize a new Pixi project in the workspace folder (`pixi.toml` or `pyproject.toml`).                                                                      |
-| **Pixi: Open Manifest**                        | `pixi.openManifest`            | Open project manifest (`pixi.toml` or `pyproject.toml`) in editor. Supports 1-click action on Project items in tree views.                                    |
-| **Pixi: Add Package...**                       | `pixi.addPackage`              | Add dependencies with interactive search and source selection. Supports context-aware 1-click `+` buttons on Project and Environment tree nodes.              |
-| **Pixi: Remove Package...**                    | `pixi.removePackage`           | Interactively pick and remove an installed package (auto-detects Conda vs PyPI). Supports 1-click inline deletion on explicit packages in the tree view.      |
-| **Pixi: Update Package...**                    | `pixi.updatePackage`           | Interactively pick and update a package to its latest compatible version (`pixi update <pkg>`). Supports 1-click inline update on explicit packages.          |
-| **Pixi: Go to Package Definition in Manifest** | `pixi.revealPackageInManifest` | Locate and jump directly to the package dependency declaration inside `pixi.toml` or `pyproject.toml`.                                                        |
-| **Pixi: Copy Package Name**                    | `pixi.copyPackageName`         | Copy the selected package name to clipboard from the context menu or command palette.                                                                         |
-| **Pixi: Show Dependency Tree**                 | `pixi.showDependencyTree`      | Show full or package-specific dependency tree in a dedicated output channel / editor view. Supports 1-click tree inspection on environment and package items. |
-| **Pixi: Why is This Installed?**               | `pixi.whyPackage`              | Diagnose package origins with a reverse dependency tree (`pixi tree -i`). Available via 1-click inline action on transitive dependencies in the tree view.    |
-| **Pixi: Add Channel...**                       | `pixi.addChannel`              | Add a Conda channel or mirror URL to the project manifest with priority placement.                                                                            |
-| **Pixi: Remove Channel...**                    | `pixi.removeChannel`           | Interactively pick and remove a configured Conda channel from the project manifest.                                                                           |
-| **Pixi: Run Task**                             | `pixi.runTask`                 | QuickPick menu to search and run any task defined in the Pixi project.                                                                                        |
-| **Pixi: Run Task in Environment...**           | `pixi.runTaskInEnvironment`    | Select a task and choose a specific Pixi environment to run it in.                                                                                            |
-| **Pixi: Go to Task Definition in Manifest**    | `pixi.tasks.revealInManifest`  | Locate and jump directly to the task definition inside `pixi.toml` or `pyproject.toml`.                                                                       |
-| **Pixi: Open Terminal in Environment...**      | `pixi.openTerminal`            | Open a dedicated VS Code terminal inside a selected Pixi environment.                                                                                         |
-| **Pixi: Global Tools ...**                     | `pixi.global`                  | Interactive management for global CLI tools (install, list, sync, update, uninstall, open manifest).                                                          |
-| **Pixi: Update Pixi CLI ...**                  | `pixi.selfUpdate`              | Check for updates and automatically update the installed Pixi CLI to the latest version.                                                                      |
-| **Pixi: Refresh Pixi Info**                    | `pixi.refreshInfo`             | Refresh Pixi CLI and system information in the Pixi Info view.                                                                                                |
-| **Pixi: Clean Package Cache ...**              | `pixi.cleanCache`              | Clean the global Pixi package cache (`pixi clean cache -y`) with 1-click inline action in Pixi Info.                                                          |
-| **Pixi: Measure Cache Size**                   | `pixi.measureCacheSize`        | Compute and update the disk size of the Pixi package cache directory in Pixi Info.                                                                            |
-
----
-
-## 🔌 Public Extension API
-
-Other VS Code extensions (e.g. language tools, Linters, or custom IDE workflows) can consume Pixi's API:
+Other VS Code extensions can programmatically access Pixi's workspaces, environments, and toolchains:
 
 ```typescript
 import * as vscode from 'vscode';
@@ -129,16 +149,12 @@ if (pixi) {
     pixi.onDidChangeActiveEnvironment((e) => {
         console.log('Active environment changed:', e.environment?.pixiEnvName);
     });
-
-    pixi.onDidChangeEnvironments(() => {
-        console.log('Pixi environments changed');
-    });
 }
 ```
 
 ---
 
-## 📦 Requirements & Installation
+## Requirements & Quick Start
 
 1. Install [Pixi](https://pixi.sh) on your system.
 2. Install **Pixi** from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=sheeptao.pixi) or [Open VSX](https://open-vsx.org/extension/sheeptao/pixi).
@@ -147,15 +163,15 @@ if (pixi) {
 
 ---
 
-## 🔍 Troubleshooting
+## Troubleshooting
 
-- **Check Logs**: Open `View` → `Output` and select `Pixi` from the dropdown.
-- **Binary Not Found**: Verify `pixi` is in your system `PATH`, or configure `pixi.executablePath`.
-- **Environments Not Showing**: Ensure `pixi.toml` exists and run `pixi install` to initialize environment prefixes.
+- **Check Output Logs**: Open `View` → `Output` and select `Pixi` from the dropdown.
+- **Binary Not Found**: Verify `pixi` is available in your system `PATH`, or set `pixi.executablePath`.
+- **Environments Not Showing**: Ensure `pixi.toml` exists and run `pixi.install` to initialize environment prefixes.
 
 ---
 
-## 📄 Acknowledgements & License
+## Acknowledgements & License
 
 - Special thanks to [Renan Santos](https://github.com/renan-r-santos) and contributors of [pixi-code](https://github.com/renan-r-santos/pixi-code) for creating the original foundation.
 - Thanks to the [Prefix.dev](https://prefix.dev) team for building the incredible [Pixi](https://pixi.sh) package manager and ecosystem.

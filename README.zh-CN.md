@@ -18,49 +18,104 @@
 
 ---
 
-**Pixi** 将 [Pixi](https://pixi.sh) 的包管理与环境工作流无缝集成至 Visual Studio Code。基于彻底解耦的语言通用核心架构设计，扩展提供了统一的工程发现、任务运行、终端集成、清单操作以及全自动多语言工具链扫描支持。
+**Pixi** 将 [Pixi](https://pixi.sh) 的高性能包管理与多语言工作区工作流无缝融入 Visual Studio Code。基于彻底解耦的语言中立核心架构，提供了一体化的工程自动发现、任务运行、预激活终端、清单快捷操作以及全自动多语言工具链扫描。
 
 > [!NOTE]
-> **多语言适配进展**：目前本扩展已完整支持 **Python** 语言环境（基于 `@vscode/python-environments`，提供解释器切换、动态文件级环境规则绑定及包依赖树视图管理）。同时核心层已提供对 **C/C++**、**R** 与 **Rust** 工具链的自动检测，更多语言支持正在规划与演进中。
+> **多语言适配进展**：目前已完整支持 **Python** 语言环境（基于 `@vscode/python-environments`，支持解释器智能切换、文件级环境路由与包依赖树管理）。核心层同时提供了对 **C/C++**、**R** 与 **Rust** 工具链的自动探测，更多语言适配正在持续演进中。
 
 ---
 
-## ✨ 功能特性
+## Pixi Explorer 侧边栏面板
 
-- **语言中立的核心架构**：将 Pixi 核心工作区逻辑（清单生命周期、环境、依赖、任务、终端）与具体编程语言适配器彻底解耦。
-- **深度 Python 环境集成**：与 VS Code 的 Python 环境扩展 (`@vscode/python-environments`) 深度打通，提供解释器智能切换、原生状态栏环境信息指示与包依赖树视图管理。
-- **多语言工具链自动检测**：自动扫描环境中安装的多语言工具链（Python 解释器、C/C++ 编译器/头文件/CMake/Ninja、R 解释器、Rust 编译器与 Cargo），为多语言工作流赋能。
-- **全自动工作区工程发现**：即时识别工作区内的 `pixi.toml` 或 `pyproject.toml`，自动发现并诊断所有声明的环境。
-- **清单快捷操作栏**：在 `pixi.toml` 和 `pyproject.toml` 编辑器右上角提供一键快捷操作按钮（锁定依赖 🔒、同步安装 ⬇️、更新依赖 🔄、重装环境 🔁）。
-- **聚合式包搜索与智能发现**：支持在 `Environments` 视图标题栏按钮（`$(search)`）、命令面板或快捷菜单中一键唤出高性能包搜索调色板。实时检索 Conda 仓库（如 conda-forge 等），即时查看最新版本、跨平台架构支持、开源许可与描述，并支持直接跳转 prefix.dev 或一键添加到工程。
-- **环境与依赖全生命周期管理**：新建与删除环境（`pixi workspace environment add/remove`、`pixi clean`）、同步安装（`pixi install`）、依赖求解（`pixi lock`）、具备输入联想搜索与版本约束建议的交互式添加依赖（支持 Conda、PyPI、自定义镜像源、本地/可编辑路径依赖及 Git仓库）与智能依赖移除。
-- **原生 Pixi Task 集成**：自动将 Pixi tasks 注册为 VS Code 原生任务（可通过 `Terminal: Run Task...` 调用），并提供专用的快速搜索启动菜单（`Pixi: Run Task`）。
-- **统一终端 Profiles**：直接从终端配置菜单或命令面板打开已预激活指定 Pixi 环境的集成终端。
-- **原生侧边栏与活动栏面板（Activity Bar & TreeView）**：内置专用的 Pixi Explorer 侧边面板，包含 `Environments`（支持点击展开查看该环境安装的全部依赖包与核心显式依赖、一键更新/移除依赖包与清单跳转、实时诊断环境安装状态、一键启动预激活终端、同步安装与重装环境）、`Tasks`（可视化树状展示所有 Pixi tasks，支持一键点击运行、在指定环境中运行与跳转清单定义）、`Global Tools`（清晰扁平展示全局安装的 CLI 工具、版本与暴露命令，支持一键更新/卸载）以及 `Pixi Info`（格式化展示 Pixi CLI 版本、系统平台、缓存占用测算与一键清理、凭据路径、全局安装目录、系统虚拟包、配置文件并支持一键升级 CLI）。
-- **全局工具全流程管理**：支持通过 `Pixi: Global Tools ...` 二级菜单管理 `~/.pixi/bin` 下的全局命令行工具（安装、列表查看、同步、更新、卸载与编辑清单）。
-- **公开的扩展 Extension API**：导出 `PixiExtensionApi`，供第三方扩展轻松获取 Pixi 工程、环境列表、活动环境状态、工具链及包信息，支持双向活动环境切换与生命周期变更事件监听。
-- **生命周期状态诊断**：环境分为已安装（Installed）、未安装（Uninstalled，清单已声明，支持一键点击安装）以及不兼容（Incompatible，与当前系统平台不匹配）。
+在 VS Code 活动栏（Activity Bar）中提供专用的 Pixi 管理面板，四重视图分工明确、操作直观：
+
+```text
+┌────────────────────────────────────────────────────────────────────────┐
+│                             PIXI EXPLORER                              │
+├────────────────────────────────────────────────────────────────────────┤
+│ ENVIRONMENTS     │ 环境全景与生命周期诊断（已安装 / 未安装 / 不兼容） │
+│                  │ ├── 显式依赖 vs 传递依赖树与 Why-installed 逆向诊断  │
+│                  │ └── 一键同步安装、重新安装、锁定依赖与预激活终端   │
+├──────────────────┼─────────────────────────────────────────────────────┤
+│ TASKS            │ 原生 Pixi Task 运行器                               │
+│                  │ ├── 一键运行任务、在指定环境中运行任务              │
+│                  │ └── 快捷跳转至清单文件中的任务定义                  │
+├──────────────────┼─────────────────────────────────────────────────────┤
+│ GLOBAL TOOLS     │ 用户级全局 CLI 工具管理（~/.pixi/bin）              │
+│                  │ └── 清晰查看已安装工具、版本，一键同步、更新与卸载  │
+├──────────────────┼─────────────────────────────────────────────────────┤
+│ PIXI INFO        │ 系统与 CLI 状态诊断（版本、平台架构、虚拟包）      │
+│                  │ └── 磁盘缓存占用实时测算、一键清理与 CLI 自身更新   │
+└────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
-## ⚙️ 扩展配置项
+## 核心特性
 
-| 配置项                             | 类型       | 默认值                        | 作用域 | 说明                                                                                                             |
-| :--------------------------------- | :--------- | :---------------------------- | :----- | :--------------------------------------------------------------------------------------------------------------- |
-| `pixi.executablePath`              | `string`   | `""`                          | 机器级 | Pixi 可执行文件路径。支持 `${workspaceFolder}` 及相对路径。为空时自动从系统 `PATH` 探测。                        |
-| `pixi.displayNameFormat`           | `string`   | `"${project}:${env}"`         | 资源级 | 环境名称展示模板。支持占位符：`${project}`、`${env}`、`${version}`。                                             |
-| `pixi.defaultManifestFormat`       | `string`   | `"ask"`                       | 资源级 | 初始化 Pixi 项目时的默认清单格式（`"ask"`、`"pixi"` 或 `"pyproject"`）。                                         |
-| `pixi.autoInstallOnOpen`           | `string`   | `"prompt"`                    | 资源级 | 打开包含未安装环境的项目时的行为控制（`"prompt"` 弹窗提示、`"always"` 自动安装、`"never"` 忽略）。               |
-| `pixi.terminal.defaultEnvironment` | `string`   | `""`                          | 资源级 | 打开 Pixi 终端时默认激活的环境名（留空时在多环境下交互式弹出选择列表）。                                         |
-| `pixi.packageSearch.includePypi`   | `boolean`  | `true`                        | 资源级 | 交互式搜索包时是否连带检索 PyPI 软件包源。                                                                       |
-| `pixi.packages.displayMode`        | `string`   | `"grouped"`                   | 资源级 | Environments 树视图中已安装包的展示模式（`"grouped"` 分组收纳、`"explicitOnly"` 仅显式依赖、`"all"` 全部平铺）。 |
-| `pixi.cache.autoMeasureSize`       | `boolean`  | `true`                        | 窗口级 | Pixi Info 视图中是否在加载时自动计算 Pixi/Rattler 全局缓存的磁盘占用体积。                                       |
-| `pixi.environmentRules`            | `string[]` | `[]`                          | 资源级 | 将 Glob 模式映射到 Pixi 环境名称（例如 `tests/**=dev`）。支持在设置面板通过 "Add Item" 交互添加。                |
-| `pixi.searchIgnorePatterns`        | `string[]` | `["**/node_modules/**", ...]` | 资源级 | 扫描工作区 Pixi 工程时忽略的 Glob 目录模式。                                                                     |
+### 工作区与环境生命周期
 
-### 配置示例
+- **全自动工程发现**：即时识别单工作区与多根工作区内的 `pixi.toml` 与 `pyproject.toml` 清单文件。
+- **清单快捷操作栏**：在清单编辑器标题栏右上角提供一键快捷操作按钮：锁定依赖、同步安装、更新依赖与重装环境。
+- **文件级环境路由**：通过 `pixi.environmentRules` 配置 Glob 路径与环境映射（例如 `tests/**=dev`），编辑特定代码时自动激活对应环境。
+- **生命周期状态诊断**：智能区分已安装（Ready 可直接执行）、未安装（清单已声明，支持一键安装）与不兼容环境（系统平台不匹配）。
 
-在项目的 `.vscode/settings.json` 中添加：
+### 聚合式包搜索与智能依赖
+
+- **跨源实时检索**：高性能同时检索 Conda 仓库（如 `conda-forge` 等）与 PyPI 软件源，支持输入联想与版本自动提示。
+- **多维信息卡片**：直接在搜索结果中预览软件包版本、支持的平台架构、开源许可协议与功能说明，并支持一键跳转 [prefix.dev](https://prefix.dev)。
+- **深度依赖诊断**：支持查看环境完整的依赖拓扑树，并通过逆向依赖分析（_“Why is this package installed?”_）快速追溯间接依赖的引入来源。
+
+### Python 与多语言工具链集成
+
+- **Python 环境深度打通**：无缝对接官方 `@vscode/python-environments` API，提供解释器智能切换、原生状态栏环境展示与已安装包管理。
+- **多语言工具链扫描**：自动探测环境中安装的 Python 解释器、C/C++ 编译器（GCC、Clang、MSVC、CMake、Ninja、头文件路径）、R 解释器（`R`、`Rscript`）以及 Rust 工具链（`rustc`、`cargo`）。
+
+### 原生任务、终端与全局工具
+
+- **VS Code 原生任务绑定**：自动将 Pixi 任务注册至 VS Code 原生任务系统（`Terminal: Run Task...`），并提供交互式 QuickPick 启动器。
+- **预激活集成终端**：从终端配置菜单或命令面板直接启动已预先激活指定 Pixi 环境的 VS Code 终端。
+- **全局 CLI 工具管理**：轻松查看、安装、更新与卸载 `~/.pixi/bin` 下的全局命令行工具（`pixi global`）。
+
+---
+
+## 常用核心命令
+
+在命令面板（`Ctrl+Shift+P` / `Cmd+Shift+P`）中输入 `Pixi:` 即可搜索并执行全部命令：
+
+| 命令名称                                  | 命令 ID               | 功能说明                                           |
+| :---------------------------------------- | :-------------------- | :------------------------------------------------- |
+| **Pixi: Search Packages ...**             | `pixi.searchPackages` | 交互式搜索 Conda 与 PyPI 软件包并一键添加依赖。    |
+| **Pixi: Install (Sync Environments)**     | `pixi.install`        | 安装依赖并同步当前工程的所有 Pixi 环境。           |
+| **Pixi: Add Package...**                  | `pixi.addPackage`     | 交互式为项目添加指定渠道与版本的依赖包。           |
+| **Pixi: Update Dependencies**             | `pixi.update`         | 更新项目依赖版本并刷新 `pixi.lock`。               |
+| **Pixi: Lock Dependencies**               | `pixi.lock`           | 求解依赖约束并更新 lockfile，不改变现有环境文件。  |
+| **Pixi: Run Task**                        | `pixi.runTask`        | 打开快速选择菜单，搜索并执行工程内声明的任何任务。 |
+| **Pixi: Open Terminal in Environment...** | `pixi.openTerminal`   | 启动一个已自动预激活指定 Pixi 环境的集成终端。     |
+| **Pixi: Global Tools ...**                | `pixi.global`         | 交互式管理用户级全局 CLI 工具（安装/更新/卸载）。  |
+| **Pixi: Clean Package Cache ...**         | `pixi.cleanCache`     | 清理全局 Pixi 包缓存以释放磁盘空间。               |
+
+> [!TIP]
+> 诸如下载依赖、移除软件包、跳转清单定义、在指定环境中运行任务以及查看依赖拓扑树等操作，均在 Pixi Explorer 树视图项旁提供了直观的一键图标按钮。
+
+---
+
+## 扩展主要配置项
+
+| 配置项                       | 类型       | 默认值                        | 作用域 | 说明                                                                        |
+| :--------------------------- | :--------- | :---------------------------- | :----- | :-------------------------------------------------------------------------- |
+| `pixi.executablePath`        | `string`   | `""`                          | 机器级 | Pixi 二进制路径。留空时自动从系统 `PATH` 环境变量中探测。                   |
+| `pixi.displayNameFormat`     | `string`   | `"${project}:${env}"`         | 资源级 | 环境名称展示模板。支持占位符：`${project}`、`${env}`、`${version}`。        |
+| `pixi.defaultManifestFormat` | `string`   | `"ask"`                       | 资源级 | 初始化项目时的默认清单格式（`"ask"`、`"pixi"` 或 `"pyproject"`）。          |
+| `pixi.autoInstallOnOpen`     | `string`   | `"prompt"`                    | 资源级 | 打开包含未安装环境的项目时的提示策略（`"prompt"`、`"always"`、`"never"`）。 |
+| `pixi.environmentRules`      | `string[]` | `[]`                          | 资源级 | 将 Glob 路径模式映射到特定 Pixi 环境（例如 `tests/**=dev`）。               |
+| `pixi.packages.displayMode`  | `string`   | `"grouped"`                   | 资源级 | 环境树视图中已安装包的展示模式（`"grouped"`、`"explicitOnly"`、`"all"`）。  |
+| `pixi.cache.autoMeasureSize` | `boolean`  | `true`                        | 窗口级 | 是否在 Pixi Info 视图中自动测算全局缓存的磁盘占用体积。                     |
+| `pixi.searchIgnorePatterns`  | `string[]` | `["**/node_modules/**", ...]` | 资源级 | 扫描工作区 Pixi 工程时忽略的 Glob 匹配模式。                                |
+
+### 推荐工作区配置示例
+
+在工程的 `.vscode/settings.json` 中添加：
 
 ```json
 {
@@ -73,44 +128,9 @@
 
 ---
 
-## ⌨️ 命令列表
+## 公开扩展 API（Extension API）
 
-| 命令名称                                       | 命令 ID                        | 功能说明                                                                                                           |
-| :--------------------------------------------- | :----------------------------- | :----------------------------------------------------------------------------------------------------------------- |
-| **Pixi: Search Packages ...**                  | `pixi.searchPackages`          | 交互式搜索 Conda 与 PyPI 软件包，支持实时自动补全、版本查看与一键添加/全局安装。                                   |
-| **Pixi: Lock Dependencies**                    | `pixi.lock`                    | 求解并更新锁文件（`pixi.lock`），不修改现有环境。                                                                  |
-| **Pixi: Install (Sync Environments)**          | `pixi.install`                 | 安装所有依赖并同步工程的所有环境。                                                                                 |
-| **Pixi: Reinstall Environment...**             | `pixi.reinstall`               | 从头重新安装指定环境或所有环境。                                                                                   |
-| **Pixi: Update Dependencies**                  | `pixi.update`                  | 依据工程约束更新依赖并刷新锁文件。                                                                                 |
-| **Pixi: Clean...**                             | `pixi.clean`                   | 清理指定环境、项目所有环境，或清理系统级全局包缓存。                                                               |
-| **Pixi: Create Environment...**                | `pixi.createEnvironment`       | 在当前项目中新建环境（或在空白文件夹中初始化项目）。                                                               |
-| **Pixi: Delete Environment...**                | `pixi.deleteEnvironment`       | 从磁盘清理或从清单中移除 Pixi 环境（具备安全确认弹窗）。                                                           |
-| **Pixi: Initialize Project...**                | `pixi.init`                    | 在当前文件夹初始化 Pixi 项目（可选择 `pixi.toml` 或 `pyproject.toml`）。                                           |
-| **Pixi: Open Manifest**                        | `pixi.openManifest`            | 在编辑器中打开项目清单（`pixi.toml` 或 `pyproject.toml`）；支持在侧边栏项目节点上一键直接打开。                    |
-| **Pixi: Add Package...**                       | `pixi.addPackage`              | 交互式添加依赖（支持实时搜索与多源选择）；支持在侧边栏项目和环境节点上一键点击 `+`，自动继承上下文并跳过冗余选择。 |
-| **Pixi: Remove Package...**                    | `pixi.removePackage`           | 交互式选择并移除已安装包（自动识别 Conda 或 PyPI 渠道）；支持在侧边栏显式依赖包上一键点击垃圾桶图标直接移除。      |
-| **Pixi: Update Package...**                    | `pixi.updatePackage`           | 交互式选择并更新单个依赖包至最新兼容版本（`pixi update <pkg>`）；支持在显式依赖包上一键点击向上箭头图标直接更新。  |
-| **Pixi: Go to Package Definition in Manifest** | `pixi.revealPackageInManifest` | 在 `pixi.toml` 或 `pyproject.toml` 清单文件中快速定位并高亮对应依赖包声明行。                                      |
-| **Pixi: Copy Package Name**                    | `pixi.copyPackageName`         | 通过右键菜单或命令面板快速复制所选软件包名称至剪贴板。                                                             |
-| **Pixi: Show Dependency Tree**                 | `pixi.showDependencyTree`      | 在专用输出面板/编辑器视图中查看完整环境或指定包的依赖树（支持在环境与包节点上一键查看）。                          |
-| **Pixi: Why is This Installed?**               | `pixi.whyPackage`              | 诊断包引入来源，生成反向依赖链路树（`pixi tree -i`）；在侧边栏间接依赖项上悬停即可一键点击排查。                   |
-| **Pixi: Add Channel...**                       | `pixi.addChannel`              | 为项目清单添加 Conda 渠道或镜像 URL，并支持指定优先级顺序。                                                        |
-| **Pixi: Remove Channel...**                    | `pixi.removeChannel`           | 交互式选择并从项目清单中移除已配置的 Conda 渠道。                                                                  |
-| **Pixi: Run Task**                             | `pixi.runTask`                 | 快速搜索并运行当前工程中定义的任意 Pixi task。                                                                     |
-| **Pixi: Run Task in Environment...**           | `pixi.runTaskInEnvironment`    | 选择一个 task 并指定在特定 Pixi 环境中运行。                                                                       |
-| **Pixi: Go to Task Definition in Manifest**    | `pixi.tasks.revealInManifest`  | 在 `pixi.toml` 或 `pyproject.toml` 清单文件中快速定位并高亮对应任务定义行。                                        |
-| **Pixi: Open Terminal in Environment...**      | `pixi.openTerminal`            | 在指定的 Pixi 环境中打开一个预激活终端。                                                                           |
-| **Pixi: Global Tools ...**                     | `pixi.global`                  | 交互式管理全局 CLI 工具（安装、列表查看、同步、更新、卸载及编辑全局清单配置）。                                    |
-| **Pixi: Update Pixi CLI ...**                  | `pixi.selfUpdate`              | 检查更新并自动升级系统上的 Pixi CLI 命令行工具至最新版本。                                                         |
-| **Pixi: Refresh Pixi Info**                    | `pixi.refreshInfo`             | 刷新 Pixi Info 视图中的系统环境与版本信息。                                                                        |
-| **Pixi: Clean Package Cache ...**              | `pixi.cleanCache`              | 清理 Pixi 系统级全局包缓存（`pixi clean cache -y`），支持在 Pixi Info 视图中一键点击垃圾桶图标清理并展示占用体积。 |
-| **Pixi: Measure Cache Size**                   | `pixi.measureCacheSize`        | 按需计算并刷新 Pixi Info 视图中全局包缓存的磁盘占用体积。                                                          |
-
----
-
-## 🔌 公开扩展 API
-
-其他 VS Code 扩展（如语言插件、代码格式化工具或自动化流）可直接消费 Pixi 的公共 API：
+其他 VS Code 扩展可通过本插件导出的 `PixiExtensionApi` 编程式获取工程信息、环境列表及工具链：
 
 ```typescript
 import * as vscode from 'vscode';
@@ -122,41 +142,37 @@ if (pixi) {
     const envs = pixi.getAllEnvironments();
     const packages = await pixi.getPackages('default', projectPaths[0]);
 
-    // 活动环境获取与切换
+    // 活动环境切换与事件监听
     const activeEnv = await pixi.getActiveEnvironment();
     await pixi.setActiveEnvironment(undefined, 'default');
 
     pixi.onDidChangeActiveEnvironment((e) => {
         console.log('活动环境已变更:', e.environment?.pixiEnvName);
     });
-
-    pixi.onDidChangeEnvironments(() => {
-        console.log('Pixi 环境发生变化');
-    });
 }
 ```
 
 ---
 
-## 📦 环境要求与安装
+## 环境要求与快速上手
 
-1. 确保系统已安装 [Pixi](https://pixi.sh)。
+1. 在系统上安装 [Pixi](https://pixi.sh)。
 2. 从 [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=sheeptao.pixi) 或 [Open VSX](https://open-vsx.org/extension/sheeptao/pixi) 安装 **Pixi** 扩展。
-3. _（Python 用户推荐）_ 安装 VS Code 官方 [Python Environments](https://marketplace.visualstudio.com/items?itemName=ms-python.vscode-python-envs) 扩展以启用解释器切换与包依赖查看。
-4. 打开任意包含 `pixi.toml` 或 `pyproject.toml` 的工作区即可开始使用。
+3. _（Python 开发推荐）_ 安装官方 [Python Environments](https://marketplace.visualstudio.com/items?itemName=ms-python.vscode-python-envs) 扩展以启用解释器切换与包管理。
+4. 打开任何包含 `pixi.toml` 或 `pyproject.toml` 的工作区目录即可自动激活。
 
 ---
 
-## 🔍 故障排查
+## 故障排查
 
-- **查看日志**：打开 `查看` → `输出`，在下拉框中选择 `Pixi`。
-- **找不到二进制文件**：检查 `pixi` 是否在系统环境变量 `PATH` 中，或在设置中显式配置 `pixi.executablePath`。
-- **环境未显示**：确保 `pixi.toml` 文件存在，并在工程目录下执行 `pixi install` 完成初始化。
+- **查看运行日志**：打开 `查看` → `输出`（Output），在右侧下拉菜单中选择 `Pixi`。
+- **找不到 pixi 二进制**：确认 `pixi` 命令已加入系统 `PATH`，或在设置中手动指定 `pixi.executablePath`。
+- **未列出任何环境**：确认工作区包含 `pixi.toml`，并运行一次 `pixi.install` 初始化环境前缀目录。
 
 ---
 
-## 📄 致谢与开源许可
+## 致谢与开源许可
 
-- 特别鸣谢 [Renan Santos](https://github.com/renan-r-santos) 以及 [pixi-code](https://github.com/renan-r-santos/pixi-code) 早期贡献者奠定的代码起点。
-- 感谢 [Prefix.dev](https://prefix.dev) 团队打造卓越的 [Pixi](https://pixi.sh) 包管理器与生态系统。
+- 特别鸣谢 [Renan Santos](https://github.com/renan-r-santos) 及 [pixi-code](https://github.com/renan-r-santos/pixi-code) 贡献者们打造的优秀初始基础。
+- 感谢 [Prefix.dev](https://prefix.dev) 团队打造的卓越 [Pixi](https://pixi.sh) 包管理生态。
 - 本项目遵循 [MIT 许可证](LICENSE)。

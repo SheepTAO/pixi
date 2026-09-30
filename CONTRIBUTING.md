@@ -6,7 +6,7 @@ Thank you for your interest in contributing to Pixi! This document provides guid
 
 ### 1. Prerequisites
 
-- **Node.js** 20+
+- **Node.js** >= 20.0.0 (Recommended: Node 22 or 24 LTS)
 - **Pixi** installed on your system ([Installation Guide](https://pixi.sh))
 - **Visual Studio Code** (optionally with the official [Python Environments](https://marketplace.visualstudio.com/items?itemName=ms-python.vscode-python-envs) extension for Python integration testing)
 
@@ -21,9 +21,10 @@ npm install
 ### 3. Development Workflow
 
 ```bash
-npm run compile    # Build the extension with Webpack
-npm run watch      # Watch for changes during local development
-npm test           # Run TypeScript compilation, Webpack build, and ESLint checks
+npm run compile        # Build the extension with Webpack
+npm run watch          # Watch for changes during local development
+npm run pretest        # Run type checking, Webpack build, and ESLint checks
+npm test               # Run pretest suite and verify test status
 ```
 
 ## Code Style & Standards
@@ -31,7 +32,7 @@ npm test           # Run TypeScript compilation, Webpack build, and ESLint check
 This project enforces strict code quality and formatting using TypeScript, ESLint, and Prettier:
 
 ```bash
-npm run format:check   # Verify code formatting
+npm run format:check   # Verify code formatting with Prettier
 npm run format         # Auto-format all files with Prettier
 npm run lint           # Check for linting issues
 npm run lint -- --fix  # Auto-fix linting issues
