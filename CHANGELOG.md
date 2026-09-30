@@ -17,9 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Major Architectural Decoupling**: Cleanly separated language-agnostic Pixi Core (`src/core/`) from language adapters (`src/languages/`), providing a resilient polyglot foundation for Visual Studio Code and Open VSX.
 - **Official Paxton Mascot & Visual Branding**: Adopted the official Pixi fairy mascot Paxton with dark-mode drop shadow as the extension icon, custom activity bar icon, and dark marketplace gallery banner.
 - **Public Extension API**: Exported `PixiExtensionApi` (`sheeptao.pixi` exports) allowing third-party extensions to query Pixi projects, environments, toolchains, and packages, with bi-directional environment switching and change event subscriptions.
-- **Manifest Lifecycle & Editor Navigation**: One-click action buttons in the editor title bar for `pixi.toml` and `pyproject.toml` (Lock 🔒, Install ⬇️, Update 🔄, Reinstall 🔁).
+- **Manifest Lifecycle & Editor Navigation**: One-click action buttons in the editor title bar for `pixi.toml` and `pyproject.toml` (Lock, Install, Update, Reinstall).
 - **Native Tasks & Terminal Profiles**: Automatic registration of Pixi tasks as native VS Code Tasks (`Terminal: Run Task...`) and pre-activated interactive Pixi terminal profiles.
-- **Synchronized Bilingual Documentation**: Comprehensive, visual, and streamlined documentation in both English (`README.md`) and Chinese (`README.zh-CN.md`).
+- **Streamlined Documentation**: Comprehensive, visual, and minimalist documentation in `README.md`.
 
 ## [0.3.0]
 
