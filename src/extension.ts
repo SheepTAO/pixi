@@ -70,7 +70,8 @@ export async function activate(context: ExtensionContext): Promise<PixiExtension
     );
 
     // 3. Initialize Public Extension API
-    const pixiApi = createPixiApi(projectManager);
+    const extensionVersion = context.extension?.packageJSON?.version;
+    const pixiApi = createPixiApi(projectManager, extensionVersion);
     context.subscriptions.push(pixiApi);
 
     // 4. Initial project discovery & validation

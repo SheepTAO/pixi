@@ -17,9 +17,9 @@ export class PixiExtensionApiImpl implements PixiExtensionApi, Disposable {
 
     constructor(
         private readonly projectManager: PixiProjectManager,
-        version = '1.0.1',
+        version?: string,
     ) {
-        this.version = version;
+        this.version = version || '1.0.1';
 
         this.disposables.push(
             this._onDidChangeActiveEnvironment,
@@ -279,6 +279,6 @@ export class PixiExtensionApiImpl implements PixiExtensionApi, Disposable {
     }
 }
 
-export function createPixiApi(projectManager: PixiProjectManager, version = '1.0.1'): PixiExtensionApi & Disposable {
+export function createPixiApi(projectManager: PixiProjectManager, version?: string): PixiExtensionApi & Disposable {
     return new PixiExtensionApiImpl(projectManager, version);
 }
