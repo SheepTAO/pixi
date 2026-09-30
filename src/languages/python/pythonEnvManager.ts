@@ -238,6 +238,9 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
                 const found = envs.find((e) => e.envId.id === targetId);
                 if (found) {
                     this.activeEnv.set(projectPath, found);
+                } else if (envs.length > 0) {
+                    this.activeEnv.delete(projectPath);
+                    await storage.set(`projectEnvId:${projectPath}`, undefined);
                 } else if (!savedId) {
                     this.activeEnv.delete(projectPath);
                 }
@@ -246,13 +249,20 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
         for (const activePath of Array.from(this.activeEnv.keys())) {
             if (!this.projectToEnvs.has(activePath)) {
                 this.activeEnv.delete(activePath);
+                await storage.set(`projectEnvId:${activePath}`, undefined);
             }
         }
 
         const globalTargetId = this.globalEnv?.envId.id || (await storage.get<string>('globalEnvId'));
         if (globalTargetId) {
             const allEnvs = Array.from(this.projectToEnvs.values()).flat();
-            this.globalEnv = allEnvs.find((e) => e.envId.id === globalTargetId);
+            const foundGlobal = allEnvs.find((e) => e.envId.id === globalTargetId);
+            if (foundGlobal) {
+                this.globalEnv = foundGlobal;
+            } else if (allEnvs.length > 0) {
+                this.globalEnv = undefined;
+                await storage.set('globalEnvId', undefined);
+            }
         }
     }
 

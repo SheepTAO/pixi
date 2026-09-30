@@ -131,7 +131,10 @@ export class PixiPythonPackageManager implements PackageManager, Disposable {
                 },
             );
         } else if (uninstallList && uninstallList.length > 0) {
-            const cached = this.packagesCache.get(environment.envId.id) || [];
+            let cached = this.packagesCache.get(environment.envId.id);
+            if (!cached || cached.length === 0) {
+                cached = (await this.getPackages(environment)) || [];
+            }
             const pypiPkgs: string[] = [];
             const condaPkgs: string[] = [];
 

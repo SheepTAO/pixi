@@ -177,6 +177,7 @@ interface PickPackageOptions {
     placeHolder: string;
     emptyWarning?: string;
     preferExplicit?: boolean;
+    formatItem?: (pkg: PixiPackage) => QuickPickItem;
 }
 
 async function pickPackageFromEnvironment(
@@ -184,7 +185,7 @@ async function pickPackageFromEnvironment(
     projectPath: string,
     targetEnvName: string | undefined | null,
     options: PickPackageOptions,
-): Promise<{ pkgName: string; envLabel: string } | undefined> {
+): Promise<{ pkgName: string; envLabel: string; targetEnv?: string } | undefined> {
     const envs = manager.getEnvironmentsForProject(projectPath);
     const resolvedEnv =
         targetEnvName !== undefined
@@ -206,22 +207,23 @@ async function pickPackageFromEnvironment(
         window.showInformationMessage(options.emptyWarning || `No packages found in environment '${envLabel}'.`);
         return undefined;
     }
-    const pick = await window.showQuickPick(
-        candidates.map((p) => ({
-            label: p.name,
-            description: p.version ? `v${p.version}` : undefined,
-            pkgName: p.name,
-        })),
-        {
-            title: options.title,
-            placeHolder: options.placeHolder,
-            matchOnDescription: true,
-        },
-    );
+    const sorted = sortPixiPackages(candidates);
+    const items = options.formatItem
+        ? sorted.map((p) => ({ ...options.formatItem!(p), pkgName: p.name }))
+        : sorted.map((p) => ({
+              label: p.name,
+              description: p.version ? `v${p.version}` : undefined,
+              pkgName: p.name,
+          }));
+    const pick = await window.showQuickPick(items, {
+        title: options.title,
+        placeHolder: options.placeHolder,
+        matchOnDescription: true,
+    });
     if (!pick) {
         return undefined;
     }
-    return { pkgName: pick.pkgName, envLabel };
+    return { pkgName: pick.pkgName, envLabel, targetEnv: resolvedEnv };
 }
 
 async function resolveTargetFolder(folderUri?: unknown, placeHolder?: string): Promise<string | undefined> {
@@ -2071,27 +2073,11 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                 return;
             }
 
-            const envs = manager.getEnvironmentsForProject(projectPath);
-            const targetEnv = await resolveTargetEnvironment(
-                envs,
-                targetItem,
-                'Select environment to update package in',
-            );
-            if (targetEnv === null) {
-                return;
-            }
-
-            const envLabel = targetEnv || 'default';
-            const packages = await manager.getPackagesForEnvironment(envLabel, projectPath);
-            if (packages.length === 0) {
-                window.showInformationMessage(`No packages found in environment '${envLabel}'.`);
-                return;
-            }
-
-            const sorted = sortPixiPackages(packages);
-
-            const pick = await window.showQuickPick(
-                sorted.map((p) => {
+            const targetEnv = extractEnvironmentName(targetItem);
+            const picked = await pickPackageFromEnvironment(manager, projectPath, targetEnv, {
+                title: 'Pixi: Update Package',
+                placeHolder: 'Select a package to update to latest compatible version',
+                formatItem: (p) => {
                     const channelBadge = p.kind === 'pypi' ? '[PyPI]' : '[Conda]';
                     const explicitBadge = p.is_explicit ? 'explicit' : 'transitive';
                     return {
@@ -2099,31 +2085,25 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                         description: p.version
                             ? `${channelBadge} v${p.version} (${explicitBadge})`
                             : `${channelBadge} (${explicitBadge})`,
-                        pkgName: p.name,
                     };
-                }),
-                {
-                    title: `Pixi: Select Package to Update (${envLabel})`,
-                    placeHolder: 'Select a package to update to latest compatible version',
-                    matchOnDescription: true,
                 },
-            );
-            if (!pick) {
+            });
+            if (!picked) {
                 return;
             }
 
             const projectName = path.basename(projectPath);
             const args = ['update'];
-            if (targetEnv) {
-                args.push('-e', targetEnv);
+            if (picked.targetEnv) {
+                args.push('-e', picked.targetEnv);
             }
-            args.push(pick.pkgName);
+            args.push(picked.pkgName);
             await runPixiWithProgress(
-                `Pixi: Updating package '${pick.pkgName}' in '${envLabel}' (${projectName})...`,
+                `Pixi: Updating package '${picked.pkgName}' in '${picked.envLabel}' (${projectName})...`,
                 args,
                 projectPath,
                 manager,
-                `Pixi: Package '${pick.pkgName}' updated successfully in '${envLabel}'.`,
+                `Pixi: Package '${picked.pkgName}' updated successfully in '${picked.envLabel}'.`,
             );
         }),
     );

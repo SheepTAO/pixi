@@ -256,12 +256,13 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
                         this.isCalculatingCacheSize = false;
                         if (bytes !== null) {
                             this.cachedCacheSize = formatBytes(bytes);
-                            this._onDidChangeTreeData.fire();
                         }
+                        this._onDidChangeTreeData.fire();
                     })
                     .catch(() => {
                         if (this.cacheCalculationEpoch === currentEpoch) {
                             this.isCalculatingCacheSize = false;
+                            this._onDidChangeTreeData.fire();
                         }
                     });
             }
