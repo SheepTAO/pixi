@@ -1,7 +1,6 @@
 import { ExtensionContext, Memento } from 'vscode';
 
 import { createDeferred, Deferred } from './deferred';
-import { traceError } from './logging';
 
 export interface PersistentState {
     get<T>(key: string, defaultValue?: T): Promise<T | undefined>;
@@ -25,13 +24,6 @@ class PersistentStateImpl implements PersistentState {
     async set<T>(key: string, value: T): Promise<void> {
         await this.clearing.promise;
         await this.memento.update(key, value);
-
-        const before = JSON.stringify(value);
-        const after = JSON.stringify(await this.memento.get<T>(key));
-        if (before !== after) {
-            await this.memento.update(key, undefined);
-            traceError('Error while updating state for key:', key);
-        }
     }
     async clear(keys?: string[]): Promise<void> {
         if (this.clearing.completed) {

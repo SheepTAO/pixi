@@ -25,7 +25,8 @@ export function matchEnvironmentName(rules: string[] | Record<string, string>, r
     const normalizedRelPath = relPath.replace(/\\/g, '/');
     const entries = Array.isArray(rules)
         ? rules.map((r) => {
-              const i = r.indexOf('=') !== -1 ? r.indexOf('=') : r.indexOf(':');
+              const sep = r.indexOf('=');
+              const i = sep !== -1 ? sep : r.indexOf(':');
               return i !== -1 ? [r.slice(0, i).trim(), r.slice(i + 1).trim()] : ['', ''];
           })
         : Object.entries(rules);

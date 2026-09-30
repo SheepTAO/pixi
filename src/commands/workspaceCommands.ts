@@ -35,10 +35,6 @@ interface SourceQuickPickItem extends QuickPickItem {
     mode: SourceMode;
 }
 
-interface PackageQuickPickItem extends QuickPickItem {
-    pkg: PixiPackage;
-}
-
 interface EnvQuickPickItem extends QuickPickItem {
     envName?: string;
 }
@@ -185,7 +181,7 @@ async function pickPackageFromEnvironment(
     projectPath: string,
     targetEnvName: string | undefined | null,
     options: PickPackageOptions,
-): Promise<{ pkgName: string; envLabel: string; targetEnv?: string } | undefined> {
+): Promise<{ pkg: PixiPackage; pkgName: string; envLabel: string; targetEnv?: string } | undefined> {
     const envs = manager.getEnvironmentsForProject(projectPath);
     const resolvedEnv =
         targetEnvName !== undefined
@@ -209,11 +205,12 @@ async function pickPackageFromEnvironment(
     }
     const sorted = sortPixiPackages(candidates);
     const items = options.formatItem
-        ? sorted.map((p) => ({ ...options.formatItem!(p), pkgName: p.name }))
+        ? sorted.map((p) => ({ ...options.formatItem!(p), pkgName: p.name, pkg: p }))
         : sorted.map((p) => ({
               label: p.name,
               description: p.version ? `v${p.version}` : undefined,
               pkgName: p.name,
+              pkg: p,
           }));
     const pick = await window.showQuickPick(items, {
         title: options.title,
@@ -223,7 +220,7 @@ async function pickPackageFromEnvironment(
     if (!pick) {
         return undefined;
     }
-    return { pkgName: pick.pkgName, envLabel, targetEnv: resolvedEnv };
+    return { pkg: pick.pkg, pkgName: pick.pkgName, envLabel, targetEnv: resolvedEnv };
 }
 
 async function resolveTargetFolder(folderUri?: unknown, placeHolder?: string): Promise<string | undefined> {
@@ -1013,7 +1010,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                 if (confirmed === 'Clean Environment') {
                     await runPixiWithProgress(
                         `Pixi: Cleaning environment '${envName}'...`,
-                        [['clean', '-e', envName]],
+                        ['clean', '-e', envName],
                         targetProjectPath,
                         manager,
                         `Pixi: Environment '${envName}' cleaned.`,
@@ -1066,7 +1063,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                 const envName = selected.envName!;
                 await runPixiWithProgress(
                     `Pixi: Cleaning environment '${envName}'...`,
-                    [['clean', '-e', envName]],
+                    ['clean', '-e', envName],
                     projectPath,
                     manager,
                     `Pixi: Environment '${envName}' cleaned.`,
@@ -1074,7 +1071,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
             } else if (selected.targetKind === 'all') {
                 await runPixiWithProgress(
                     'Pixi: Cleaning all environments...',
-                    [['clean']],
+                    ['clean'],
                     projectPath,
                     manager,
                     'Pixi: All environments cleaned in this project.',
@@ -1548,53 +1545,30 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                 return;
             }
 
-            const envs = manager.getEnvironmentsForProject(projectPath);
             const directEnvName = extractEnvironmentName(targetItem);
+            const targetEnvName = directEnvName === 'default' ? undefined : directEnvName;
 
-            let targetEnv: string | undefined;
-            if (directEnvName) {
-                targetEnv = directEnvName === 'default' ? undefined : directEnvName;
-            } else {
-                const picked = await pickTargetEnvironment(envs, 'remove');
-                if (picked === null) {
-                    return;
-                }
-                targetEnv = picked;
-            }
-
-            const queryEnv = targetEnv || envs[0]?.pixiEnvName || 'default';
-            const packages = await manager.getPackagesForEnvironment(queryEnv, projectPath);
-
-            const explicitPkgs = packages.filter((p) => p.is_explicit);
-            const candidates = sortPixiPackages(explicitPkgs.length > 0 ? explicitPkgs : packages);
-
-            if (candidates.length === 0) {
-                window.showInformationMessage(`No packages found to remove in environment '${queryEnv}'.`);
-                return;
-            }
-
-            const items: PackageQuickPickItem[] = candidates.map((p) => {
-                const channelBadge = p.kind === 'pypi' ? '[PyPI]' : '[Conda]';
-                const explicitBadge = p.is_explicit ? '' : ' (transitive)';
-                return {
-                    label: p.name,
-                    description: `${channelBadge} ${p.version}${explicitBadge}`,
-                    pkg: p,
-                };
-            });
-
-            const selected = await window.showQuickPick(items, {
+            const picked = await pickPackageFromEnvironment(manager, projectPath, targetEnvName, {
                 title: 'Pixi: Remove Package',
-                placeHolder: `Select a package to remove from '${queryEnv}'`,
-                matchOnDescription: true,
+                placeHolder: 'Select a package to remove',
+                emptyWarning: 'No packages found to remove in this environment.',
+                preferExplicit: true,
+                formatItem: (p) => {
+                    const channelBadge = p.kind === 'pypi' ? '[PyPI]' : '[Conda]';
+                    const explicitBadge = p.is_explicit ? '' : ' (transitive)';
+                    return {
+                        label: p.name,
+                        description: `${channelBadge} ${p.version}${explicitBadge}`,
+                    };
+                },
             });
-            if (!selected) {
+            if (!picked) {
                 return;
             }
 
-            if (!selected.pkg.is_explicit) {
+            if (!picked.pkg.is_explicit) {
                 const proceed = await window.showWarningMessage(
-                    `'${selected.pkg.name}' is marked as a transitive dependency. Removing it directly may fail if it is not declared in the manifest. Continue?`,
+                    `'${picked.pkg.name}' is marked as a transitive dependency. Removing it directly may fail if it is not declared in the manifest. Continue?`,
                     'Remove Anyway',
                 );
                 if (proceed !== 'Remove Anyway') {
@@ -1602,25 +1576,25 @@ export function registerWorkspaceCommands(manager: PixiProjectManager): Disposab
                 }
             }
 
-            const isPypi = selected.pkg.kind === 'pypi';
+            const isPypi = picked.pkg.kind === 'pypi';
             const args = ['remove'];
             if (isPypi) {
                 args.push('--pypi');
             }
-            if (targetEnv) {
-                args.push('-e', targetEnv);
+            if (picked.targetEnv) {
+                args.push('-e', picked.targetEnv);
             }
-            args.push(selected.pkg.name);
+            args.push(picked.pkg.name);
 
             const projectName = path.basename(projectPath);
-            const displayEnv = targetEnv || 'default';
+            const displayEnv = picked.targetEnv || 'default';
             const sourceLabel = isPypi ? 'PyPI' : 'Conda';
             await runPixiWithProgress(
-                `Pixi: Removing '${selected.pkg.name}' (${sourceLabel}) from environment '${displayEnv}' in '${projectName}'...`,
+                `Pixi: Removing '${picked.pkg.name}' (${sourceLabel}) from environment '${displayEnv}' in '${projectName}'...`,
                 args,
                 projectPath,
                 manager,
-                `Pixi: Successfully removed '${selected.pkg.name}' (${sourceLabel}) from environment '${displayEnv}' in '${projectName}'.`,
+                `Pixi: Successfully removed '${picked.pkg.name}' (${sourceLabel}) from environment '${displayEnv}' in '${projectName}'.`,
             );
         }),
     );

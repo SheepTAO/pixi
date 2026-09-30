@@ -13,14 +13,16 @@ interface ManifestCandidate {
     versionRegex: RegExp;
 }
 
+const TOML_VERSION_REGEX = /(?:^|\n)\s*version\s*=\s*["']([^"']+)["']/;
+
 const MANIFEST_CANDIDATES: readonly ManifestCandidate[] = [
     {
         filename: 'pixi.toml',
-        versionRegex: /(?:^|\n)\s*version\s*=\s*["']([^"']+)["']/,
+        versionRegex: TOML_VERSION_REGEX,
     },
     {
         filename: 'pyproject.toml',
-        versionRegex: /(?:^|\n)\s*version\s*=\s*["']([^"']+)["']/,
+        versionRegex: TOML_VERSION_REGEX,
     },
     {
         filename: 'setup.cfg',
