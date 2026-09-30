@@ -1,12 +1,14 @@
 export interface PixiEnvironmentPlatform {
     name: string;
     subdir?: string;
+    virtual_packages?: string[];
 }
 
 export interface PixiRawEnvironmentInfo {
     name: string;
     prefix: string;
     platforms?: Array<PixiEnvironmentPlatform | string>;
+    resolved_platform?: PixiEnvironmentPlatform | null;
 }
 
 export interface PixiInfo {

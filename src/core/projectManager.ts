@@ -289,16 +289,25 @@ export class PixiProjectManager implements Disposable {
             const envs: PixiEnvironmentInfo[] = await Promise.all(
                 (pixiInfo.environments_info || []).map(async (rawEnv) => {
                     const platformNames = (rawEnv.platforms || []).map((p) => (typeof p === 'string' ? p : p.name));
-                    const isPlatformSupported =
-                        !currentPlatform || platformNames.length === 0 || platformNames.includes(currentPlatform);
+                    const isDeclaredForHost =
+                        !currentPlatform ||
+                        (rawEnv.platforms || []).length === 0 ||
+                        Boolean(rawEnv.resolved_platform) ||
+                        (rawEnv.platforms || []).some((p) =>
+                            typeof p === 'string'
+                                ? p === currentPlatform
+                                : p.subdir === currentPlatform || p.name === currentPlatform,
+                        );
 
-                    let status: PixiEnvironmentStatus = 'installed';
+                    let status: PixiEnvironmentStatus;
                     let statusReason: string | undefined;
 
-                    if (!isPlatformSupported) {
+                    if (fs.existsSync(rawEnv.prefix)) {
+                        status = 'installed';
+                    } else if (!isDeclaredForHost) {
                         status = 'incompatible';
                         statusReason = `Environment '${rawEnv.name}' declared platforms [${platformNames.join(', ')}], which is incompatible with host platform '${currentPlatform}'.`;
-                    } else if (!fs.existsSync(rawEnv.prefix)) {
+                    } else {
                         status = 'uninstalled';
                         statusReason = `Environment '${rawEnv.name}' is not installed on disk. Run 'pixi install -e ${rawEnv.name}' to create it.`;
                     }

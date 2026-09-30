@@ -5,6 +5,13 @@ All notable changes to the "pixi" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2026-09-30
+
+- **Fix Environment Platform Compatibility Check**:
+    - Prioritize disk existence (`fs.existsSync`) to ensure installed environments are never mistakenly flagged as `(incompatible)`.
+    - Match platform `subdir` and `name` against host platform, properly supporting custom named platforms (e.g. `win-64-cuda`, `linux-64-cuda`).
+    - Expand `PixiEnvironmentPlatform` with `virtual_packages` and `PixiRawEnvironmentInfo` with `resolved_platform` matching native Pixi CLI schema.
+
 ## [1.0.0] - 2026-09-30
 
 - **Dedicated Pixi Explorer Side Panel**: Introduced a full-featured Activity Bar container with 4 dedicated Tree Views:
