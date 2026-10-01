@@ -29,6 +29,18 @@ jobs:
             exit 1
           fi
 
+          IS_EVEN_MINOR=$(node -p "
+            const parts = '$TAG_VERSION'.split('.');
+            const minor = parseInt(parts[1], 10);
+            isNaN(minor) || minor % 2 === 0 ? 'true' : 'false';
+          ")
+          if [ "$IS_EVEN_MINOR" != "true" ]; then
+            echo "Error: Release tag ($TAG_VERSION) has an odd minor version."
+            echo "According to VS Code extension guidelines, odd minor versions are reserved for pre-releases."
+            echo "Please use an even minor version (e.g. 1.2.0, 1.4.0) for stable releases."
+            exit 1
+          fi
+
   publish-code-marketplace:
     name: 'Publish (Code Marketplace)'
     runs-on: ubuntu-latest

@@ -65,8 +65,12 @@ jobs:
 
       - name: Package extension
         run: |
-          MAJOR_MINOR=$(node -p "require('./package.json').version.split('.').slice(0,2).join('.')")
-          npm version "${MAJOR_MINOR}.$(date -u +'%y%j%H%M')" --no-git-tag-version
+          PRE_VERSION=$(node -p '
+            const [major, minor] = require("./package.json").version.split(".").map(Number);
+            const oddMinor = (minor % 2 === 0) ? minor + 1 : minor;
+            major + "." + oddMinor + "."
+          ')$(date -u +'%y%j%H%M')
+          npm version "$PRE_VERSION" --no-git-tag-version
           npx @vscode/vsce package --pre-release --no-git-tag-version -o extension.vsix
 
       - name: Publish Extension (Code Marketplace)
@@ -94,8 +98,12 @@ jobs:
 
       - name: Package extension
         run: |
-          MAJOR_MINOR=$(node -p "require('./package.json').version.split('.').slice(0,2).join('.')")
-          npm version "${MAJOR_MINOR}.$(date -u +'%y%j%H%M')" --no-git-tag-version
+          PRE_VERSION=$(node -p '
+            const [major, minor] = require("./package.json").version.split(".").map(Number);
+            const oddMinor = (minor % 2 === 0) ? minor + 1 : minor;
+            major + "." + oddMinor + "."
+          ')$(date -u +'%y%j%H%M')
+          npm version "$PRE_VERSION" --no-git-tag-version
           npx @vscode/vsce package --pre-release --no-git-tag-version -o extension.vsix
 
       - name: Publish Extension (OpenVSX)
