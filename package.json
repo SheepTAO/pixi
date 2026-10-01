@@ -1017,7 +1017,6 @@
                         "compact",
                         "full",
                         "header",
-                        "both",
                         "off"
                     ],
                     "enumDescriptions": [
@@ -1025,7 +1024,6 @@
                         "Compact CodeLens: Show a single compact inline button (e.g. '▶ Run (dev)') above each task.",
                         "Full CodeLens: Show full inline buttons ('▶ Run Task' and '⚙ Run in Environment...') above each task.",
                         "Header CodeLens: Show an aggregated run action above the [tasks] section header only.",
-                        "Both: Enable both hover tooltips and compact inline CodeLens buttons.",
                         "Off: Disable all in-editor task run actions in manifests."
                     ],
                     "default": "hover",

@@ -20,7 +20,7 @@ import {
 import { PixiProjectManager } from '../core/projectManager';
 import { PixiTask, PixiTaskProvider } from './taskProvider';
 
-export type ManifestActionMode = 'hover' | 'compact' | 'full' | 'header' | 'both' | 'off';
+export type ManifestActionMode = 'hover' | 'compact' | 'full' | 'header' | 'off';
 
 interface ParsedTaskLine {
     name: string;
@@ -115,7 +115,7 @@ export class PixiTaskManifestProvider implements CodeLensProvider, HoverProvider
             return headerLenses;
         }
 
-        // 2. Per-task CodeLens (compact, full, or both)
+        // 2. Per-task CodeLens (compact or full)
         const projectTasks = await this.taskProvider.getTasksForProject(projectPath);
         if (token.isCancellationRequested) {
             return [];
@@ -126,7 +126,7 @@ export class PixiTaskManifestProvider implements CodeLensProvider, HoverProvider
             taskMap.set(t.name, t);
         }
 
-        const isCompact = mode === 'compact' || mode === 'both';
+        const isCompact = mode === 'compact';
         const lenses: CodeLens[] = [];
 
         for (const parsed of tasks) {
@@ -193,7 +193,7 @@ export class PixiTaskManifestProvider implements CodeLensProvider, HoverProvider
         token: CancellationToken,
     ): Promise<Hover | undefined> {
         const mode = this.getManifestActionMode(document);
-        if (mode !== 'hover' && mode !== 'both') {
+        if (mode !== 'hover') {
             return undefined;
         }
 
@@ -276,7 +276,7 @@ export class PixiTaskManifestProvider implements CodeLensProvider, HoverProvider
     private getManifestActionMode(document: TextDocument): ManifestActionMode {
         const config = workspace.getConfiguration('pixi.tasks', document.uri);
         const mode = config.get<string>('manifestActions');
-        if (mode && ['hover', 'compact', 'full', 'header', 'both', 'off'].includes(mode)) {
+        if (mode && ['hover', 'compact', 'full', 'header', 'off'].includes(mode)) {
             return mode as ManifestActionMode;
         }
 
