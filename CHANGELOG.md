@@ -5,6 +5,26 @@ All notable changes to the "pixi" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-10-01
+
+- **Locked Dependency Inlay Hints & Navigation**:
+    - Inline locked version hints directly in `pixi.toml` and `pyproject.toml` manifests (e.g. `: 1.26.4`), configurable via `pixi.dependencies.inlayHints`.
+    - Rich hover inspection cards displaying locked version, package kind (Conda/PyPI), build string, requested specification, license, and multi-environment matrix comparison.
+    - `Ctrl`/`Cmd` + Click definition navigation from manifest package entries directly to corresponding definitions in `pixi.lock`.
+    - Add `pixi.openLockfile` command to jump to and highlight package entries within `pixi.lock`.
+- **Manifest Task CodeLens & Hover Actions**:
+    - Interactive CodeLens and Hover actions for tasks in `pixi.toml` and `pyproject.toml` (`PixiTaskManifestProvider`).
+    - Configurable display styles via `pixi.tasks.manifestActions` (`hover`, `compact`, `full`, `header`, `off`).
+    - Direct manifest actions: Run Task, Run in Environment, and jump to Documentation.
+- **Intelligent Tasks View Grouping & Management**:
+    - Support namespace prefix grouping (`prefix`), environment grouping (`environment`), and flat listing (`none`) in the Tasks tree view, configurable via `pixi.tasks.groupBy`.
+    - Quick switcher button in the Tasks view title bar to toggle grouping mode interactively.
+    - Fine-grained grouping control with `pixi.tasks.prefixSeparators`, `pixi.tasks.minGroupSize`, and `pixi.tasks.maxDepth`.
+    - Dedicated task lifecycle commands: `pixi.tasks.runTask`, `pixi.tasks.runTaskInEnvironment`, `pixi.tasks.removeTask`, and interactive task creation.
+- **CI & Release Automation**:
+    - Automate odd-minor pre-releases via GitHub Actions manual workflow dispatch.
+    - Enforce even-minor versioning policy for stable releases according to VS Code marketplace guidelines.
+
 ## [1.0.1] - 2026-09-30
 
 - **Fix Environment Platform Compatibility Check**:
