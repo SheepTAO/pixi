@@ -104,6 +104,7 @@ interface PathContextCandidate {
     projectPath?: string;
     project?: { projectPath?: string };
     env?: { projectPath?: string };
+    task?: { projectPath?: string };
     fsPath?: string;
 }
 
@@ -128,7 +129,7 @@ export function normalizeFolderPath(target?: unknown): string | undefined {
         return safeDir(target);
     }
     const t = target as PathContextCandidate;
-    const candidate = t.projectPath || t.project?.projectPath || t.env?.projectPath || t.fsPath;
+    const candidate = t.projectPath || t.project?.projectPath || t.env?.projectPath || t.task?.projectPath || t.fsPath;
     return typeof candidate === 'string' ? safeDir(candidate) : undefined;
 }
 

@@ -35,7 +35,8 @@ A dedicated Activity Bar container providing complete visibility and control ove
 │                  │ ├── Explicit vs Transitive Dependencies             │
 │                  │ └── 1-click Install, Reinstall, Lock & Terminal     │
 ├──────────────────┼─────────────────────────────────────────────────────┤
-│ TASKS            │ Native Pixi Tasks Runner                            │
+│ TASKS            │ Native Pixi Tasks Lifecycle                         │
+│                  │ ├── Add & Remove Tasks via Guided UI Wizards        │
 │                  │ ├── 1-click Run & Run in Custom Environment         │
 │                  │ └── Jump to Task Definition in Manifest             │
 ├──────────────────┼─────────────────────────────────────────────────────┤
@@ -71,6 +72,7 @@ A dedicated Activity Bar container providing complete visibility and control ove
 
 ### Native Tasks, Terminals & Global Tools
 
+- **Interactive Task Lifecycle**: Create new runnable tasks via guided wizards (name, shell command, environment, `--depends-on` task dependencies) and remove tasks directly from side panel actions or command palette.
 - **Intelligent Task Grouping**: Organize workspace tasks in the side panel by namespace prefix (`data-*`, `gui-*`), by target environment, or in a flat list with 1-click grouping switcher.
 - **Native VS Code Tasks**: Auto-registers Pixi tasks as native VS Code tasks (`Terminal: Run Task...`) with a dedicated QuickPick runner.
 - **Pre-Configured Terminals**: Launch interactive terminal sessions with the target Pixi environment pre-activated.
@@ -82,20 +84,22 @@ A dedicated Activity Bar container providing complete visibility and control ove
 
 Launch any command via the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) by typing `Pixi:`:
 
-| Command                                   | Identifier            | Description                                                                |
-| :---------------------------------------- | :-------------------- | :------------------------------------------------------------------------- |
-| **Pixi: Search Packages ...**             | `pixi.searchPackages` | Search Conda & PyPI packages with autocompletion and 1-click install.      |
-| **Pixi: Install (Sync Environments)**     | `pixi.install`        | Install dependencies and synchronize all project environments.             |
-| **Pixi: Add Package...**                  | `pixi.addPackage`     | Add packages to the project with interactive channel and version picking.  |
-| **Pixi: Update Dependencies**             | `pixi.update`         | Update dependencies and refresh `pixi.lock`.                               |
-| **Pixi: Lock Dependencies**               | `pixi.lock`           | Solve dependencies and update the lockfile without modifying environments. |
-| **Pixi: Run Task**                        | `pixi.runTask`        | QuickPick menu to search and run any task defined in the project.          |
-| **Pixi: Open Terminal in Environment...** | `pixi.openTerminal`   | Open an integrated terminal pre-activated in a selected environment.       |
-| **Pixi: Global Tools ...**                | `pixi.global`         | Interactive menu to install, list, update, and uninstall global CLI tools. |
-| **Pixi: Clean Package Cache ...**         | `pixi.cleanCache`     | Clean global Pixi package cache directory with disk space reclamation.     |
+| Command                                   | Identifier              | Description                                                                |
+| :---------------------------------------- | :---------------------- | :------------------------------------------------------------------------- |
+| **Pixi: Search Packages ...**             | `pixi.searchPackages`   | Search Conda & PyPI packages with autocompletion and 1-click install.      |
+| **Pixi: Install (Sync Environments)**     | `pixi.install`          | Install dependencies and synchronize all project environments.             |
+| **Pixi: Add Package...**                  | `pixi.addPackage`       | Add packages to the project with interactive channel and version picking.  |
+| **Pixi: Update Dependencies**             | `pixi.update`           | Update dependencies and refresh `pixi.lock`.                               |
+| **Pixi: Lock Dependencies**               | `pixi.lock`             | Solve dependencies and update the lockfile without modifying environments. |
+| **Pixi: Add Task ...**                    | `pixi.tasks.addTask`    | Guided wizard to create a new runnable task in the project manifest.       |
+| **Pixi: Remove Task**                     | `pixi.tasks.removeTask` | Remove a task from the project manifest with confirmation dialog.          |
+| **Pixi: Run Task**                        | `pixi.runTask`          | QuickPick menu to search and run any task defined in the project.          |
+| **Pixi: Open Terminal in Environment...** | `pixi.openTerminal`     | Open an integrated terminal pre-activated in a selected environment.       |
+| **Pixi: Global Tools ...**                | `pixi.global`           | Interactive menu to install, list, update, and uninstall global CLI tools. |
+| **Pixi: Clean Package Cache ...**         | `pixi.cleanCache`       | Clean global Pixi package cache directory with disk space reclamation.     |
 
 > [!TIP]
-> Contextual actions (such as removing packages, jumping to manifest declarations, running tasks in custom environments, and inspecting dependency trees) are also directly available via inline icon buttons in the Pixi Explorer tree views and editor title bar.
+> Contextual actions (such as adding/removing tasks, removing packages, jumping to manifest declarations, running tasks in custom environments, and inspecting dependency trees) are also directly available via inline icon buttons in the Pixi Explorer tree views and editor title bar.
 
 ---
 

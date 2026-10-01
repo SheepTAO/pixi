@@ -105,7 +105,7 @@ export function extractEnvironmentName(...targets: unknown[]): string | undefine
         }
         if (typeof target === 'string') {
             const trimmed = target.trim();
-            if (trimmed) {
+            if (trimmed && !trimmed.includes('/') && !trimmed.includes('\\')) {
                 return trimmed;
             }
         } else if (typeof target === 'object') {

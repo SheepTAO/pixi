@@ -66,8 +66,9 @@ interface RawPixiTask {
 }
 
 interface RawPixiTaskEnvironment {
+    environment?: string;
     tasks?: RawPixiTask[];
-    features?: { tasks?: RawPixiTask[] }[];
+    features?: { name?: string; tasks?: RawPixiTask[] }[];
 }
 
 export class PixiTaskProvider implements TaskProvider, Disposable {
@@ -185,51 +186,55 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
         const taskMap = new Map<string, PixiTask>();
         try {
             const raw = safeJsonParse<RawPixiTaskEnvironment[]>(jsonStr, []);
-            if (Array.isArray(raw)) {
-                for (const envObj of raw) {
-                    const all = [...(envObj.tasks || [])];
-                    if (Array.isArray(envObj.features)) {
-                        for (const f of envObj.features) {
-                            if (Array.isArray(f.tasks)) {
-                                all.push(...f.tasks);
-                            }
-                        }
-                    }
-                    for (const t of all) {
-                        if (!t || !t.name) {
-                            continue;
-                        }
-                        const cmdStr =
-                            typeof t.cmd === 'string' ? t.cmd : Array.isArray(t.cmd) ? t.cmd.join(' ') : undefined;
-                        const dependsOn = Array.isArray(t.depends_on) ? t.depends_on : undefined;
-                        const inputs = Array.isArray(t.inputs) && t.inputs.length > 0 ? t.inputs : undefined;
-                        const outputs = Array.isArray(t.outputs) && t.outputs.length > 0 ? t.outputs : undefined;
-                        const cleanEnv = typeof t.clean_env === 'boolean' ? t.clean_env : undefined;
 
-                        const existing = taskMap.get(t.name);
-                        if (existing) {
-                            existing.cmd ??= cmdStr;
-                            existing.description ??= t.description;
-                            existing.default_environment ??= t.default_environment;
-                            if (!existing.depends_on?.length && dependsOn?.length) {
-                                existing.depends_on = dependsOn;
-                            }
-                            existing.inputs ??= inputs;
-                            existing.outputs ??= outputs;
-                            existing.clean_env ??= cleanEnv;
-                        } else {
-                            taskMap.set(t.name, {
-                                name: t.name,
-                                cmd: cmdStr,
-                                description: t.description || undefined,
-                                default_environment: t.default_environment || undefined,
-                                depends_on: dependsOn,
-                                inputs,
-                                outputs,
-                                clean_env: cleanEnv,
-                                projectPath,
-                            });
-                        }
+            const registerTask = (t: RawPixiTask, defaultEnv?: string) => {
+                if (!t || !t.name) {
+                    return;
+                }
+                const cmdStr = typeof t.cmd === 'string' ? t.cmd : Array.isArray(t.cmd) ? t.cmd.join(' ') : undefined;
+                const taskEnv = t.default_environment || defaultEnv;
+
+                const existing = taskMap.get(t.name);
+                if (existing) {
+                    existing.cmd ??= cmdStr;
+                    existing.description ??= t.description;
+                    if (!existing.default_environment && taskEnv) {
+                        existing.default_environment = taskEnv;
+                    }
+                    if (!existing.depends_on?.length && Array.isArray(t.depends_on)) {
+                        existing.depends_on = t.depends_on;
+                    }
+                    existing.inputs ??= Array.isArray(t.inputs) && t.inputs.length > 0 ? t.inputs : undefined;
+                    existing.outputs ??= Array.isArray(t.outputs) && t.outputs.length > 0 ? t.outputs : undefined;
+                    existing.clean_env ??= typeof t.clean_env === 'boolean' ? t.clean_env : undefined;
+                } else {
+                    taskMap.set(t.name, {
+                        name: t.name,
+                        cmd: cmdStr,
+                        description: t.description || undefined,
+                        default_environment: taskEnv,
+                        depends_on: Array.isArray(t.depends_on) ? t.depends_on : undefined,
+                        inputs: Array.isArray(t.inputs) && t.inputs.length > 0 ? t.inputs : undefined,
+                        outputs: Array.isArray(t.outputs) && t.outputs.length > 0 ? t.outputs : undefined,
+                        clean_env: typeof t.clean_env === 'boolean' ? t.clean_env : undefined,
+                        projectPath,
+                    });
+                }
+            };
+
+            for (const envObj of raw) {
+                // 1. Inline environment tasks ([environments.<env>.tasks])
+                const inlineEnv =
+                    envObj.environment && envObj.environment !== 'default' ? envObj.environment : undefined;
+                for (const t of envObj.tasks ?? []) {
+                    registerTask(t, inlineEnv);
+                }
+
+                // 2. Feature tasks ([tasks] under default feature, or [feature.<name>.tasks])
+                for (const f of envObj.features ?? []) {
+                    const featureEnv = f.name && f.name !== 'default' ? f.name : undefined;
+                    for (const t of f.tasks ?? []) {
+                        registerTask(t, featureEnv);
                     }
                 }
             }

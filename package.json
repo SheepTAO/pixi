@@ -267,6 +267,18 @@
                 "title": "Go to Task Definition in Manifest",
                 "category": "Pixi",
                 "icon": "$(go-to-file)"
+            },
+            {
+                "command": "pixi.tasks.addTask",
+                "title": "Add Task ...",
+                "category": "Pixi",
+                "icon": "$(plus)"
+            },
+            {
+                "command": "pixi.tasks.removeTask",
+                "title": "Remove Task",
+                "category": "Pixi",
+                "icon": "$(trash)"
             }
         ],
         "menus": {
@@ -387,6 +399,14 @@
                     "when": "pixi.hasPixiProject"
                 },
                 {
+                    "command": "pixi.tasks.addTask",
+                    "when": "pixi.hasPixiProject"
+                },
+                {
+                    "command": "pixi.tasks.removeTask",
+                    "when": "pixi.hasPixiProject"
+                },
+                {
                     "command": "pixi.tasks.changeGrouping",
                     "when": "false"
                 },
@@ -492,6 +512,11 @@
                     "command": "pixi.refreshInfo",
                     "when": "view == pixi.views.info",
                     "group": "navigation@2"
+                },
+                {
+                    "command": "pixi.tasks.addTask",
+                    "when": "view == pixi.views.tasks && pixi.hasPixiProject",
+                    "group": "navigation@0"
                 },
                 {
                     "command": "pixi.runTask",
@@ -666,6 +691,11 @@
                     "group": "inline@3"
                 },
                 {
+                    "command": "pixi.tasks.removeTask",
+                    "when": "view == pixi.views.tasks && viewItem == pixiTaskItem",
+                    "group": "inline@4"
+                },
+                {
                     "command": "pixi.runTask",
                     "when": "view == pixi.views.tasks && viewItem == pixiTaskItem",
                     "group": "1_run@1"
@@ -681,6 +711,16 @@
                     "group": "2_nav@1"
                 },
                 {
+                    "command": "pixi.tasks.removeTask",
+                    "when": "view == pixi.views.tasks && viewItem == pixiTaskItem",
+                    "group": "3_danger@1"
+                },
+                {
+                    "command": "pixi.tasks.addTask",
+                    "when": "view == pixi.views.tasks && viewItem == pixiTaskProject",
+                    "group": "inline@0"
+                },
+                {
                     "command": "pixi.runTask",
                     "when": "view == pixi.views.tasks && viewItem == pixiTaskProject",
                     "group": "inline@1"
@@ -691,19 +731,44 @@
                     "group": "inline@2"
                 },
                 {
+                    "command": "pixi.tasks.addTask",
+                    "when": "view == pixi.views.tasks && viewItem == pixiTaskProject",
+                    "group": "1_task@1"
+                },
+                {
                     "command": "pixi.runTask",
                     "when": "view == pixi.views.tasks && viewItem == pixiTaskProject",
-                    "group": "1_run@1"
+                    "group": "2_run@1"
                 },
                 {
                     "command": "pixi.runTaskInEnvironment",
                     "when": "view == pixi.views.tasks && viewItem == pixiTaskProject",
-                    "group": "1_run@2"
+                    "group": "2_run@2"
                 },
                 {
                     "command": "pixi.openManifest",
                     "when": "view == pixi.views.tasks && viewItem == pixiTaskProject",
-                    "group": "2_manifest@1"
+                    "group": "3_manifest@1"
+                },
+                {
+                    "command": "pixi.tasks.addTask",
+                    "when": "view == pixi.views.tasks && viewItem == pixiTaskGroup",
+                    "group": "inline@1"
+                },
+                {
+                    "command": "pixi.tasks.addTask",
+                    "when": "view == pixi.views.tasks && viewItem == pixiTaskGroup",
+                    "group": "1_task@1"
+                },
+                {
+                    "command": "pixi.tasks.addTask",
+                    "when": "view == pixi.views.tasks && viewItem == pixiTaskEmpty",
+                    "group": "inline@1"
+                },
+                {
+                    "command": "pixi.tasks.addTask",
+                    "when": "view == pixi.views.tasks && viewItem == pixiTaskEmpty",
+                    "group": "1_task@1"
                 }
             ]
         },

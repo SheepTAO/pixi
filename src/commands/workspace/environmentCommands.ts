@@ -336,7 +336,8 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
             }
 
             const projectName = path.basename(projectPath);
-            const validEnvName = extractEnvironmentName(envName, folderUri);
+            const validEnvName =
+                (typeof envName === 'string' && envName.trim()) || extractEnvironmentName(folderUri) || undefined;
             const args = ['install'];
             if (validEnvName) {
                 args.push('-e', validEnvName);
@@ -366,7 +367,8 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
             }
 
             const projectName = path.basename(projectPath);
-            const validEnvName = extractEnvironmentName(envName, folderUri);
+            const validEnvName =
+                (typeof envName === 'string' && envName.trim()) || extractEnvironmentName(folderUri) || undefined;
 
             const runReinstall = async (target?: string, isAll?: boolean) => {
                 const title = target
@@ -436,7 +438,8 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
             }
 
             const projectName = path.basename(projectPath);
-            const validEnvName = extractEnvironmentName(envName, folderUri);
+            const validEnvName =
+                (typeof envName === 'string' && envName.trim()) || extractEnvironmentName(folderUri) || undefined;
             const args = ['update'];
             if (validEnvName) {
                 args.push('-e', validEnvName);
