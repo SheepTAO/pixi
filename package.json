@@ -102,6 +102,12 @@
                 "icon": "$(layers)"
             },
             {
+                "command": "pixi.tasks.changeGrouping",
+                "title": "Change Grouping ...",
+                "category": "Pixi",
+                "icon": "$(organization)"
+            },
+            {
                 "command": "pixi.openTerminal",
                 "title": "Open Terminal in Environment ...",
                 "category": "Pixi",
@@ -489,9 +495,14 @@
                     "group": "navigation@1"
                 },
                 {
+                    "command": "pixi.tasks.changeGrouping",
+                    "when": "view == pixi.views.tasks && pixi.hasPixiProject",
+                    "group": "navigation@2"
+                },
+                {
                     "command": "pixi.tasks.refresh",
                     "when": "view == pixi.views.tasks",
-                    "group": "navigation@2"
+                    "group": "navigation@3"
                 }
             ],
             "view/item/context": [
@@ -886,6 +897,49 @@
                     "default": true,
                     "description": "Automatically compute the disk size of Pixi/Rattler cache directories in the Pixi Info view.",
                     "scope": "window"
+                },
+                "pixi.tasks.groupBy": {
+                    "type": "string",
+                    "enum": [
+                        "prefix",
+                        "environment",
+                        "none"
+                    ],
+                    "enumDescriptions": [
+                        "Group tasks by namespace prefix (e.g. 'data-*', 'gui-*', 'test-*')",
+                        "Group tasks by their default environment (e.g. 'dev', 'test', 'pkg')",
+                        "Display tasks in a flat list without grouping"
+                    ],
+                    "default": "prefix",
+                    "description": "Specifies how tasks are grouped in the Pixi Tasks tree view.",
+                    "scope": "resource"
+                },
+                "pixi.tasks.prefixSeparators": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "default": [
+                        "-",
+                        "_"
+                    ],
+                    "description": "Characters used to extract namespace prefixes from task names.",
+                    "scope": "resource"
+                },
+                "pixi.tasks.minGroupSize": {
+                    "type": "integer",
+                    "default": 2,
+                    "minimum": 1,
+                    "description": "Minimum number of tasks sharing a prefix required to form a group folder. Isolated tasks below this count stay at the root level.",
+                    "scope": "resource"
+                },
+                "pixi.tasks.maxDepth": {
+                    "type": "integer",
+                    "default": 1,
+                    "minimum": 1,
+                    "maximum": 3,
+                    "description": "Maximum nesting depth for prefix-based task groups (1 keeps subtasks flat under the top-level prefix, 2 allows one level of sub-groups).",
+                    "scope": "resource"
                 }
             }
         },

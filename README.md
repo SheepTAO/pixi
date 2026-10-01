@@ -71,6 +71,7 @@ A dedicated Activity Bar container providing complete visibility and control ove
 
 ### Native Tasks, Terminals & Global Tools
 
+- **Intelligent Task Grouping**: Organize workspace tasks in the side panel by namespace prefix (`data-*`, `gui-*`), by target environment, or in a flat list with 1-click grouping switcher.
 - **Native VS Code Tasks**: Auto-registers Pixi tasks as native VS Code tasks (`Terminal: Run Task...`) with a dedicated QuickPick runner.
 - **Pre-Configured Terminals**: Launch interactive terminal sessions with the target Pixi environment pre-activated.
 - **Global Tools Management**: Easily inspect, install, update, and uninstall user-level CLI packages installed in `~/.pixi/bin`.
@@ -120,7 +121,8 @@ Add this to your project's `.vscode/settings.json`:
     "pixi.environmentRules": ["tests/**=dev", "train/**=train", "scripts/*.py=dev"],
     "pixi.defaultManifestFormat": "pixi",
     "pixi.displayNameFormat": "${project}:${env} (${version})",
-    "pixi.packages.displayMode": "grouped"
+    "pixi.packages.displayMode": "grouped",
+    "pixi.tasks.groupBy": "prefix"
 }
 ```
 

@@ -10,6 +10,7 @@ import {
     TreeItemCollapsibleState,
     TreeView,
     Uri,
+    workspace,
 } from 'vscode';
 
 import { PixiProjectManager } from '../core/projectManager';
@@ -127,7 +128,30 @@ export class PixiTaskEmptyTreeItem extends TreeItem {
     }
 }
 
-export type PixiTasksTreeItem = PixiTaskProjectTreeItem | PixiTaskTreeItem | PixiTaskEmptyTreeItem;
+export class PixiTaskGroupTreeItem extends TreeItem {
+    constructor(
+        public readonly groupName: string,
+        public readonly tasks: PixiTask[],
+        public readonly project: PixiProject,
+        public readonly groupType: 'prefix' | 'environment' = 'prefix',
+        public readonly depth: number = 1,
+    ) {
+        super(groupName, TreeItemCollapsibleState.Expanded);
+        this.description = `(${tasks.length})`;
+        this.tooltip =
+            groupType === 'environment'
+                ? `Environment '${groupName}': ${tasks.length} task(s)`
+                : `Task Group '${groupName}': ${tasks.length} task(s)`;
+        this.iconPath = groupType === 'environment' ? new ThemeIcon('layers') : new ThemeIcon('folder');
+        this.contextValue = 'pixiTaskGroup';
+    }
+}
+
+export type PixiTasksTreeItem =
+    | PixiTaskProjectTreeItem
+    | PixiTaskGroupTreeItem
+    | PixiTaskTreeItem
+    | PixiTaskEmptyTreeItem;
 
 export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTreeItem>, Disposable {
     private readonly _onDidChangeTreeData = new EventEmitter<PixiTasksTreeItem | undefined | null | void>();
@@ -145,6 +169,11 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
             this.taskProvider.onDidChangeTasks(() => {
                 this.updateViewDescription();
                 this._onDidChangeTreeData.fire();
+            }),
+            workspace.onDidChangeConfiguration((e) => {
+                if (e.affectsConfiguration('pixi.tasks')) {
+                    this._onDidChangeTreeData.fire();
+                }
             }),
         );
     }
@@ -200,6 +229,10 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
             return this.getTaskItemsForProject(element.project);
         }
 
+        if (element instanceof PixiTaskGroupTreeItem) {
+            return this.getTaskGroupChildren(element);
+        }
+
         return [];
     }
 
@@ -208,6 +241,143 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
         if (tasks.length === 0) {
             return [new PixiTaskEmptyTreeItem(project)];
         }
-        return tasks.map((t) => new PixiTaskTreeItem(t, project));
+
+        const config = workspace.getConfiguration('pixi.tasks', Uri.file(project.projectPath));
+        const groupBy = config.get<'prefix' | 'environment' | 'none'>('groupBy', 'prefix');
+
+        if (groupBy === 'none') {
+            return tasks.map((t) => new PixiTaskTreeItem(t, project));
+        }
+
+        if (groupBy === 'environment') {
+            return this.groupTasksByEnvironment(tasks, project);
+        }
+
+        const prefixSeparators = config.get<string[]>('prefixSeparators', ['-', '_']);
+        const minGroupSize = Math.max(1, config.get<number>('minGroupSize', 2));
+
+        return this.groupTasksByPrefix(tasks, project, prefixSeparators, minGroupSize, 1);
+    }
+
+    private groupTasksByEnvironment(tasks: PixiTask[], project: PixiProject): PixiTasksTreeItem[] {
+        const envMap = new Map<string, PixiTask[]>();
+
+        for (const task of tasks) {
+            const envName = task.default_environment || 'default';
+            let list = envMap.get(envName);
+            if (!list) {
+                list = [];
+                envMap.set(envName, list);
+            }
+            list.push(task);
+        }
+
+        const groups: PixiTasksTreeItem[] = [];
+        const envNames = Array.from(envMap.keys()).sort((a, b) => {
+            if (a === 'default') {
+                return -1;
+            }
+            if (b === 'default') {
+                return 1;
+            }
+            return a.localeCompare(b);
+        });
+
+        for (const envName of envNames) {
+            const envTasks = envMap.get(envName)!;
+            groups.push(new PixiTaskGroupTreeItem(envName, envTasks, project, 'environment', 1));
+        }
+
+        return groups;
+    }
+
+    private groupTasksByPrefix(
+        tasks: PixiTask[],
+        project: PixiProject,
+        prefixSeparators: string[],
+        minGroupSize: number,
+        currentDepth: number,
+    ): PixiTasksTreeItem[] {
+        const groupMap = new Map<string, PixiTask[]>();
+        const rootTasks: PixiTask[] = [];
+
+        const patterns = (prefixSeparators || [])
+            .filter(Boolean)
+            .slice()
+            .sort((a, b) => b.length - a.length)
+            .map((s) => s.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'));
+        const sepRegex = patterns.length > 0 ? new RegExp(patterns.join('|')) : /[-_]/;
+
+        for (const task of tasks) {
+            const parts = task.name.split(sepRegex).filter(Boolean);
+            if (parts.length < currentDepth + 1) {
+                rootTasks.push(task);
+                continue;
+            }
+
+            const prefix = parts[currentDepth - 1];
+            let list = groupMap.get(prefix);
+            if (!list) {
+                list = [];
+                groupMap.set(prefix, list);
+            }
+            list.push(task);
+        }
+
+        const items: PixiTasksTreeItem[] = [];
+
+        // Groups meeting or exceeding minGroupSize
+        const validPrefixes = Array.from(groupMap.keys())
+            .filter((p) => groupMap.get(p)!.length >= minGroupSize)
+            .sort((a, b) => a.localeCompare(b));
+
+        for (const prefix of validPrefixes) {
+            const groupTasks = groupMap.get(prefix)!;
+            items.push(new PixiTaskGroupTreeItem(prefix, groupTasks, project, 'prefix', currentDepth));
+        }
+
+        // Sub-threshold tasks are kept flat
+        for (const groupTasks of groupMap.values()) {
+            if (groupTasks.length < minGroupSize) {
+                rootTasks.push(...groupTasks);
+            }
+        }
+
+        rootTasks.sort((a, b) => a.name.localeCompare(b.name));
+        for (const task of rootTasks) {
+            items.push(new PixiTaskTreeItem(task, project));
+        }
+
+        return items;
+    }
+
+    private async getTaskGroupChildren(groupItem: PixiTaskGroupTreeItem): Promise<PixiTasksTreeItem[]> {
+        const project = groupItem.project;
+        if (groupItem.groupType === 'environment') {
+            return groupItem.tasks
+                .slice()
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map((t) => new PixiTaskTreeItem(t, project));
+        }
+
+        const config = workspace.getConfiguration('pixi.tasks', Uri.file(project.projectPath));
+        const maxDepth = Math.max(1, Math.min(3, config.get<number>('maxDepth', 1)));
+        const prefixSeparators = config.get<string[]>('prefixSeparators', ['-', '_']);
+        const minGroupSize = Math.max(1, config.get<number>('minGroupSize', 2));
+
+        if (groupItem.depth < maxDepth) {
+            return this.groupTasksByPrefix(
+                groupItem.tasks,
+                project,
+                prefixSeparators,
+                minGroupSize,
+                groupItem.depth + 1,
+            );
+        }
+
+        return groupItem.tasks
+            .slice()
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .map((t) => new PixiTaskTreeItem(t, project));
     }
 }

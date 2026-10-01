@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import {
     commands,
+    ConfigurationTarget,
     Disposable,
     Event,
     EventEmitter,
@@ -147,6 +148,51 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
             }),
             commands.registerCommand('pixi.tasks.refresh', () => {
                 this.refresh();
+            }),
+            commands.registerCommand('pixi.tasks.changeGrouping', async () => {
+                const config = workspace.getConfiguration('pixi.tasks');
+                const current = config.get<string>('groupBy', 'prefix');
+
+                interface GroupByQuickPickItem extends QuickPickItem {
+                    value: 'prefix' | 'environment' | 'none';
+                }
+
+                const items: GroupByQuickPickItem[] = [
+                    {
+                        label: '$(symbol-namespace) Group by Prefix',
+                        description: 'Group tasks by name prefix (e.g. data-*, test-*, gui-*)',
+                        detail: current === 'prefix' ? '(Currently active)' : undefined,
+                        value: 'prefix',
+                    },
+                    {
+                        label: '$(layers) Group by Environment',
+                        description: 'Group tasks by default environment (e.g. dev, test, docs)',
+                        detail: current === 'environment' ? '(Currently active)' : undefined,
+                        value: 'environment',
+                    },
+                    {
+                        label: '$(list-flat) Flat List',
+                        description: 'Display all tasks in a flat list without grouping',
+                        detail: current === 'none' ? '(Currently active)' : undefined,
+                        value: 'none',
+                    },
+                ];
+
+                const selected = await window.showQuickPick(items, {
+                    title: 'Pixi Tasks: Change Grouping',
+                    placeHolder: 'Select how tasks should be organized in the Tasks view',
+                });
+
+                if (selected) {
+                    const inspect = config.inspect<string>('groupBy');
+                    const target =
+                        inspect?.workspaceFolderValue !== undefined
+                            ? ConfigurationTarget.WorkspaceFolder
+                            : inspect?.workspaceValue !== undefined
+                              ? ConfigurationTarget.Workspace
+                              : ConfigurationTarget.Global;
+                    await config.update('groupBy', selected.value, target);
+                }
             }),
             commands.registerCommand('pixi.tasks.revealInManifest', async (arg?: unknown) => {
                 const item = arg as TaskCommandArg | undefined;
