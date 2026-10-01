@@ -1010,10 +1010,26 @@
                     "description": "Maximum nesting depth for prefix-based task groups (1 keeps subtasks flat under the top-level prefix, 2 allows one level of sub-groups).",
                     "scope": "resource"
                 },
-                "pixi.tasks.codeLens": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "Show interactive CodeLens actions (Run Task, Run in Environment) above task definitions in pixi.toml and pyproject.toml.",
+                "pixi.tasks.manifestActions": {
+                    "type": "string",
+                    "enum": [
+                        "hover",
+                        "compact",
+                        "full",
+                        "header",
+                        "both",
+                        "off"
+                    ],
+                    "enumDescriptions": [
+                        "Hover Tooltips (Default): Show task command details and run links when hovering over task names. Zero line insertions, cleanest layout.",
+                        "Compact CodeLens: Show a single compact inline button (e.g. '▶ Run (dev)') above each task.",
+                        "Full CodeLens: Show full inline buttons ('▶ Run Task' and '⚙ Run in Environment...') above each task.",
+                        "Header CodeLens: Show an aggregated run action above the [tasks] section header only.",
+                        "Both: Enable both hover tooltips and compact inline CodeLens buttons.",
+                        "Off: Disable all in-editor task run actions in manifests."
+                    ],
+                    "default": "hover",
+                    "description": "Specifies how interactive task actions are presented in pixi.toml and pyproject.toml manifests.",
                     "scope": "resource"
                 }
             }

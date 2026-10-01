@@ -73,7 +73,7 @@ A dedicated Activity Bar container providing complete visibility and control ove
 ### Native Tasks, Terminals & Global Tools
 
 - **Interactive Task Lifecycle**: Create new runnable tasks via guided wizards (name, shell command, environment, `--depends-on` task dependencies) and remove tasks directly from side panel actions or command palette.
-- **Interactive Task CodeLens**: Direct `▶ Run Task` and `⚙ Run in Environment...` inline actions above task definitions in `pixi.toml` and `pyproject.toml`.
+- **Manifest Task Actions (Hover & CodeLens)**: Non-intrusive hover tooltips with full command previews and instant execution links, plus customizable CodeLens modes (compact, full, header-only, or off).
 - **Intelligent Task Grouping**: Organize workspace tasks in the side panel by namespace prefix (`data-*`, `gui-*`), by target environment, or in a flat list with 1-click grouping switcher.
 - **Native VS Code Tasks**: Auto-registers Pixi tasks as native VS Code tasks (`Terminal: Run Task...`) with a dedicated QuickPick runner.
 - **Pre-Configured Terminals**: Launch interactive terminal sessions with the target Pixi environment pre-activated.
@@ -106,21 +106,21 @@ Launch any command via the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) by t
 
 ## Extension Settings
 
-| Setting                       | Type       | Default                       | Scope    | Description                                                                                       |
-| :---------------------------- | :--------- | :---------------------------- | :------- | :------------------------------------------------------------------------------------------------ |
-| `pixi.executablePath`         | `string`   | `""`                          | Machine  | Path to the Pixi binary. Discovered from system `PATH` if empty.                                  |
-| `pixi.displayNameFormat`      | `string`   | `"${project}:${env}"`         | Resource | Display format for environments. Placeholders: `${project}`, `${env}`, `${version}`.              |
-| `pixi.defaultManifestFormat`  | `string`   | `"ask"`                       | Resource | Default manifest format for project initialization (`"ask"`, `"pixi"`, or `"pyproject"`).         |
-| `pixi.autoInstallOnOpen`      | `string`   | `"prompt"`                    | Resource | Behavior when opening projects with uninstalled environments (`"prompt"`, `"always"`, `"never"`). |
-| `pixi.environmentRules`       | `string[]` | `[]`                          | Resource | Map glob patterns to environment names (e.g. `tests/**=dev`, `train/**=gpu`).                     |
-| `pixi.packages.displayMode`   | `string`   | `"grouped"`                   | Resource | Package tree display mode (`"grouped"`, `"explicitOnly"`, or `"all"`).                            |
-| `pixi.cache.autoMeasureSize`  | `boolean`  | `true`                        | Window   | Automatically compute Pixi cache disk usage in Pixi Info.                                         |
-| `pixi.tasks.groupBy`          | `string`   | `"prefix"`                    | Resource | Task grouping mode in Tasks view (`"prefix"`, `"environment"`, `"none"`).                         |
-| `pixi.tasks.prefixSeparators` | `string[]` | `["-", "_"]`                  | Resource | Delimiters used to parse namespace prefixes from task names.                                      |
-| `pixi.tasks.minGroupSize`     | `integer`  | `2`                           | Resource | Minimum tasks required to form a prefix group folder (isolated tasks stay flat).                  |
-| `pixi.tasks.maxDepth`         | `integer`  | `1`                           | Resource | Maximum nesting depth for prefix-based task groups (1–3).                                         |
-| `pixi.tasks.codeLens`         | `boolean`  | `true`                        | Resource | Enable CodeLens actions (Run Task, Run in Environment) above task definitions in manifests.       |
-| `pixi.searchIgnorePatterns`   | `string[]` | `["**/node_modules/**", ...]` | Resource | Glob patterns to ignore when scanning workspace for Pixi projects.                                |
+| Setting                       | Type       | Default                       | Scope    | Description                                                                                                    |
+| :---------------------------- | :--------- | :---------------------------- | :------- | :------------------------------------------------------------------------------------------------------------- |
+| `pixi.executablePath`         | `string`   | `""`                          | Machine  | Path to the Pixi binary. Discovered from system `PATH` if empty.                                               |
+| `pixi.displayNameFormat`      | `string`   | `"${project}:${env}"`         | Resource | Display format for environments. Placeholders: `${project}`, `${env}`, `${version}`.                           |
+| `pixi.defaultManifestFormat`  | `string`   | `"ask"`                       | Resource | Default manifest format for project initialization (`"ask"`, `"pixi"`, or `"pyproject"`).                      |
+| `pixi.autoInstallOnOpen`      | `string`   | `"prompt"`                    | Resource | Behavior when opening projects with uninstalled environments (`"prompt"`, `"always"`, `"never"`).              |
+| `pixi.environmentRules`       | `string[]` | `[]`                          | Resource | Map glob patterns to environment names (e.g. `tests/**=dev`, `train/**=gpu`).                                  |
+| `pixi.packages.displayMode`   | `string`   | `"grouped"`                   | Resource | Package tree display mode (`"grouped"`, `"explicitOnly"`, or `"all"`).                                         |
+| `pixi.cache.autoMeasureSize`  | `boolean`  | `true`                        | Window   | Automatically compute Pixi cache disk usage in Pixi Info.                                                      |
+| `pixi.tasks.groupBy`          | `string`   | `"prefix"`                    | Resource | Task grouping mode in Tasks view (`"prefix"`, `"environment"`, `"none"`).                                      |
+| `pixi.tasks.prefixSeparators` | `string[]` | `["-", "_"]`                  | Resource | Delimiters used to parse namespace prefixes from task names.                                                   |
+| `pixi.tasks.minGroupSize`     | `integer`  | `2`                           | Resource | Minimum tasks required to form a prefix group folder (isolated tasks stay flat).                               |
+| `pixi.tasks.maxDepth`         | `integer`  | `1`                           | Resource | Maximum nesting depth for prefix-based task groups (1–3).                                                      |
+| `pixi.tasks.manifestActions`  | `string`   | `"hover"`                     | Resource | Display style for task actions in manifests (`"hover"`, `"compact"`, `"full"`, `"header"`, `"both"`, `"off"`). |
+| `pixi.searchIgnorePatterns`   | `string[]` | `["**/node_modules/**", ...]` | Resource | Glob patterns to ignore when scanning workspace for Pixi projects.                                             |
 
 ### Example Configuration
 
