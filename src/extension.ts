@@ -5,7 +5,7 @@ import { clearGlobalManifestCache } from './cli/globalCli';
 import { clearPixiCache, validatePixiCli } from './cli/pixiCli';
 import { registerGlobalCommands } from './commands/globalCommands';
 import { registerInfoCommands } from './commands/infoCommands';
-import { registerWorkspaceCommands } from './commands/workspaceCommands';
+import { registerWorkspaceCommands } from './commands/workspace';
 import { registerLogger } from './common/logging';
 import { setPersistentState } from './common/persistentState';
 import { PixiProjectManager } from './core/projectManager';
@@ -29,12 +29,12 @@ export async function activate(context: ExtensionContext): Promise<PixiExtension
     context.subscriptions.push(projectManager);
 
     const taskProvider = new PixiTaskProvider(projectManager, log);
-    context.subscriptions.push(taskProvider, taskProvider.registerCommands());
+    context.subscriptions.push(taskProvider);
 
     const terminalProvider = new PixiTerminalProvider(projectManager, log);
     context.subscriptions.push(terminalProvider, terminalProvider.registerCommands());
 
-    const workspaceCommands = registerWorkspaceCommands(projectManager);
+    const workspaceCommands = registerWorkspaceCommands(projectManager, taskProvider);
     context.subscriptions.push(workspaceCommands);
 
     const globalCommands = registerGlobalCommands();

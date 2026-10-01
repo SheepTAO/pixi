@@ -1,8 +1,5 @@
-import * as fs from 'fs';
 import * as path from 'path';
 import {
-    commands,
-    ConfigurationTarget,
     Disposable,
     Event,
     EventEmitter,
@@ -21,7 +18,7 @@ import {
 } from 'vscode';
 
 import { getPixi, runPixi } from '../cli/pixiCli';
-import { revealDefinitionInManifest, safeJsonParse } from '../common/execUtils';
+import { safeJsonParse } from '../common/execUtils';
 import { traceError, traceVerbose } from '../common/logging';
 import { getEnvironmentStatusBadge, promptToInstallEnvironment } from '../core/environmentRules';
 import { PixiProjectManager } from '../core/projectManager';
@@ -115,118 +112,6 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
         for (const d of this.disposables) {
             d.dispose();
         }
-    }
-
-    registerCommands(): Disposable {
-        interface TaskCommandArg {
-            task?: PixiTask;
-            name?: string;
-            projectPath?: string;
-            project?: { projectPath?: string; manifestPath?: string };
-        }
-
-        const disposables: Disposable[] = [
-            commands.registerCommand('pixi.runTask', (arg?: unknown) => {
-                const item = arg as TaskCommandArg | undefined;
-                const targetTask = item?.task || (item?.name && item?.projectPath ? (item as PixiTask) : undefined);
-                if (targetTask) {
-                    return this.executePixiTask(targetTask);
-                }
-                const projectPath =
-                    typeof arg === 'string' ? arg : item?.project?.projectPath || item?.projectPath || undefined;
-                return this.promptAndRunTask(projectPath);
-            }),
-            commands.registerCommand('pixi.runTaskInEnvironment', (arg?: unknown) => {
-                const item = arg as TaskCommandArg | undefined;
-                const targetTask = item?.task || (item?.name && item?.projectPath ? (item as PixiTask) : undefined);
-                const projectPath = !targetTask
-                    ? typeof arg === 'string'
-                        ? arg
-                        : item?.project?.projectPath || item?.projectPath || undefined
-                    : item?.project?.projectPath || item?.projectPath || targetTask.projectPath;
-                return this.promptAndRunTaskInEnvironment(targetTask, projectPath);
-            }),
-            commands.registerCommand('pixi.tasks.refresh', () => {
-                this.refresh();
-            }),
-            commands.registerCommand('pixi.tasks.changeGrouping', async () => {
-                const config = workspace.getConfiguration('pixi.tasks');
-                const current = config.get<string>('groupBy', 'prefix');
-
-                interface GroupByQuickPickItem extends QuickPickItem {
-                    value: 'prefix' | 'environment' | 'none';
-                }
-
-                const items: GroupByQuickPickItem[] = [
-                    {
-                        label: '$(symbol-namespace) Group by Prefix',
-                        description: 'Group tasks by name prefix (e.g. data-*, test-*, gui-*)',
-                        detail: current === 'prefix' ? '(Currently active)' : undefined,
-                        value: 'prefix',
-                    },
-                    {
-                        label: '$(layers) Group by Environment',
-                        description: 'Group tasks by default environment (e.g. dev, test, docs)',
-                        detail: current === 'environment' ? '(Currently active)' : undefined,
-                        value: 'environment',
-                    },
-                    {
-                        label: '$(list-flat) Flat List',
-                        description: 'Display all tasks in a flat list without grouping',
-                        detail: current === 'none' ? '(Currently active)' : undefined,
-                        value: 'none',
-                    },
-                ];
-
-                const selected = await window.showQuickPick(items, {
-                    title: 'Pixi Tasks: Change Grouping',
-                    placeHolder: 'Select how tasks should be organized in the Tasks view',
-                });
-
-                if (selected) {
-                    const inspect = config.inspect<string>('groupBy');
-                    const target =
-                        inspect?.workspaceFolderValue !== undefined
-                            ? ConfigurationTarget.WorkspaceFolder
-                            : inspect?.workspaceValue !== undefined
-                              ? ConfigurationTarget.Workspace
-                              : ConfigurationTarget.Global;
-                    await config.update('groupBy', selected.value, target);
-                }
-            }),
-            commands.registerCommand('pixi.tasks.revealInManifest', async (arg?: unknown) => {
-                const item = arg as TaskCommandArg | undefined;
-                let task: PixiTask | undefined =
-                    item?.task || (item?.name && item?.projectPath ? (item as PixiTask) : undefined);
-
-                if (!task) {
-                    const targetProjectPath = item?.project?.projectPath || item?.projectPath;
-                    task = await this.pickTask({
-                        title: 'Select Task to Reveal in Manifest',
-                        placeHolder: 'Select a task to jump to its definition in manifest',
-                        targetProjectPath,
-                    });
-                    if (!task) {
-                        return;
-                    }
-                }
-
-                const projectPath = task.projectPath;
-                const manifestPath = item?.project?.manifestPath || this.projectManager.getManifestPath(projectPath);
-
-                if (!manifestPath || !fs.existsSync(manifestPath)) {
-                    window.showWarningMessage('Could not find manifest file for this project.');
-                    return;
-                }
-
-                await revealDefinitionInManifest({
-                    manifestPath,
-                    targetName: task.name,
-                    kind: 'task',
-                });
-            }),
-        ];
-        return Disposable.from(...disposables);
     }
 
     async provideTasks(): Promise<Task[]> {
@@ -433,18 +318,6 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
         });
 
         return selected?.pixiTask;
-    }
-
-    private async promptAndRunTask(targetProjectPath?: string) {
-        const selected = await this.pickTask({
-            title: 'Pixi: Run Task',
-            placeHolder: 'Select a Pixi task to run',
-            targetProjectPath,
-        });
-
-        if (selected) {
-            await this.executePixiTask(selected);
-        }
     }
 
     public async executePixiTask(pixiTask: PixiTask, targetEnvName?: string): Promise<void> {

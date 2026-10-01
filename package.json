@@ -387,6 +387,10 @@
                     "when": "pixi.hasPixiProject"
                 },
                 {
+                    "command": "pixi.tasks.changeGrouping",
+                    "when": "false"
+                },
+                {
                     "command": "pixi.refreshProjects",
                     "when": "pixi.hasPixiProject"
                 },
