@@ -90,6 +90,12 @@
                 "icon": "$(file-code)"
             },
             {
+                "command": "pixi.openLockfile",
+                "title": "Open Lockfile",
+                "category": "Pixi",
+                "icon": "$(lock)"
+            },
+            {
                 "command": "pixi.runTask",
                 "title": "Run Task",
                 "category": "Pixi",
@@ -1028,6 +1034,12 @@
                     ],
                     "default": "hover",
                     "description": "Specifies how interactive task actions are presented in pixi.toml and pyproject.toml manifests.",
+                    "scope": "resource"
+                },
+                "pixi.dependencies.inlayHints": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Show locked dependency versions as inline hints in pixi.toml and pyproject.toml manifests.",
                     "scope": "resource"
                 }
             }
