@@ -161,7 +161,7 @@ export function revealRangeInEditor(editor: TextEditor, line: number, startCol: 
 }
 
 export interface RevealDefinitionOptions {
-    manifestPath: string;
+    manifestPath?: string;
     targetName: string;
     kind: 'package' | 'task';
 }

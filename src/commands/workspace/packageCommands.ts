@@ -1,4 +1,3 @@
-import * as fs from 'fs';
 import * as path from 'path';
 import {
     CancellationError,
@@ -244,6 +243,26 @@ function parseAddedSpecsFromOutput(output: string, fallback: string): string {
     return addedMatches.length > 0 ? addedMatches.join(', ') : fallback;
 }
 
+export async function executeAddPackage(
+    manager: PixiProjectManager,
+    projectPath: string,
+    args: string[],
+    specsLabel: string,
+    sourceLabel: string,
+    targetEnv?: string,
+): Promise<boolean> {
+    const projectName = path.basename(projectPath);
+    const displayEnv = targetEnv || 'default';
+    const progressTitle = `Pixi: Adding '${specsLabel}' (${sourceLabel}) to environment '${displayEnv}' in '${projectName}'...`;
+
+    const successMsg = (output: string) => {
+        const resolvedSpec = parseAddedSpecsFromOutput(output, specsLabel);
+        return `Pixi: Successfully added ${resolvedSpec} (${sourceLabel}) to environment '${displayEnv}' in '${projectName}'.`;
+    };
+
+    return runPixiWithProgress(progressTitle, args, projectPath, manager, successMsg);
+}
+
 export async function showPackageSearchPicker(
     manager: PixiProjectManager,
     initialQuery?: string,
@@ -439,17 +458,8 @@ async function handlePackageSearchSelection(
             }
             args.push(finalSpec);
 
-            const projectName = path.basename(projectPath);
-            const displayEnv = targetEnv || 'default';
             const sourceLabel = isPypi ? 'PyPI' : `Conda (${pkg.channel || 'conda-forge'})`;
-            const progressTitle = `Pixi: Adding '${finalSpec}' (${sourceLabel}) to environment '${displayEnv}' in '${projectName}'...`;
-
-            const successMsg = (output: string) => {
-                const resolvedSpec = parseAddedSpecsFromOutput(output, finalSpec);
-                return `Pixi: Successfully added ${resolvedSpec} (${sourceLabel}) to environment '${displayEnv}' in '${projectName}'.`;
-            };
-
-            await runPixiWithProgress(progressTitle, args, projectPath, manager, successMsg);
+            await executeAddPackage(manager, projectPath, args, finalSpec, sourceLabel, targetEnv);
             break;
         }
 
@@ -774,7 +784,6 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
                 return;
             }
 
-            const projectName = path.basename(projectPath);
             const envs = manager.getEnvironmentsForProject(projectPath);
 
             const directEnvName =
@@ -814,16 +823,8 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
                 }
                 args.push(spec);
 
-                const displayEnv = targetEnv || directEnvName || 'default';
                 const sourceLabel = isPypi ? 'PyPI' : `Conda (${pkg.channel || 'conda-forge'})`;
-                const progressTitle = `Pixi: Adding '${spec}' (${sourceLabel}) to environment '${displayEnv}' in '${projectName}'...`;
-
-                const successMsg = (output: string) => {
-                    const resolvedSpec = parseAddedSpecsFromOutput(output, spec);
-                    return `Pixi: Successfully added ${resolvedSpec} (${sourceLabel}) to environment '${displayEnv}' in '${projectName}'.`;
-                };
-
-                await runPixiWithProgress(progressTitle, args, projectPath, manager, successMsg);
+                await executeAddPackage(manager, projectPath, args, spec, sourceLabel, targetEnv || directEnvName);
                 return;
             }
 
@@ -976,15 +977,14 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
                 }
             }
 
-            const displayEnv = targetEnv || directEnvName || 'default';
-            const progressTitle = `Pixi: Adding '${specs.join(', ')}' (${sourceLabel}) to environment '${displayEnv}' in '${projectName}'...`;
-
-            const successMsg = (output: string) => {
-                const resolvedSpecs = parseAddedSpecsFromOutput(output, specs.join(', '));
-                return `Pixi: Successfully added ${resolvedSpecs} (${sourceLabel}) to environment '${displayEnv}' in '${projectName}'.`;
-            };
-
-            await runPixiWithProgress(progressTitle, args, projectPath, manager, successMsg);
+            await executeAddPackage(
+                manager,
+                projectPath,
+                args,
+                specs.join(', '),
+                sourceLabel,
+                targetEnv || directEnvName,
+            );
         }),
     );
 
@@ -1302,15 +1302,6 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
                 }
             }
 
-            if (!manifestPath) {
-                manifestPath = manager.getManifestPath(projectPath);
-            }
-
-            if (!manifestPath || !fs.existsSync(manifestPath)) {
-                window.showWarningMessage('Could not find manifest file for this project.');
-                return;
-            }
-
             if (!pkgName) {
                 const picked = await pickPackageFromEnvironment(manager, projectPath, undefined, {
                     title: 'Select Package to Reveal in Manifest',
@@ -1325,7 +1316,7 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
             }
 
             await revealDefinitionInManifest({
-                manifestPath,
+                manifestPath: manifestPath || manager.getManifestPath(projectPath),
                 targetName: pkgName,
                 kind: 'package',
             });

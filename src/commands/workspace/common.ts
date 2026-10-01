@@ -171,12 +171,12 @@ export async function pickPixiProject(
     const projectPaths = manager.getProjectPaths();
 
     if (direct) {
-        if (isPixiProject(direct)) {
-            return direct;
-        }
         const matched = manager.findProjectForUri(Uri.file(direct));
         if (matched) {
             return matched;
+        }
+        if (isPixiProject(direct)) {
+            return direct;
         }
     }
 

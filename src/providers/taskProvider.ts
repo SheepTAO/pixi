@@ -97,8 +97,6 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
             const normalized = path.normalize(projectPath);
             this.taskCache.delete(normalized);
             this.taskPromises.delete(normalized);
-            this.taskCache.delete(projectPath);
-            this.taskPromises.delete(projectPath);
         } else {
             this.taskCache.clear();
             this.taskPromises.clear();
@@ -187,38 +185,27 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
         try {
             const raw = safeJsonParse<RawPixiTaskEnvironment[]>(jsonStr, []);
 
-            const registerTask = (t: RawPixiTask, defaultEnv?: string) => {
+            const normalizeTask = (t: RawPixiTask, fallbackEnv?: string): PixiTask => ({
+                name: t.name!,
+                cmd: typeof t.cmd === 'string' ? t.cmd : Array.isArray(t.cmd) ? t.cmd.join(' ') : undefined,
+                description: t.description || undefined,
+                default_environment: t.default_environment || fallbackEnv,
+                depends_on: Array.isArray(t.depends_on) && t.depends_on.length > 0 ? t.depends_on : undefined,
+                inputs: Array.isArray(t.inputs) && t.inputs.length > 0 ? t.inputs : undefined,
+                outputs: Array.isArray(t.outputs) && t.outputs.length > 0 ? t.outputs : undefined,
+                clean_env: typeof t.clean_env === 'boolean' ? t.clean_env : undefined,
+                projectPath,
+            });
+
+            const registerTask = (t: RawPixiTask, fallbackEnv?: string) => {
                 if (!t || !t.name) {
                     return;
                 }
-                const cmdStr = typeof t.cmd === 'string' ? t.cmd : Array.isArray(t.cmd) ? t.cmd.join(' ') : undefined;
-                const taskEnv = t.default_environment || defaultEnv;
-
                 const existing = taskMap.get(t.name);
-                if (existing) {
-                    existing.cmd ??= cmdStr;
-                    existing.description ??= t.description;
-                    if (!existing.default_environment && taskEnv) {
-                        existing.default_environment = taskEnv;
-                    }
-                    if (!existing.depends_on?.length && Array.isArray(t.depends_on)) {
-                        existing.depends_on = t.depends_on;
-                    }
-                    existing.inputs ??= Array.isArray(t.inputs) && t.inputs.length > 0 ? t.inputs : undefined;
-                    existing.outputs ??= Array.isArray(t.outputs) && t.outputs.length > 0 ? t.outputs : undefined;
-                    existing.clean_env ??= typeof t.clean_env === 'boolean' ? t.clean_env : undefined;
-                } else {
-                    taskMap.set(t.name, {
-                        name: t.name,
-                        cmd: cmdStr,
-                        description: t.description || undefined,
-                        default_environment: taskEnv,
-                        depends_on: Array.isArray(t.depends_on) ? t.depends_on : undefined,
-                        inputs: Array.isArray(t.inputs) && t.inputs.length > 0 ? t.inputs : undefined,
-                        outputs: Array.isArray(t.outputs) && t.outputs.length > 0 ? t.outputs : undefined,
-                        clean_env: typeof t.clean_env === 'boolean' ? t.clean_env : undefined,
-                        projectPath,
-                    });
+                if (!existing) {
+                    taskMap.set(t.name, normalizeTask(t, fallbackEnv));
+                } else if (!existing.default_environment && fallbackEnv) {
+                    existing.default_environment = fallbackEnv;
                 }
             };
 

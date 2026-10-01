@@ -1,4 +1,3 @@
-import * as fs from 'fs';
 import * as path from 'path';
 import {
     commands,
@@ -129,16 +128,8 @@ export function registerTaskCommands(manager: PixiProjectManager, taskProvider: 
                 }
             }
 
-            const projectPath = task.projectPath;
-            const manifestPath = manager.getManifestPath(projectPath);
-
-            if (!manifestPath || !fs.existsSync(manifestPath)) {
-                window.showWarningMessage('Could not find manifest file for this project.');
-                return;
-            }
-
             await revealDefinitionInManifest({
-                manifestPath,
+                manifestPath: manager.getManifestPath(task.projectPath),
                 targetName: task.name,
                 kind: 'task',
             });
@@ -286,14 +277,11 @@ export function registerTaskCommands(manager: PixiProjectManager, taskProvider: 
 
             if (success) {
                 taskProvider.refresh(projectPath);
-                const manifestPath = manager.getManifestPath(projectPath);
-                if (manifestPath && fs.existsSync(manifestPath)) {
-                    await revealDefinitionInManifest({
-                        manifestPath,
-                        targetName: taskName,
-                        kind: 'task',
-                    });
-                }
+                await revealDefinitionInManifest({
+                    manifestPath: manager.getManifestPath(projectPath),
+                    targetName: taskName,
+                    kind: 'task',
+                });
             }
         }),
 
