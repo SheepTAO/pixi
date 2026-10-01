@@ -24,7 +24,16 @@ export interface TaskCommandArg {
 }
 
 function extractTask(arg?: unknown): PixiTask | undefined {
-    return (arg as TaskCommandArg | undefined)?.task;
+    if (!arg || typeof arg !== 'object') {
+        return undefined;
+    }
+    if ('task' in arg && (arg as { task?: PixiTask }).task) {
+        return (arg as { task: PixiTask }).task;
+    }
+    if ('name' in arg && 'projectPath' in arg) {
+        return arg as PixiTask;
+    }
+    return undefined;
 }
 
 export function registerTaskCommands(manager: PixiProjectManager, taskProvider: PixiTaskProvider): Disposable[] {

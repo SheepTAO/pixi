@@ -1009,6 +1009,12 @@
                     "maximum": 3,
                     "description": "Maximum nesting depth for prefix-based task groups (1 keeps subtasks flat under the top-level prefix, 2 allows one level of sub-groups).",
                     "scope": "resource"
+                },
+                "pixi.tasks.codeLens": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Show interactive CodeLens actions (Run Task, Run in Environment) above task definitions in pixi.toml and pyproject.toml.",
+                    "scope": "resource"
                 }
             }
         },

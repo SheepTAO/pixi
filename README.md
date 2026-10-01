@@ -73,6 +73,7 @@ A dedicated Activity Bar container providing complete visibility and control ove
 ### Native Tasks, Terminals & Global Tools
 
 - **Interactive Task Lifecycle**: Create new runnable tasks via guided wizards (name, shell command, environment, `--depends-on` task dependencies) and remove tasks directly from side panel actions or command palette.
+- **Interactive Task CodeLens**: Direct `▶ Run Task` and `⚙ Run in Environment...` inline actions above task definitions in `pixi.toml` and `pyproject.toml`.
 - **Intelligent Task Grouping**: Organize workspace tasks in the side panel by namespace prefix (`data-*`, `gui-*`), by target environment, or in a flat list with 1-click grouping switcher.
 - **Native VS Code Tasks**: Auto-registers Pixi tasks as native VS Code tasks (`Terminal: Run Task...`) with a dedicated QuickPick runner.
 - **Pre-Configured Terminals**: Launch interactive terminal sessions with the target Pixi environment pre-activated.
@@ -118,6 +119,7 @@ Launch any command via the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) by t
 | `pixi.tasks.prefixSeparators` | `string[]` | `["-", "_"]`                  | Resource | Delimiters used to parse namespace prefixes from task names.                                      |
 | `pixi.tasks.minGroupSize`     | `integer`  | `2`                           | Resource | Minimum tasks required to form a prefix group folder (isolated tasks stay flat).                  |
 | `pixi.tasks.maxDepth`         | `integer`  | `1`                           | Resource | Maximum nesting depth for prefix-based task groups (1–3).                                         |
+| `pixi.tasks.codeLens`         | `boolean`  | `true`                        | Resource | Enable CodeLens actions (Run Task, Run in Environment) above task definitions in manifests.       |
 | `pixi.searchIgnorePatterns`   | `string[]` | `["**/node_modules/**", ...]` | Resource | Glob patterns to ignore when scanning workspace for Pixi projects.                                |
 
 ### Example Configuration
