@@ -1,7 +1,5 @@
 import * as ch from 'child_process';
 import * as fs from 'fs';
-import * as http from 'http';
-import * as https from 'https';
 import * as os from 'os';
 import * as path from 'path';
 import semver from 'semver';
@@ -329,96 +327,50 @@ async function fetchPypiPackage(
     packageName: string,
     token?: CancellationToken,
 ): Promise<PixiPackageSearchResult | null> {
-    return new Promise((resolve) => {
-        if (token?.isCancellationRequested) {
-            return resolve(null);
-        }
+    if (token?.isCancellationRequested) {
+        return null;
+    }
 
+    const controller = new AbortController();
+    const cancelDisposable = token?.onCancellationRequested(() => controller.abort());
+    const timeoutId = setTimeout(() => controller.abort(), 2500);
+
+    try {
         const targetUrl = `https://pypi.org/pypi/${encodeURIComponent(packageName)}/json`;
-        const parsedUrl = new URL(targetUrl);
-        const proxy = process.env.https_proxy || process.env.HTTPS_PROXY || process.env.http_proxy;
-        const timeoutMs = 2500;
-        let isDone = false;
-
-        const cancelDisposable = token?.onCancellationRequested(() => {
-            safeResolve(null);
-        });
-
-        const safeResolve = (val: PixiPackageSearchResult | null) => {
-            if (!isDone) {
-                isDone = true;
-                cancelDisposable?.dispose();
-                resolve(val);
-            }
-        };
-
-        const onResponse = (res: http.IncomingMessage) => {
-            if (res.statusCode !== 200) {
-                return safeResolve(null);
-            }
-            let raw = '';
-            res.on('data', (chunk) => (raw += chunk));
-            res.on('end', () => {
-                try {
-                    const data = JSON.parse(raw);
-                    if (!data?.info?.name || !data?.info?.version) {
-                        return safeResolve(null);
-                    }
-                    safeResolve({
-                        name: data.info.name,
-                        latestVersion: data.info.version,
-                        versions: [data.info.version],
-                        platforms: ['all'],
-                        channel: 'pypi',
-                        sourceType: 'pypi',
-                        license: data.info.license || undefined,
-                        summary: data.info.summary || undefined,
-                    });
-                } catch {
-                    safeResolve(null);
-                }
-            });
-            res.on('error', () => safeResolve(null));
-        };
-
-        const sendGet = (agent?: https.Agent) => {
-            const req = https.get(targetUrl, agent ? { agent } : {}, onResponse);
-            req.setTimeout(timeoutMs, () => {
-                req.destroy();
-                safeResolve(null);
-            });
-            req.on('error', () => safeResolve(null));
-        };
-
-        if (proxy && parsedUrl.protocol === 'https:') {
-            try {
-                const p = new URL(proxy);
-                const connectReq = http.request({
-                    host: p.hostname,
-                    port: p.port,
-                    method: 'CONNECT',
-                    path: `${parsedUrl.hostname}:443`,
-                });
-                connectReq.setTimeout(timeoutMs, () => {
-                    connectReq.destroy();
-                    safeResolve(null);
-                });
-                connectReq.on('connect', (_res, socket) => {
-                    sendGet(new https.Agent({ socket }));
-                });
-                connectReq.on('error', () => safeResolve(null));
-                connectReq.end();
-            } catch {
-                safeResolve(null);
-            }
-        } else {
-            try {
-                sendGet();
-            } catch {
-                safeResolve(null);
-            }
+        const res = await fetch(targetUrl, { signal: controller.signal });
+        if (!res.ok) {
+            return null;
         }
-    });
+
+        const data = (await res.json()) as {
+            info?: {
+                name?: string;
+                version?: string;
+                license?: string;
+                summary?: string;
+            };
+        };
+
+        if (!data?.info?.name || !data?.info?.version) {
+            return null;
+        }
+
+        return {
+            name: data.info.name,
+            latestVersion: data.info.version,
+            versions: [data.info.version],
+            platforms: ['all'],
+            channel: 'pypi',
+            sourceType: 'pypi',
+            license: data.info.license || undefined,
+            summary: data.info.summary || undefined,
+        };
+    } catch {
+        return null;
+    } finally {
+        clearTimeout(timeoutId);
+        cancelDisposable?.dispose();
+    }
 }
 
 export async function searchPixiPackages(

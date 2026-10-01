@@ -46,7 +46,7 @@ export function matchEnvironmentName(rules: string[] | Record<string, string>, r
 /**
  * Generic environment matcher that finds the matching environment object from a list.
  */
-export function matchEnvironmentRule<T extends { pixiEnvName: string; displayName?: string; name?: string }>(
+export function matchEnvironmentRule<T extends { pixiEnvName: string }>(
     rules: string[] | Record<string, string>,
     relPath: string,
     envs: T[],
@@ -55,13 +55,13 @@ export function matchEnvironmentRule<T extends { pixiEnvName: string; displayNam
     if (!target) {
         return undefined;
     }
-    return envs.find((e) => e.pixiEnvName === target || e.displayName?.startsWith(`${target} `) || e.name === target);
+    return envs.find((e) => e.pixiEnvName === target);
 }
 
 /**
  * Resolves the matching environment for a given document URI according to configured environment rules.
  */
-export function matchEnvironmentForUri<T extends { pixiEnvName: string; displayName?: string; name?: string }>(
+export function matchEnvironmentForUri<T extends { pixiEnvName: string }>(
     uri: Uri,
     projectPath: string,
     envs: T[],

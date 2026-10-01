@@ -13,6 +13,7 @@ import {
     workspace,
 } from 'vscode';
 
+import { updateProjectTreeViewDescription } from '../common/execUtils';
 import { PixiProjectManager } from '../core/projectManager';
 import { PixiProject } from '../core/types';
 import { PixiTask, PixiTaskProvider } from '../providers/taskProvider';
@@ -165,7 +166,7 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
             this.projectManager.onDidProjectsChanged(() => this.refresh()),
             this.projectManager.onDidChangeEnvironments(() => this.refresh()),
             this.taskProvider.onDidChangeTasks(() => {
-                this.updateViewDescription();
+                updateProjectTreeViewDescription(this.treeView, this.projectManager);
                 this._onDidChangeTreeData.fire();
             }),
             workspace.onDidChangeConfiguration((e) => {
@@ -178,20 +179,7 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
 
     public bindView(treeView: TreeView<PixiTasksTreeItem>): void {
         this.treeView = treeView;
-        this.updateViewDescription();
-    }
-
-    private updateViewDescription(): void {
-        if (!this.treeView) {
-            return;
-        }
-        const projects = this.projectManager.getProjects();
-        if (projects.length === 1) {
-            const manifestName = path.basename(projects[0].manifestPath);
-            this.treeView.description = `${projects[0].name} (${manifestName})`;
-        } else {
-            this.treeView.description = undefined;
-        }
+        updateProjectTreeViewDescription(this.treeView, this.projectManager);
     }
 
     public refresh(): void {

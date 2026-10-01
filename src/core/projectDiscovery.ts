@@ -88,7 +88,8 @@ export async function resolvePixiProjectPaths(): Promise<string[]> {
         const pixiDirs = await findPixiDirectories(allPatterns);
         for (const dir of pixiDirs) {
             const root = path.dirname(dir);
-            if (isPixiProject(root)) {
+            const base = path.basename(dir);
+            if (base === '.pixi' || base === 'pixi.toml' || isPixiProject(root)) {
                 projectRoots.push(root);
             }
         }

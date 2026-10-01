@@ -183,6 +183,9 @@ export class PixiProjectManager implements Disposable {
                 return projectPath;
             }
         }
+        if (this.projectPaths.length > 0) {
+            return undefined;
+        }
         if (isPixiProject(filePath)) {
             return filePath;
         }

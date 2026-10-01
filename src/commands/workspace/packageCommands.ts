@@ -49,6 +49,28 @@ interface PackageItemContextCandidate extends EnvironmentContextCandidate {
     name?: string;
 }
 
+interface ExtractedPackageContext {
+    pkg?: PixiPackage;
+    env?: PixiEnvironmentInfo;
+    projectPath?: string;
+    manifestPath?: string;
+    name?: string;
+}
+
+function extractPackageContext(arg?: unknown): ExtractedPackageContext {
+    const item = arg as PackageItemContextCandidate | undefined;
+    return {
+        pkg: item?.pkg,
+        env: item?.env,
+        projectPath: item?.project?.projectPath || item?.env?.projectPath,
+        manifestPath: item?.manifestPath || item?.project?.manifestPath || item?.env?.manifestPath,
+        name:
+            item?.pkg?.name ||
+            (typeof item?.name === 'string' ? item.name : undefined) ||
+            (typeof arg === 'string' ? arg : undefined),
+    };
+}
+
 interface PickPackageOptions {
     title: string;
     placeHolder: string;
@@ -969,11 +991,9 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
     // Pixi: Remove Package...
     disposables.push(
         commands.registerCommand('pixi.removePackage', async (targetItem?: unknown) => {
-            const item = targetItem as PackageItemContextCandidate | undefined;
-            if (item?.pkg && item?.env) {
-                const pkg: PixiPackage = item.pkg;
-                const env: PixiEnvironmentInfo = item.env;
-                const projectPath: string = item.project?.projectPath || env.projectPath;
+            const ctx = extractPackageContext(targetItem);
+            if (ctx.pkg && ctx.env && ctx.projectPath) {
+                const { pkg, env, projectPath } = ctx;
                 const envName = env.pixiEnvName;
 
                 if (!pkg.is_explicit) {
@@ -1048,24 +1068,17 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
     // Pixi: Show Dependency Tree
     disposables.push(
         commands.registerCommand('pixi.showDependencyTree', async (targetItem?: unknown) => {
-            const item = targetItem as PackageItemContextCandidate | undefined;
-            if (item?.pkg && item?.env) {
-                const pkg: PixiPackage = item.pkg;
-                const env: PixiEnvironmentInfo = item.env;
-                const projectPath: string = item.project?.projectPath || env.projectPath;
-                const envName = env.pixiEnvName;
-                const args = buildTreeArgs(envName);
-                args.push(exactPackageRegex(pkg.name));
-                await displayTreeOutput(`package '${pkg.name}' in '${envName}'`, args, projectPath);
+            const ctx = extractPackageContext(targetItem);
+            if (ctx.pkg && ctx.env && ctx.projectPath) {
+                const args = buildTreeArgs(ctx.env.pixiEnvName);
+                args.push(exactPackageRegex(ctx.pkg.name));
+                await displayTreeOutput(`package '${ctx.pkg.name}' in '${ctx.env.pixiEnvName}'`, args, ctx.projectPath);
                 return;
             }
 
-            if (item?.env && item?.project?.projectPath) {
-                const env: PixiEnvironmentInfo = item.env;
-                const projectPath: string = item.project.projectPath;
-                const envName = env.pixiEnvName;
-                const args = buildTreeArgs(envName);
-                await displayTreeOutput(`environment '${envName}'`, args, projectPath);
+            if (ctx.env && ctx.projectPath) {
+                const args = buildTreeArgs(ctx.env.pixiEnvName);
+                await displayTreeOutput(`environment '${ctx.env.pixiEnvName}'`, args, ctx.projectPath);
                 return;
             }
 
@@ -1133,15 +1146,17 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
     // Pixi: Why is This Package Installed? (Reverse Tree)
     disposables.push(
         commands.registerCommand('pixi.whyPackage', async (targetItem?: unknown) => {
-            const item = targetItem as PackageItemContextCandidate | undefined;
-            if (item?.pkg && item?.env) {
-                const pkg: PixiPackage = item.pkg;
-                const env: PixiEnvironmentInfo = item.env;
-                const projectPath: string = item.project?.projectPath || env.projectPath;
-                const envName = env.pixiEnvName;
-                const args = buildTreeArgs(envName, true);
-                args.push(exactPackageRegex(pkg.name));
-                await displayTreeOutput(`package '${pkg.name}' in '${envName}'`, args, projectPath, true, pkg.name);
+            const ctx = extractPackageContext(targetItem);
+            if (ctx.pkg && ctx.env && ctx.projectPath) {
+                const args = buildTreeArgs(ctx.env.pixiEnvName, true);
+                args.push(exactPackageRegex(ctx.pkg.name));
+                await displayTreeOutput(
+                    `package '${ctx.pkg.name}' in '${ctx.env.pixiEnvName}'`,
+                    args,
+                    ctx.projectPath,
+                    true,
+                    ctx.pkg.name,
+                );
                 return;
             }
 
@@ -1239,10 +1254,9 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
     // Pixi: Update Package
     disposables.push(
         commands.registerCommand('pixi.updatePackage', async (targetItem?: unknown) => {
-            const item = targetItem as PackageItemContextCandidate | undefined;
-            if (item?.pkg && item?.env) {
-                const projectPath: string = item.project?.projectPath || item.env.projectPath;
-                return executeUpdatePackage(manager, projectPath, item.pkg.name, item.env.pixiEnvName);
+            const ctx = extractPackageContext(targetItem);
+            if (ctx.pkg && ctx.env && ctx.projectPath) {
+                return executeUpdatePackage(manager, ctx.projectPath, ctx.pkg.name, ctx.env.pixiEnvName);
             }
 
             const projectPath = await pickPixiProject(manager, 'Select Pixi project to update package in', targetItem);
@@ -1276,10 +1290,10 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
     // Pixi: Reveal Package in Manifest (pixi.toml / pyproject.toml)
     disposables.push(
         commands.registerCommand('pixi.revealPackageInManifest', async (targetItem?: unknown) => {
-            const item = targetItem as PackageItemContextCandidate | undefined;
-            let pkgName: string | undefined = item?.pkg?.name;
-            let projectPath: string | undefined = item?.project?.projectPath || item?.env?.projectPath;
-            let manifestPath: string | undefined = item?.project?.manifestPath || item?.env?.manifestPath;
+            const ctx = extractPackageContext(targetItem);
+            let pkgName = ctx.pkg?.name;
+            let projectPath = ctx.projectPath;
+            let manifestPath = ctx.manifestPath;
 
             if (!projectPath) {
                 projectPath = await pickPixiProject(manager, 'Select Pixi project', targetItem);
@@ -1321,11 +1335,8 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
     // Pixi: Copy Package Name
     disposables.push(
         commands.registerCommand('pixi.copyPackageName', async (targetItem?: unknown) => {
-            const item = targetItem as PackageItemContextCandidate | undefined;
-            let pkgName =
-                item?.pkg?.name ||
-                (typeof item?.name === 'string' ? item.name : undefined) ||
-                (typeof targetItem === 'string' ? targetItem : undefined);
+            const ctx = extractPackageContext(targetItem);
+            let pkgName = ctx.name;
 
             if (!pkgName) {
                 const projectPath = await pickPixiProject(

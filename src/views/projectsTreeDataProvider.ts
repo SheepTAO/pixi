@@ -13,6 +13,7 @@ import {
     workspace,
 } from 'vscode';
 
+import { updateProjectTreeViewDescription } from '../common/execUtils';
 import { sortPixiPackages } from '../core/packageManager';
 import { PixiProjectManager } from '../core/projectManager';
 import { PixiEnvironmentInfo, PixiPackage, PixiProject } from '../core/types';
@@ -267,25 +268,12 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
 
     public bindView(treeView: TreeView<PixiProjectsTreeItem>): void {
         this.treeView = treeView;
-        this.updateViewDescription();
-    }
-
-    private updateViewDescription(): void {
-        if (!this.treeView) {
-            return;
-        }
-        const projects = this.projectManager.getProjects();
-        if (projects.length === 1) {
-            const manifestName = path.basename(projects[0].manifestPath);
-            this.treeView.description = `${projects[0].name} (${manifestName})`;
-        } else {
-            this.treeView.description = undefined;
-        }
+        updateProjectTreeViewDescription(this.treeView, this.projectManager);
     }
 
     public refresh(): void {
         this.projectManager.clearPackagesCache();
-        this.updateViewDescription();
+        updateProjectTreeViewDescription(this.treeView, this.projectManager);
         this._onDidChangeTreeData.fire();
     }
 

@@ -109,28 +109,38 @@ interface PathContextCandidate {
 }
 
 /**
- * Resolves a directory path from various command arguments (Uri, string path, or tree item objects).
+ * Resolves a file or directory path from various command arguments (Uri, string path, or tree item objects).
  */
-export function normalizeFolderPath(target?: unknown): string | undefined {
+export function normalizeLocationPath(target?: unknown): string | undefined {
     if (!target) {
         return undefined;
     }
-    const safeDir = (p: string): string => {
-        try {
-            if (fs.existsSync(p) && !fs.statSync(p).isDirectory()) {
-                return path.dirname(p);
-            }
-        } catch {
-            // ignore stat failure
-        }
-        return p;
-    };
     if (typeof target === 'string') {
-        return safeDir(target);
+        return target;
+    }
+    if (target instanceof Uri) {
+        return target.fsPath;
     }
     const t = target as PathContextCandidate;
-    const candidate = t.projectPath || t.project?.projectPath || t.env?.projectPath || t.task?.projectPath || t.fsPath;
-    return typeof candidate === 'string' ? safeDir(candidate) : undefined;
+    return t.projectPath || t.project?.projectPath || t.env?.projectPath || t.task?.projectPath || t.fsPath;
+}
+
+/**
+ * Resolves a directory path from various command arguments, ensuring file paths are resolved to their parent directory.
+ */
+export function normalizeFolderPath(target?: unknown): string | undefined {
+    const p = normalizeLocationPath(target);
+    if (!p) {
+        return undefined;
+    }
+    try {
+        if (fs.existsSync(p) && !fs.statSync(p).isDirectory()) {
+            return path.dirname(p);
+        }
+    } catch {
+        // ignore stat failure
+    }
+    return p;
 }
 
 /**
@@ -173,133 +183,100 @@ export async function revealDefinitionInManifest(options: RevealDefinitionOption
         const lines = text.split(/\r?\n/);
 
         const escapedName = escapeRegex(targetName);
+        const altName =
+            kind === 'package'
+                ? targetName.includes('-')
+                    ? targetName.replace(/-/g, '_')
+                    : targetName.includes('_')
+                      ? targetName.replace(/_/g, '-')
+                      : undefined
+                : undefined;
+        const namePattern = altName ? `(?:${escapedName}|${escapeRegex(altName)})` : escapedName;
+
+        const keyRegex = new RegExp(`^\\s*["']?${namePattern}["']?\\s*=`, 'i');
+        const taskSectionRegex =
+            kind === 'task' ? new RegExp(`^\\s*\\[+.*tasks\\.(["']?)${escapedName}\\1\\]`, 'i') : undefined;
+        const pyprojectDepRegex =
+            kind === 'package' ? new RegExp(`["']${namePattern}(?:\\s*[\\[><=~!^;@]|["'])`, 'i') : undefined;
+
         let targetLine = -1;
-        let startCol = 0;
-        let endCol = 0;
+        let fallbackLine = -1;
+        let currentSection = '';
 
-        if (kind === 'task') {
-            const keyRegex = new RegExp(`^\\s*["']?${escapedName}["']?\\s*=`, 'i');
-            const sectionRegex = new RegExp(`^\\s*\\[+.*tasks\\.(["']?)${escapedName}\\1\\]`, 'i');
-            let currentSection = '';
-            let matchedViaSection = false;
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const sectionMatch = line.match(/^\s*\[+([^\]]+)\]+/);
+            if (sectionMatch) {
+                currentSection = sectionMatch[1].trim();
+            }
 
-            // Pass 1: search inside recognized tasks section
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i];
-                const sectionMatch = line.match(/^\s*\[+([^\]]+)\]+/);
-                if (sectionMatch) {
-                    currentSection = sectionMatch[1].trim();
-                }
-                if (sectionRegex.test(line)) {
+            if (kind === 'task') {
+                if (taskSectionRegex && taskSectionRegex.test(line)) {
                     targetLine = i;
-                    matchedViaSection = true;
                     break;
                 }
                 const isTasksSection = /(^|\.)tasks(\.|$)/i.test(currentSection);
-                if (isTasksSection && keyRegex.test(line)) {
-                    targetLine = i;
-                    break;
-                }
-            }
-
-            // Fallback pass: search across entire file
-            if (targetLine < 0) {
-                for (let i = 0; i < lines.length; i++) {
-                    if (keyRegex.test(lines[i])) {
+                if (keyRegex.test(line)) {
+                    if (isTasksSection) {
                         targetLine = i;
                         break;
+                    } else if (fallbackLine < 0) {
+                        fallbackLine = i;
                     }
                 }
-            }
-
-            if (targetLine >= 0) {
-                const lineText = lines[targetLine];
-                const baseOffset = matchedViaSection ? Math.max(0, lineText.toLowerCase().lastIndexOf('tasks.')) : 0;
-                const searchPart = matchedViaSection
-                    ? lineText.slice(baseOffset)
-                    : lineText.indexOf('=') >= 0
-                      ? lineText.slice(0, lineText.indexOf('='))
-                      : lineText;
-
-                const m = searchPart.match(new RegExp(`(["']?)(${escapedName})\\1`, 'i'));
-                if (m && m.index !== undefined) {
-                    const quoteOffset = m[1] ? m[1].length : 0;
-                    startCol = baseOffset + m.index + quoteOffset;
-                    endCol = startCol + targetName.length;
-                } else {
-                    endCol = lineText.length;
-                }
-                revealRangeInEditor(editor, targetLine, startCol, endCol);
-                return true;
             } else {
-                window.showInformationMessage(
-                    `Could not locate task definition for '${targetName}' in ${path.basename(manifestPath)}.`,
-                );
-                return false;
-            }
-        } else {
-            const altName = targetName.includes('-')
-                ? targetName.replace(/-/g, '_')
-                : targetName.includes('_')
-                  ? targetName.replace(/_/g, '-')
-                  : undefined;
-            const escapedAlt = altName ? escapeRegex(altName) : undefined;
-            const namePattern = escapedAlt ? `(?:${escapedName}|${escapedAlt})` : escapedName;
-
-            const exactKeyRegex = new RegExp(`^\\s*["']?${namePattern}["']?\\s*=`, 'i');
-            const pyprojectDepRegex = new RegExp(`["']${namePattern}(?:\\s*[\\[><=~!^;@]|["'])`, 'i');
-
-            let currentSection = '';
-            // Pass 1: search inside recognized dependency tables
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i];
-                const sectionMatch = line.match(/^\s*\[+([^\]]+)\]+/);
-                if (sectionMatch) {
-                    currentSection = sectionMatch[1].trim();
-                }
-
                 const isDepSection =
                     /(^|\.)(?:dependencies|pypi-dependencies|build-dependencies|host-dependencies|optional-dependencies)(\.|$)/i.test(
                         currentSection,
                     );
-                if (isDepSection && (exactKeyRegex.test(line) || pyprojectDepRegex.test(line))) {
-                    targetLine = i;
-                    break;
-                }
-            }
-
-            // Pass 2: fallback search across entire file
-            if (targetLine < 0) {
-                for (let i = 0; i < lines.length; i++) {
-                    if (exactKeyRegex.test(lines[i]) || pyprojectDepRegex.test(lines[i])) {
+                const isMatch = keyRegex.test(line) || (pyprojectDepRegex ? pyprojectDepRegex.test(line) : false);
+                if (isMatch) {
+                    if (isDepSection) {
                         targetLine = i;
                         break;
+                    } else if (fallbackLine < 0) {
+                        fallbackLine = i;
                     }
                 }
             }
-
-            if (targetLine >= 0) {
-                const lineText = lines[targetLine];
-                const nameRegex = new RegExp(`(?:\\b|["'])(${namePattern})(?:\\b|["'])`, 'i');
-                const match = nameRegex.exec(lineText);
-                startCol = 0;
-                endCol = lineText.length;
-                if (match && match.index !== undefined) {
-                    const innerIdx = match[0].indexOf(match[1]);
-                    startCol = match.index + (innerIdx >= 0 ? innerIdx : 0);
-                    endCol = startCol + match[1].length;
-                }
-                revealRangeInEditor(editor, targetLine, startCol, endCol);
-                return true;
-            } else {
-                window.showInformationMessage(
-                    `Could not locate definition for '${targetName}' in ${path.basename(manifestPath)}.`,
-                );
-                return false;
-            }
         }
+
+        const finalLine = targetLine >= 0 ? targetLine : fallbackLine;
+        if (finalLine >= 0) {
+            const lineText = lines[finalLine];
+            const nameRegex = new RegExp(`(?:\\b|["'])(${namePattern})(?:\\b|["'])`, 'i');
+            const match = nameRegex.exec(lineText);
+            let startCol = 0;
+            let endCol = lineText.length;
+            if (match && match.index !== undefined) {
+                const innerIdx = match[0].indexOf(match[1]);
+                startCol = match.index + (innerIdx >= 0 ? innerIdx : 0);
+                endCol = startCol + match[1].length;
+            }
+            revealRangeInEditor(editor, finalLine, startCol, endCol);
+            return true;
+        }
+
+        const label = kind === 'task' ? `task definition for '${targetName}'` : `definition for '${targetName}'`;
+        window.showInformationMessage(`Could not locate ${label} in ${path.basename(manifestPath)}.`);
+        return false;
     } catch (err: unknown) {
         window.showErrorMessage(`Failed to open manifest: ${err instanceof Error ? err.message : String(err)}`);
         return false;
     }
+}
+
+/**
+ * Updates a TreeView description to show the single project name and manifest if only one project exists.
+ */
+export function updateProjectTreeViewDescription(
+    treeView: { description?: string } | undefined,
+    projectManager: { getProjects: () => Array<{ name: string; manifestPath: string }> },
+): void {
+    if (!treeView) {
+        return;
+    }
+    const projects = projectManager.getProjects();
+    treeView.description =
+        projects.length === 1 ? `${projects[0].name} (${path.basename(projects[0].manifestPath)})` : undefined;
 }

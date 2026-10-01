@@ -13,18 +13,12 @@ import {
 
 import { clearGlobalManifestCache } from '../cli/globalCli';
 import { cleanGlobalCache, clearPixiCache, clearSearchCache, runPixi } from '../cli/pixiCli';
+import { normalizeLocationPath } from '../common/execUtils';
 import { traceError, traceVerbose } from '../common/logging';
 import { PixiInfoTreeDataProvider } from '../views/infoTreeDataProvider';
 
 export async function openLocation(target?: unknown): Promise<void> {
-    const targetPath =
-        typeof target === 'string'
-            ? target
-            : target instanceof Uri
-              ? target.fsPath
-              : typeof (target as { fsPath?: unknown })?.fsPath === 'string'
-                ? (target as { fsPath: string }).fsPath
-                : undefined;
+    const targetPath = normalizeLocationPath(target);
     if (!targetPath) {
         return;
     }
