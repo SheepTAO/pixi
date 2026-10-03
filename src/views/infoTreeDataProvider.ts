@@ -52,20 +52,25 @@ export async function computeDirectorySize(dirPath: string): Promise<number | nu
             });
         }
 
-        // Windows support via PowerShell
+        // Windows support via robocopy (orders of magnitude faster than PowerShell on large directories)
         return await new Promise<number | null>((resolve) => {
-            const escaped = dirPath.replace(/'/g, "''");
-            const psCmd = `(Get-ChildItem -LiteralPath '${escaped}' -Recurse -File -Force -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum`;
+            const normalizedPath = dirPath.replace(/[/\\]+$/, '');
             ch.execFile(
-                'powershell',
-                ['-NoProfile', '-NonInteractive', '-Command', psCmd],
-                { timeout: 10000 },
-                (err, stdout) => {
-                    if (err || !stdout) {
+                'robocopy',
+                [normalizedPath, normalizedPath, '/L', '/E', '/BYTES', '/NFL', '/NDL', '/NJH', '/XJ', '/R:0', '/W:0'],
+                { timeout: 30000, windowsHide: true },
+                (_err, stdout) => {
+                    if (!stdout) {
                         return resolve(null);
                     }
-                    const bytes = parseInt(stdout.trim(), 10);
-                    resolve(isNaN(bytes) ? null : bytes);
+                    // robocopy returns exit code 1 when files are found; match Bytes in summary table
+                    const match = stdout.match(/Bytes\s*:\s*(\d+)/i);
+                    if (match) {
+                        const bytes = parseInt(match[1], 10);
+                        resolve(isNaN(bytes) ? null : bytes);
+                    } else {
+                        resolve(null);
+                    }
                 },
             );
         });
