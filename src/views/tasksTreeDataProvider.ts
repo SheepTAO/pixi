@@ -46,8 +46,17 @@ export class PixiTaskTreeItem extends TreeItem {
         const lower = task.name.toLowerCase();
         if (lower.includes('test')) {
             this.iconPath = new ThemeIcon('beaker', new ThemeColor('charts.green'));
+        } else if (lower.includes('bench') || lower.includes('profile') || lower.includes('eval')) {
+            this.iconPath = new ThemeIcon('pulse', new ThemeColor('charts.yellow'));
         } else if (lower.includes('build') || lower.includes('compile') || lower.includes('pkg')) {
             this.iconPath = new ThemeIcon('tools', new ThemeColor('charts.orange'));
+        } else if (
+            lower.includes('deploy') ||
+            lower.includes('release') ||
+            lower.includes('publish') ||
+            lower.includes('upload')
+        ) {
+            this.iconPath = new ThemeIcon('rocket', new ThemeColor('charts.red'));
         } else if (
             lower.includes('run') ||
             lower.includes('start') ||
@@ -63,12 +72,29 @@ export class PixiTaskTreeItem extends TreeItem {
             lower.includes('fmt')
         ) {
             this.iconPath = new ThemeIcon('check-all', new ThemeColor('charts.purple'));
+        } else if (
+            lower.includes('preprocess') ||
+            lower.includes('data') ||
+            lower.includes('prep') ||
+            lower.includes('etl')
+        ) {
+            this.iconPath = new ThemeIcon('database', new ThemeColor('charts.blue'));
+        } else if (
+            lower.includes('install') ||
+            lower.includes('download') ||
+            lower.includes('fetch') ||
+            lower.includes('pull') ||
+            lower.includes('update')
+        ) {
+            this.iconPath = new ThemeIcon('cloud-download', new ThemeColor('charts.blue'));
+        } else if (lower.includes('watch') || lower.includes('monitor')) {
+            this.iconPath = new ThemeIcon('eye', new ThemeColor('charts.cyan'));
         } else if (lower.includes('clean')) {
-            this.iconPath = new ThemeIcon('clear-all');
+            this.iconPath = new ThemeIcon('clear-all', new ThemeColor('descriptionForeground'));
         } else if (lower.includes('doc')) {
-            this.iconPath = new ThemeIcon('book');
+            this.iconPath = new ThemeIcon('book', new ThemeColor('charts.yellow'));
         } else if (lower.includes('sync') || lower.includes('setup')) {
-            this.iconPath = new ThemeIcon('sync');
+            this.iconPath = new ThemeIcon('sync', new ThemeColor('charts.green'));
         } else {
             this.iconPath = new ThemeIcon('terminal-view-icon');
         }

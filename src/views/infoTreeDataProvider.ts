@@ -113,6 +113,7 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
     private cachedSystemInfo: PixiSystemInfo | null = null;
     private cachedCacheSize: string | null = null;
     private isCalculatingCacheSize = false;
+    private cacheMeasurementAttempted = false;
     private cacheCalculationEpoch = 0;
 
     public refresh(): void {
@@ -120,6 +121,7 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
         this.cachedSystemInfo = null;
         this.cachedCacheSize = null;
         this.isCalculatingCacheSize = false;
+        this.cacheMeasurementAttempted = false;
         this._onDidChangeTreeData.fire();
     }
 
@@ -131,6 +133,7 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
     }
 
     public async measureCacheSize(): Promise<void> {
+        this.cacheMeasurementAttempted = false;
         if (!this.cachedSystemInfo) {
             try {
                 const rawJson = await runPixi(['info', '--json']);
@@ -149,6 +152,7 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
             return;
         }
         this.isCalculatingCacheSize = true;
+        this.cacheMeasurementAttempted = true;
         this._onDidChangeTreeData.fire();
         const currentEpoch = this.cacheCalculationEpoch;
         try {
@@ -253,7 +257,12 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
             };
             items.push(cacheItem);
 
-            if (!this.cachedCacheSize && !this.isCalculatingCacheSize && autoMeasure) {
+            if (
+                !this.cachedCacheSize &&
+                !this.isCalculatingCacheSize &&
+                !this.cacheMeasurementAttempted &&
+                autoMeasure
+            ) {
                 void this.calculateCacheSize(info.cache_dir);
             }
         }

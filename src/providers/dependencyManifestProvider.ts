@@ -83,7 +83,10 @@ export async function findPackageLineInLockfile(lockPath: string, pkgName: strin
     const altName = pkgName.includes('_') ? pkgName.replace(/_/g, '-') : pkgName.replace(/-/g, '_');
     const altEscaped = altName.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
 
-    const regCondaOrPypi = new RegExp(`^\\s*-\\s*(?:conda|pypi):\\s*.*[/\\\\](?:${escaped}|${altEscaped})-[0-9]`, 'i');
+    const regCondaOrPypi = new RegExp(
+        `^\\s*-\\s*(?:conda|pypi):\\s*.*[/\\\\](?:${escaped}|${altEscaped})(?:-[0-9]|[/\\\\]?\\s*$)`,
+        'i',
+    );
     const regName = new RegExp(`^\\s*name:\\s*["']?(?:${escaped}|${altEscaped})["']?\\s*$`, 'i');
 
     const packagesIndex = lines.findIndex((l) => /^packages:\s*$/.test(l));
@@ -101,7 +104,7 @@ export async function findPackageLineInLockfile(lockPath: string, pkgName: strin
         }
     }
 
-    const broadReg = new RegExp(`[/\\\\](?:${escaped}|${altEscaped})-[0-9]`, 'i');
+    const broadReg = new RegExp(`[/\\\\](?:${escaped}|${altEscaped})(?:-[0-9]|[/\\\\]?\\s*$)`, 'i');
     for (let i = 0; i < lines.length; i++) {
         if (broadReg.test(lines[i])) {
             return i;
@@ -220,9 +223,9 @@ export class PixiDependencyManifestProvider
                 continue;
             }
 
-            const secMatch = trimmed.match(/^\[([a-zA-Z0-9_\-\.]+)\]$/);
+            const secMatch = trimmed.match(/^\[+([^\]]+)\]+$/);
             if (secMatch) {
-                currentSection = secMatch[1].trim();
+                currentSection = secMatch[1].trim().replace(/["']/g, '');
                 inArrayBlock = false;
                 continue;
             }
@@ -531,11 +534,28 @@ export class PixiDependencyManifestProvider
                 }
             }
 
+            const actions: string[] = [];
             if (lockExists) {
                 const openLockArgs = encodeURIComponent(JSON.stringify([{ projectPath, packageName: matched.name }]));
-                md.appendMarkdown(
-                    `---\n[$(go-to-file) Open in pixi.lock](command:pixi.openLockfile?${openLockArgs} "Jump to package definition in pixi.lock")`,
+                actions.push(
+                    `[$(go-to-file) Open in pixi.lock](command:pixi.openLockfile?${openLockArgs} "Jump to package definition in pixi.lock")`,
                 );
+            }
+
+            if (!targetPkg.is_local && !targetPkg.is_editable) {
+                if (targetPkg.kind === 'pypi' || matched.section.toLowerCase().includes('pypi')) {
+                    const pypiUrl = `https://pypi.org/project/${encodeURIComponent(targetPkg.name)}/`;
+                    actions.push(`[$(link-external) PyPI](${pypiUrl} "Open package on PyPI")`);
+                } else {
+                    const chMatch = targetPkg.source?.match(/conda\.anaconda\.org\/([^/]+)/);
+                    const channel = chMatch ? chMatch[1] : 'conda-forge';
+                    const prefixUrl = `https://prefix.dev/channels/${channel}/packages/${encodeURIComponent(targetPkg.name)}`;
+                    actions.push(`[$(link-external) prefix.dev](${prefixUrl} "Open package on prefix.dev")`);
+                }
+            }
+
+            if (actions.length > 0) {
+                md.appendMarkdown(`---\n${actions.join(' &nbsp;&nbsp;|&nbsp;&nbsp; ')}`);
             }
         }
 
