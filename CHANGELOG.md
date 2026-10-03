@@ -5,6 +5,19 @@ All notable changes to the "pixi" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2026-10-03
+
+- **Windows Cache Measurement Performance**:
+    - Accelerate cache directory size calculation on Windows using native `robocopy` read-only scan, reducing calculation time on 350k+ files from timeout failure to 1~2 seconds.
+    - Add measurement fault tolerance to prevent repeated calculation attempts on inaccessible directories.
+- **Task View Icons & Semantics Expansion**:
+    - Expand semantic Codicon matching for tasks with deployment/release (`$(rocket)`), benchmark/evaluation (`$(pulse)`), preprocessing/ETL (`$(database)`), installation/download (`$(cloud-download)`), and monitoring (`$(eye)`).
+    - Harmonize theme colors across all task icon categories.
+- **Manifest Dependency Parsing & External Links**:
+    - Support quoted platform/target dependency table headers in `pixi.toml` (e.g. `[target."linux-64".dependencies]`).
+    - Support definition navigation to local path and editable subpackages in `pixi.lock`.
+    - Add direct links to package documentation on PyPI and prefix.dev in package hover inspection cards.
+
 ## [1.2.0] - 2026-10-01
 
 - **Locked Dependency Inlay Hints & Navigation**:
