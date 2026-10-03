@@ -178,7 +178,7 @@ if (pixi) {
 
 ## Troubleshooting
 
-- **Check Output Logs**: Open `View` → `Output` and select `Pixi` from the dropdown.
+- **Check Output Logs**: Open `View` → `Output` and select `Pixi` from the dropdown. To view detailed diagnostic logs (file scanning, background processes), run **Developer: Set Log Level...** from the Command Palette, select **Pixi**, and set to **Trace** or **Debug**.
 - **Binary Not Found**: Verify `pixi` is available in your system `PATH`, or set `pixi.executablePath`.
 - **Environments Not Showing**: Ensure `pixi.toml` exists and run `pixi.install` to initialize environment prefixes.
 

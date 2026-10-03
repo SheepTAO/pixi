@@ -6,7 +6,7 @@ import { clearPixiCache, validatePixiCli } from './cli/pixiCli';
 import { registerGlobalCommands } from './commands/globalCommands';
 import { registerInfoCommands } from './commands/infoCommands';
 import { registerWorkspaceCommands } from './commands/workspace';
-import { registerLogger } from './common/logging';
+import { registerLogger, traceInfo } from './common/logging';
 import { setPersistentState } from './common/persistentState';
 import { PixiProjectManager } from './core/projectManager';
 import { activatePythonSupport } from './languages/python';
@@ -83,10 +83,20 @@ export async function activate(context: ExtensionContext): Promise<PixiExtension
     const pixiApi = createPixiApi(projectManager, extensionVersion);
     context.subscriptions.push(pixiApi);
 
+    traceInfo(`Pixi extension v${extensionVersion} activated.`);
+
     // 4. Initial project discovery & validation
     await projectManager.initialize();
-    if (projectManager.getProjectPaths().length > 0) {
+    const projects = projectManager.getProjects();
+    if (projects.length > 0) {
         await validatePixiCli();
+        for (const p of projects) {
+            const envs = projectManager.getEnvironmentsForProject(p.projectPath);
+            const envNames = envs.map((e) => e.pixiEnvName).join(', ');
+            traceInfo(`Discovered Pixi project: ${p.name} [${envs.length} envs: ${envNames || 'none'}]`);
+        }
+    } else {
+        traceInfo('No Pixi projects discovered in current workspace.');
     }
 
     // 5. Conditionally activate Python support (if ms-python.vscode-python-envs is available)

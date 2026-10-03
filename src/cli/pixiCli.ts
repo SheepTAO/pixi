@@ -8,7 +8,7 @@ import which from 'which';
 
 import { createDeferred } from '../common/deferred';
 import { quoteArgs, safeJsonParse, untildify } from '../common/execUtils';
-import { traceError, traceVerbose } from '../common/logging';
+import { traceError, traceInfo, traceVerbose } from '../common/logging';
 
 let _cachedPixi: string | undefined;
 
@@ -167,6 +167,7 @@ export async function validatePixiCli(): Promise<boolean> {
             );
             return false;
         }
+        traceInfo(`Pixi CLI: ${await getPixi()} (v${parsedVersion.version})`);
         return true;
     } catch (err) {
         traceError('Pixi validation failed:', err);
