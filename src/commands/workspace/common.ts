@@ -95,30 +95,23 @@ export async function pickTargetEnvironment(
 export interface EnvironmentContextCandidate {
     pixiEnvName?: string;
     envName?: string;
-    env?: { pixiEnvName?: string; projectPath?: string; manifestPath?: string };
+    env?: { pixiEnvName?: string };
 }
 
-export function extractEnvironmentName(...targets: unknown[]): string | undefined {
-    for (const target of targets) {
-        if (!target) {
-            continue;
+export function extractEnvironmentName(target?: unknown): string | undefined {
+    if (!target) {
+        return undefined;
+    }
+    if (typeof target === 'string') {
+        const trimmed = target.trim();
+        if (trimmed && !trimmed.includes('/') && !trimmed.includes('\\')) {
+            return trimmed;
         }
-        if (typeof target === 'string') {
-            const trimmed = target.trim();
-            if (trimmed && !trimmed.includes('/') && !trimmed.includes('\\')) {
-                return trimmed;
-            }
-        } else if (typeof target === 'object') {
-            const item = target as EnvironmentContextCandidate;
-            const name =
-                (typeof item.env?.pixiEnvName === 'string' && item.env.pixiEnvName.trim()) ||
-                (typeof item.envName === 'string' && item.envName.trim()) ||
-                (typeof item.pixiEnvName === 'string' && item.pixiEnvName.trim()) ||
-                undefined;
-            if (name) {
-                return name;
-            }
-        }
+        return undefined;
+    }
+    if (typeof target === 'object') {
+        const item = target as EnvironmentContextCandidate;
+        return item.pixiEnvName || item.env?.pixiEnvName || item.envName;
     }
     return undefined;
 }

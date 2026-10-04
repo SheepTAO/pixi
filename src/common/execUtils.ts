@@ -121,8 +121,11 @@ export function normalizeLocationPath(target?: unknown): string | undefined {
     if (target instanceof Uri) {
         return target.fsPath;
     }
-    const t = target as PathContextCandidate;
-    return t.projectPath || t.project?.projectPath || t.env?.projectPath || t.task?.projectPath || t.fsPath;
+    if (typeof target === 'object') {
+        const t = target as PathContextCandidate;
+        return t.projectPath || t.project?.projectPath || t.env?.projectPath || t.task?.projectPath || t.fsPath;
+    }
+    return undefined;
 }
 
 /**

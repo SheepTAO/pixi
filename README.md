@@ -89,7 +89,7 @@ Launch any command via the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) by t
 
 | Command                                   | Identifier              | Description                                                                      |
 | :---------------------------------------- | :---------------------- | :------------------------------------------------------------------------------- |
-| **Pixi: Search Packages ...**             | `pixi.searchPackages`   | Search Conda & PyPI packages with autocompletion and 1-click install.            |
+| **Pixi: Search Packages ...**             | `pixi.searchPackages`   | Search Conda & PyPI packages to inspect platforms, licenses, metadata, and docs. |
 | **Pixi: Install (Sync Environments)**     | `pixi.install`          | Install dependencies and synchronize all project environments.                   |
 | **Pixi: Reinstall All Environments**      | `pixi.reinstall`        | Rebuild and re-install all environments in the project (`pixi reinstall --all`). |
 | **Pixi: Clean All Environments (.pixi)**  | `pixi.clean`            | Clean and remove the `.pixi` directory for the project with safety confirmation. |

@@ -19,6 +19,13 @@ import { PixiProject } from '../core/types';
 import { PixiTask, PixiTaskProvider } from '../providers/taskProvider';
 
 export class PixiTaskProjectTreeItem extends TreeItem {
+    get projectPath(): string {
+        return this.project.projectPath;
+    }
+    get manifestPath(): string {
+        return this.project.manifestPath;
+    }
+
     constructor(public readonly project: PixiProject) {
         super(project.name, TreeItemCollapsibleState.Expanded);
         this.description = path.basename(project.manifestPath);
@@ -29,6 +36,13 @@ export class PixiTaskProjectTreeItem extends TreeItem {
 }
 
 export class PixiTaskTreeItem extends TreeItem {
+    get projectPath(): string | undefined {
+        return this.project?.projectPath || this.task.projectPath;
+    }
+    get manifestPath(): string | undefined {
+        return this.project?.manifestPath;
+    }
+
     constructor(
         public readonly task: PixiTask,
         public readonly project?: PixiProject,

@@ -22,13 +22,7 @@ import { getProjectConfiguredChannels } from '../../core/projectDiscovery';
 import { PixiProjectManager } from '../../core/projectManager';
 import { PixiEnvironmentInfo, PixiPackage } from '../../core/types';
 import { handleGlobalInstall } from '../globalCommands';
-import {
-    EnvironmentContextCandidate,
-    extractEnvironmentName,
-    pickPixiProject,
-    pickTargetEnvironment,
-    resolveTargetEnvironment,
-} from './common';
+import { extractEnvironmentName, pickPixiProject, pickTargetEnvironment, resolveTargetEnvironment } from './common';
 
 export type SourceMode = 'conda' | 'pypi' | 'pypi-custom' | 'path' | 'git';
 
@@ -40,10 +34,11 @@ interface SearchResultQuickPickItem extends QuickPickItem {
     pkg?: PixiPackageSearchResult;
 }
 
-interface PackageItemContextCandidate extends EnvironmentContextCandidate {
+interface PackageItemContextCandidate {
     pkg?: PixiPackage;
     env?: PixiEnvironmentInfo;
     project?: { projectPath?: string; manifestPath?: string };
+    projectPath?: string;
     manifestPath?: string;
     name?: string;
 }
@@ -57,17 +52,23 @@ interface ExtractedPackageContext {
 }
 
 function extractPackageContext(arg?: unknown): ExtractedPackageContext {
-    const item = arg as PackageItemContextCandidate | undefined;
-    return {
-        pkg: item?.pkg,
-        env: item?.env,
-        projectPath: item?.project?.projectPath || item?.env?.projectPath,
-        manifestPath: item?.manifestPath || item?.project?.manifestPath || item?.env?.manifestPath,
-        name:
-            item?.pkg?.name ||
-            (typeof item?.name === 'string' ? item.name : undefined) ||
-            (typeof arg === 'string' ? arg : undefined),
-    };
+    if (!arg) {
+        return {};
+    }
+    if (typeof arg === 'string') {
+        return { name: arg };
+    }
+    if (typeof arg === 'object') {
+        const item = arg as PackageItemContextCandidate;
+        return {
+            pkg: item.pkg,
+            env: item.env,
+            projectPath: item.projectPath || item.project?.projectPath || item.env?.projectPath,
+            manifestPath: item.manifestPath || item.project?.manifestPath || item.env?.manifestPath,
+            name: item.pkg?.name || item.name,
+        };
+    }
+    return {};
 }
 
 interface PickPackageOptions {
@@ -263,20 +264,23 @@ export async function executeAddPackage(
     return runPixiWithProgress(progressTitle, args, projectPath, manager, successMsg);
 }
 
-export async function showPackageSearchPicker(
-    manager: PixiProjectManager,
-    initialQuery?: string,
-    targetProjectPath?: string,
-): Promise<void> {
-    const quickPick = window.createQuickPick<SearchResultQuickPickItem>();
-    quickPick.title = 'Pixi: Search Packages (Conda & PyPI)';
-    quickPick.placeholder = 'Type package name to search Conda & PyPI... (e.g. numpy, uv, torch, ruff)';
-    quickPick.matchOnDescription = true;
-    quickPick.matchOnDetail = true;
+interface DebouncedSearchController {
+    triggerSearch: (query: string) => void;
+    dispose: () => void;
+}
 
+function attachDebouncedPackageSearch<T extends QuickPickItem>(
+    quickPick: ReturnType<typeof window.createQuickPick<T>>,
+    options: {
+        projectPath?: string;
+        channels?: string[];
+        buildPrefixItems?: (query: string) => T[];
+    },
+): DebouncedSearchController {
     let debounceTimer: NodeJS.Timeout | undefined;
     let searchCts: CancellationTokenSource | undefined;
-    const projectChannels = targetProjectPath ? getProjectConfiguredChannels(targetProjectPath) : [];
+    const projectChannels =
+        options.channels ?? (options.projectPath ? getProjectConfiguredChannels(options.projectPath) : []);
 
     const performSearch = (query: string) => {
         if (debounceTimer) {
@@ -288,19 +292,31 @@ export async function showPackageSearchPicker(
         }
 
         const trimmed = query.trim();
+        const prefixItems = options.buildPrefixItems ? options.buildPrefixItems(trimmed) : [];
+
         if (trimmed.length < 2) {
             quickPick.items = [
+                ...prefixItems,
                 {
                     label: '$(info) Start typing to search...',
-                    description: 'Enter at least 2 characters to search Conda and PyPI packages',
+                    description: 'Type at least 2 characters to search Conda & PyPI packages',
                     alwaysShow: true,
-                },
+                } as unknown as T,
             ];
             quickPick.busy = false;
             return;
         }
 
+        quickPick.items = [
+            ...prefixItems,
+            {
+                label: '$(sync~spin) Searching Conda & PyPI packages...',
+                description: `Looking up "${trimmed}"...`,
+                alwaysShow: true,
+            } as unknown as T,
+        ];
         quickPick.busy = true;
+
         debounceTimer = setTimeout(async () => {
             searchCts = new CancellationTokenSource();
             const token = searchCts.token;
@@ -308,7 +324,7 @@ export async function showPackageSearchPicker(
             try {
                 const results = await searchPixiPackages(
                     trimmed,
-                    { cwd: targetProjectPath, channels: projectChannels },
+                    { cwd: options.projectPath, channels: projectChannels },
                     token,
                 );
                 if (token.isCancellationRequested) {
@@ -317,26 +333,29 @@ export async function showPackageSearchPicker(
 
                 if (results.length === 0) {
                     quickPick.items = [
+                        ...prefixItems,
                         {
                             label: '$(info) No packages found',
                             description: `No Conda or PyPI packages matching "${trimmed}"`,
                             alwaysShow: true,
-                        },
+                        } as unknown as T,
                     ];
                 } else {
-                    quickPick.items = results.map(createPackageQuickPickItem);
+                    const searchItems = results.map(createPackageQuickPickItem) as unknown as T[];
+                    quickPick.items = [...prefixItems, ...searchItems];
                 }
             } catch (err: unknown) {
                 if (!token.isCancellationRequested) {
                     const rawMsg = (err instanceof Error ? err.message : String(err)).trim();
                     const firstLine = rawMsg.split(/\r?\n/)[0] || rawMsg;
                     quickPick.items = [
+                        ...prefixItems,
                         {
                             label: '$(warning) Search failed',
                             description: firstLine,
                             detail: rawMsg.length > firstLine.length ? rawMsg : undefined,
                             alwaysShow: true,
-                        },
+                        } as unknown as T,
                     ];
                 }
             } finally {
@@ -347,20 +366,7 @@ export async function showPackageSearchPicker(
         }, 300);
     };
 
-    quickPick.onDidChangeValue((val) => performSearch(val));
-
-    quickPick.onDidAccept(async () => {
-        const selected = quickPick.selectedItems[0];
-        if (!selected || !selected.pkg) {
-            return;
-        }
-        const pkg = selected.pkg;
-        quickPick.hide();
-
-        await handlePackageSearchSelection(manager, pkg, targetProjectPath);
-    });
-
-    quickPick.onDidHide(() => {
+    const cleanup = () => {
         if (debounceTimer) {
             clearTimeout(debounceTimer);
         }
@@ -368,125 +374,177 @@ export async function showPackageSearchPicker(
             searchCts.cancel();
             searchCts.dispose();
         }
+    };
+
+    quickPick.onDidChangeValue(performSearch);
+
+    return { triggerSearch: performSearch, dispose: cleanup };
+}
+
+export async function showPackageSearchPicker(
+    _manager?: PixiProjectManager,
+    initialQuery?: string,
+    targetProjectPath?: string,
+): Promise<void> {
+    const quickPick = window.createQuickPick<SearchResultQuickPickItem>();
+    quickPick.title = 'Pixi: Search Packages (Conda & PyPI)';
+    quickPick.placeholder = 'Type package name to search Conda & PyPI... (e.g. numpy, uv, torch, ruff)';
+    quickPick.matchOnDescription = true;
+    quickPick.matchOnDetail = true;
+
+    const search = attachDebouncedPackageSearch(quickPick, { projectPath: targetProjectPath });
+
+    quickPick.onDidAccept(async () => {
+        const selected = quickPick.selectedItems[0];
+        if (!selected || !selected.pkg) {
+            return;
+        }
+        quickPick.hide();
+        await handlePackageSearchSelection(selected.pkg, targetProjectPath);
+    });
+
+    quickPick.onDidHide(() => {
+        search.dispose();
         quickPick.dispose();
     });
 
     quickPick.show();
-    if (initialQuery && initialQuery.trim()) {
-        quickPick.value = initialQuery.trim();
-        performSearch(initialQuery.trim());
-    } else {
-        performSearch('');
+    const query = initialQuery?.trim() ?? '';
+    if (query) {
+        quickPick.value = query;
     }
+    search.triggerSearch(query);
 }
 
-async function handlePackageSearchSelection(
-    manager: PixiProjectManager,
-    pkg: PixiPackageSearchResult,
-    targetProjectPath?: string,
-): Promise<void> {
-    const projects = manager.getProjects();
-    const hasProjects = projects.length > 0;
+async function handlePackageSearchSelection(pkg: PixiPackageSearchResult, targetProjectPath?: string): Promise<void> {
     const isPypi = pkg.sourceType === 'pypi';
+    const primaryChan = pkg.channel ? pkg.channel.split(',')[0].trim() : 'conda-forge';
+    const webUrl = isPypi
+        ? `https://pypi.org/project/${encodeURIComponent(pkg.name)}/`
+        : `https://prefix.dev/channels/${encodeURIComponent(primaryChan)}/packages/${encodeURIComponent(pkg.name)}`;
 
-    interface ActionQuickPickItem extends QuickPickItem {
-        action: 'add-project' | 'install-global' | 'open-browser' | 'copy';
+    interface PackageInspectionItem extends QuickPickItem {
+        action?: 'add' | 'global-install' | 'open-browser' | 'copy-spec' | 'copy-name';
     }
 
-    const actions: ActionQuickPickItem[] = [];
-    if (hasProjects) {
-        actions.push({
-            label: '$(plus) Add to Project Environment',
-            description: `Add ${pkg.name} (${pkg.latestVersion}) to workspace Pixi project (${isPypi ? 'PyPI' : 'Conda'})`,
-            action: 'add-project',
-        });
-    }
-    if (!isPypi) {
-        actions.push({
-            label: '$(tools) Install Globally as CLI Tool',
-            description: `Install into Pixi global environment (pixi global install ${pkg.name})`,
-            action: 'install-global',
-        });
-        actions.push({
-            label: '$(globe) View on Prefix.dev',
-            description: 'Open prefix.dev package page in external browser',
+    const items: PackageInspectionItem[] = [
+        {
+            label: 'Actions',
+            kind: QuickPickItemKind.Separator,
+        },
+        {
+            label: isPypi ? '$(symbol-keyword) View on PyPI' : '$(globe) View on Prefix.dev',
+            description: isPypi ? 'pypi.org' : `prefix.dev (${primaryChan})`,
+            detail: webUrl,
             action: 'open-browser',
-        });
-    } else {
-        actions.push({
-            label: '$(symbol-keyword) View on PyPI',
-            description: 'Open pypi.org project page in external browser',
-            action: 'open-browser',
-        });
-    }
-    actions.push({
-        label: '$(copy) Copy Dependency String',
-        description: `Copy "${pkg.name}>=${pkg.latestVersion}" to clipboard`,
-        action: 'copy',
-    });
+        },
+        {
+            label: '$(plus) Add to Project...',
+            description: `Install ${pkg.name} into workspace project`,
+            detail: 'Runs interactive add with target environment and version constraint picking',
+            action: 'add',
+        },
+        ...(!isPypi
+            ? [
+                  {
+                      label: '$(tools) Install Globally as CLI Tool...',
+                      description: `pixi global install ${pkg.name}`,
+                      detail: 'Install executable tool into Pixi global environment',
+                      action: 'global-install' as const,
+                  },
+              ]
+            : []),
+        {
+            label: '$(copy) Copy Dependency Spec',
+            description: `${pkg.name}>=${pkg.latestVersion}`,
+            detail: 'Copy dependency constraint string to clipboard',
+            action: 'copy-spec',
+        },
+        {
+            label: '$(copy) Copy Package Name',
+            description: pkg.name,
+            detail: `Copy "${pkg.name}" to clipboard`,
+            action: 'copy-name',
+        },
+        {
+            label: 'Package Information',
+            kind: QuickPickItemKind.Separator,
+        },
+        {
+            label: '$(info) Summary',
+            detail: pkg.summary || 'No description provided.',
+        },
+        {
+            label: '$(server) Supported Platforms',
+            description:
+                pkg.platforms && pkg.platforms.length > 0
+                    ? pkg.platforms.join(', ')
+                    : isPypi
+                      ? 'Universal / Python Wheels & sdist'
+                      : 'Not specified',
+        },
+        {
+            label: '$(repo) Channel / Source',
+            description: isPypi ? 'PyPI (Python Package Index)' : `Conda • ${pkg.channel}`,
+        },
+        ...(pkg.license
+            ? [
+                  {
+                      label: '$(law) License',
+                      description: pkg.license,
+                  },
+              ]
+            : []),
+        ...(pkg.versions && pkg.versions.length > 0
+            ? [
+                  {
+                      label: '$(versions) Available Versions',
+                      description:
+                          pkg.versions.slice(0, 8).join(', ') +
+                          (pkg.versions.length > 8 ? ` (+${pkg.versions.length - 8} more)` : ''),
+                  },
+              ]
+            : []),
+    ];
 
-    const actionPick = await window.showQuickPick(actions, {
-        title: `Pixi: Package ${pkg.name} (v${pkg.latestVersion}) • ${isPypi ? 'PyPI' : `Conda (${pkg.channel})`}`,
-        placeHolder: `Select action for package '${pkg.name}'`,
+    const pick = await window.showQuickPick(items, {
+        title: `Pixi Package: ${pkg.name} v${pkg.latestVersion} (${isPypi ? 'PyPI' : `Conda • ${pkg.channel}`})`,
+        placeHolder: `Select an action or view package information for '${pkg.name}'`,
     });
-    if (!actionPick) {
+    if (!pick) {
         return;
     }
 
-    switch (actionPick.action) {
-        case 'add-project': {
-            const projectPath =
-                targetProjectPath || (await pickPixiProject(manager, `Select Pixi project to add ${pkg.name} to`));
-            if (!projectPath) {
-                return;
-            }
-
-            const finalSpec = await promptPackageVersionConstraint(pkg);
-            if (!finalSpec) {
-                return;
-            }
-
-            const envs = manager.getEnvironmentsForProject(projectPath);
-            const targetEnv = await pickTargetEnvironment(envs, 'add');
-            if (targetEnv === null) {
-                return;
-            }
-
-            const args = ['add'];
-            if (isPypi) {
-                args.push('--pypi');
-            }
-            if (targetEnv) {
-                args.push('-e', targetEnv);
-            }
-            args.push(finalSpec);
-
-            const sourceLabel = isPypi ? 'PyPI' : `Conda (${pkg.channel || 'conda-forge'})`;
-            await executeAddPackage(manager, projectPath, args, finalSpec, sourceLabel, targetEnv);
+    switch (pick.action) {
+        case 'open-browser': {
+            await vscodeEnv.openExternal(Uri.parse(webUrl));
             break;
         }
-
-        case 'install-global': {
+        case 'add': {
+            await commands.executeCommand('pixi.addPackage', targetProjectPath, undefined, pkg);
+            break;
+        }
+        case 'global-install': {
             await handleGlobalInstall(pkg.name);
             break;
         }
-
-        case 'open-browser': {
-            if (isPypi) {
-                const url = `https://pypi.org/project/${encodeURIComponent(pkg.name)}/`;
-                await vscodeEnv.openExternal(Uri.parse(url));
-            } else {
-                const primaryChan = pkg.channel.split(',')[0].trim() || 'conda-forge';
-                const url = `https://prefix.dev/channels/${encodeURIComponent(primaryChan)}/packages/${encodeURIComponent(pkg.name)}`;
-                await vscodeEnv.openExternal(Uri.parse(url));
-            }
+        case 'copy-spec': {
+            const spec = `${pkg.name}>=${pkg.latestVersion}`;
+            await vscodeEnv.clipboard.writeText(spec);
+            window.showInformationMessage(`Copied "${spec}" to clipboard.`);
             break;
         }
-
-        case 'copy': {
-            const specStr = `${pkg.name}>=${pkg.latestVersion}`;
-            await vscodeEnv.clipboard.writeText(specStr);
-            window.showInformationMessage(`Copied "${specStr}" to clipboard.`);
+        case 'copy-name': {
+            await vscodeEnv.clipboard.writeText(pkg.name);
+            window.showInformationMessage(`Copied "${pkg.name}" to clipboard.`);
+            break;
+        }
+        default: {
+            const textToCopy = pick.description || pick.detail;
+            if (textToCopy) {
+                await vscodeEnv.clipboard.writeText(textToCopy);
+                window.showInformationMessage(`Copied: ${textToCopy}`);
+            }
             break;
         }
     }
@@ -506,14 +564,13 @@ export type AddPackagePromptResult =
 async function promptAddPackageSpec(
     projectPath: string,
     targetEnvName?: string,
+    initialQuery?: string,
 ): Promise<AddPackagePromptResult | undefined> {
     return new Promise((resolve) => {
         interface AddPackageQuickPickItem extends QuickPickItem {
             pkg?: PixiPackageSearchResult;
             isDirectInput?: boolean;
         }
-
-        const projectChannels = getProjectConfiguredChannels(projectPath);
 
         const quickPick = window.createQuickPick<AddPackageQuickPickItem>();
         quickPick.title = targetEnvName
@@ -524,99 +581,24 @@ async function promptAddPackageSpec(
         quickPick.matchOnDescription = true;
         quickPick.matchOnDetail = true;
 
-        let debounceTimer: NodeJS.Timeout | undefined;
-        let searchCts: CancellationTokenSource | undefined;
         let resolved = false;
 
-        const updateItems = (query: string) => {
-            if (debounceTimer) {
-                clearTimeout(debounceTimer);
-            }
-            if (searchCts) {
-                searchCts.cancel();
-                searchCts.dispose();
-            }
-
-            const trimmed = query.trim();
-            const directItem: AddPackageQuickPickItem[] = trimmed
-                ? [
-                      {
-                          label: `$(edit) Add: "${trimmed}"`,
-                          description: 'Press Enter to select source channel and install directly',
-                          alwaysShow: true,
-                          isDirectInput: true,
-                      },
-                  ]
-                : [];
-
-            if (trimmed.length < 2) {
-                quickPick.items = [
-                    ...directItem,
+        const search = attachDebouncedPackageSearch(quickPick, {
+            projectPath,
+            buildPrefixItems: (query: string): AddPackageQuickPickItem[] => {
+                if (!query) {
+                    return [];
+                }
+                return [
                     {
-                        label: '$(info) Start typing to search...',
-                        description: 'Type at least 2 characters to search Conda & PyPI packages with live suggestions',
+                        label: `$(edit) Add: "${query}"`,
+                        description: 'Press Enter to select source channel and install directly',
                         alwaysShow: true,
+                        isDirectInput: true,
                     },
                 ];
-                quickPick.busy = false;
-                return;
-            }
-
-            quickPick.items = [
-                ...directItem,
-                {
-                    label: '$(sync~spin) Searching Conda & PyPI packages...',
-                    description: `Looking up "${trimmed}"...`,
-                    alwaysShow: true,
-                },
-            ];
-            quickPick.busy = true;
-
-            debounceTimer = setTimeout(async () => {
-                searchCts = new CancellationTokenSource();
-                const token = searchCts.token;
-
-                try {
-                    const results = await searchPixiPackages(
-                        trimmed,
-                        { cwd: projectPath, channels: projectChannels },
-                        token,
-                    );
-                    if (token.isCancellationRequested) {
-                        return;
-                    }
-
-                    const searchItems: AddPackageQuickPickItem[] = results.map(createPackageQuickPickItem);
-                    quickPick.items = [...directItem, ...searchItems];
-                } catch (err: unknown) {
-                    if (!token.isCancellationRequested) {
-                        const rawMsg = (err instanceof Error ? err.message : String(err)).trim();
-                        const firstLine = rawMsg.split(/\r?\n/)[0] || rawMsg;
-                        const errorItems: AddPackageQuickPickItem[] = [
-                            {
-                                label: `$(edit) Add: "${trimmed}"`,
-                                description: 'Press Enter to select source channel and add directly to manifest',
-                                alwaysShow: true,
-                                isDirectInput: true,
-                            },
-                            {
-                                label: '$(warning) Search failed',
-                                description: firstLine,
-                                detail: rawMsg.length > firstLine.length ? rawMsg : undefined,
-                                alwaysShow: true,
-                            },
-                        ];
-                        quickPick.items = errorItems;
-                    }
-                } finally {
-                    if (!token.isCancellationRequested) {
-                        quickPick.busy = false;
-                    }
-                }
-            }, 300);
-        };
-
-        quickPick.onDidChangeValue((val) => updateItems(val));
+            },
+        });
 
         quickPick.onDidAccept(async () => {
             const selected = quickPick.selectedItems[0];
@@ -640,7 +622,6 @@ async function promptAddPackageSpec(
                     resolve(undefined);
                     return;
                 }
-
                 resolve({
                     kind: 'selected',
                     pkg,
@@ -668,13 +649,7 @@ async function promptAddPackageSpec(
         });
 
         quickPick.onDidHide(() => {
-            if (debounceTimer) {
-                clearTimeout(debounceTimer);
-            }
-            if (searchCts) {
-                searchCts.cancel();
-                searchCts.dispose();
-            }
+            search.dispose();
             quickPick.dispose();
             if (!resolved) {
                 resolve(undefined);
@@ -682,7 +657,11 @@ async function promptAddPackageSpec(
         });
 
         quickPick.show();
-        updateItems('');
+        const query = initialQuery?.trim() ?? '';
+        if (query) {
+            quickPick.value = query;
+        }
+        search.triggerSearch(query);
     });
 }
 
@@ -806,214 +785,231 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
 
     // Pixi: Add Package...
     disposables.push(
-        commands.registerCommand('pixi.addPackage', async (targetItem?: unknown, presetEnv?: string) => {
-            const projectPath = await pickPixiProject(manager, 'Select Pixi project to add package to', targetItem);
-            if (!projectPath) {
-                return;
-            }
-
-            const envs = manager.getEnvironmentsForProject(projectPath);
-
-            const directEnvName =
-                (typeof presetEnv === 'string' && presetEnv.trim()) || extractEnvironmentName(targetItem);
-
-            let targetEnv: string | undefined;
-            let isTargetEnvLocked = false;
-            if (directEnvName) {
-                isTargetEnvLocked = true;
-                targetEnv = directEnvName === 'default' ? undefined : directEnvName;
-            }
-
-            const promptResult = await promptAddPackageSpec(projectPath, directEnvName);
-            if (!promptResult) {
-                return;
-            }
-
-            if (!isTargetEnvLocked) {
-                const picked = await pickTargetEnvironment(envs, 'add');
-                if (picked === null) {
+        commands.registerCommand(
+            'pixi.addPackage',
+            async (targetItem?: unknown, presetEnv?: string, initialPkg?: string | PixiPackageSearchResult) => {
+                const projectPath = await pickPixiProject(manager, 'Select Pixi project to add package to', targetItem);
+                if (!projectPath) {
                     return;
                 }
-                targetEnv = picked;
-            }
 
-            if (promptResult.kind === 'selected') {
-                const pkg = promptResult.pkg;
-                const spec = promptResult.spec;
-                const isPypi = pkg.sourceType === 'pypi';
+                const envs = manager.getEnvironmentsForProject(projectPath);
 
-                const args = ['add'];
-                if (isPypi) {
-                    args.push('--pypi');
+                const directEnvName =
+                    (typeof presetEnv === 'string' && presetEnv.trim()) || extractEnvironmentName(targetItem);
+
+                let targetEnv: string | undefined;
+                let isTargetEnvLocked = false;
+                if (directEnvName) {
+                    isTargetEnvLocked = true;
+                    targetEnv = directEnvName === 'default' ? undefined : directEnvName;
                 }
-                if (targetEnv) {
-                    args.push('-e', targetEnv);
+
+                let promptResult: AddPackagePromptResult | undefined;
+                if (initialPkg && typeof initialPkg === 'object') {
+                    const pkg = initialPkg;
+                    const spec = await promptPackageVersionConstraint(pkg);
+                    if (!spec) {
+                        return;
+                    }
+                    promptResult = { kind: 'selected', pkg, spec };
+                } else {
+                    promptResult = await promptAddPackageSpec(
+                        projectPath,
+                        directEnvName,
+                        typeof initialPkg === 'string' ? initialPkg : undefined,
+                    );
                 }
-                args.push(spec);
-
-                const sourceLabel = isPypi ? 'PyPI' : `Conda (${pkg.channel || 'conda-forge'})`;
-                await executeAddPackage(manager, projectPath, args, spec, sourceLabel, targetEnv || directEnvName);
-                return;
-            }
-
-            const specs = promptResult.specs;
-            if (specs.length === 0) {
-                return;
-            }
-
-            const source = await window.showQuickPick<SourceQuickPickItem>(
-                [
-                    {
-                        label: '$(package) Conda (default)',
-                        description: 'Install as Conda package from project channels (writes to [dependencies])',
-                        mode: 'conda',
-                    },
-                    {
-                        label: '$(symbol-keyword) PyPI',
-                        description: 'Install from official Python Package Index (writes to [pypi-dependencies])',
-                        mode: 'pypi',
-                    },
-                    {
-                        label: '$(globe) PyPI (Custom Index / Mirror...)',
-                        description: 'Install from custom PyPI index/mirror (e.g. Tsinghua, Aliyun, private index)',
-                        mode: 'pypi-custom',
-                    },
-                    {
-                        label: '$(folder) Local Path / Editable...',
-                        description: 'Install a local directory as a path or editable dependency',
-                        mode: 'path',
-                    },
-                    {
-                        label: '$(git-branch) Git Repository...',
-                        description: 'Install dependency directly from Git repository URL',
-                        mode: 'git',
-                    },
-                ],
-                {
-                    title: 'Pixi: Select Package Source Channel',
-                    placeHolder: 'Choose package source channel or dependency type',
-                },
-            );
-            if (!source) {
-                return;
-            }
-
-            const args = ['add'];
-            if (targetEnv) {
-                args.push('-e', targetEnv);
-            }
-
-            let sourceLabel = 'Conda';
-
-            if (source.mode === 'conda') {
-                const projectChannels = getProjectConfiguredChannels(projectPath);
-                const primaryChannel = projectChannels[0] || 'conda-forge';
-                sourceLabel = `Conda (${primaryChannel})`;
-                args.push(...specs);
-            } else if (source.mode === 'pypi') {
-                sourceLabel = 'PyPI';
-                args.push('--pypi', ...specs);
-            } else if (source.mode === 'pypi-custom') {
-                const indexUrl = await window.showInputBox({
-                    title: 'Pixi: Custom PyPI Index URL',
-                    prompt: 'Enter custom PyPI index/mirror URL',
-                    placeHolder: 'https://pypi.tuna.tsinghua.edu.cn/simple',
-                    value: 'https://pypi.tuna.tsinghua.edu.cn/simple',
-                    ignoreFocusOut: true,
-                });
-                if (!indexUrl || !indexUrl.trim()) {
+                if (!promptResult) {
                     return;
                 }
-                sourceLabel = `PyPI (${indexUrl.trim()})`;
-                args.push('--pypi', '--index', indexUrl.trim(), ...specs);
-            } else if (source.mode === 'path') {
-                const folderUris = await window.showOpenDialog({
-                    canSelectFiles: false,
-                    canSelectFolders: true,
-                    canSelectMany: false,
-                    openLabel: 'Select Package Directory',
-                    title: 'Pixi: Select Local Package Directory',
-                    defaultUri: Uri.file(projectPath),
-                });
-                if (!folderUris || folderUris.length === 0) {
+
+                if (!isTargetEnvLocked) {
+                    const picked = await pickTargetEnvironment(envs, 'add');
+                    if (picked === null) {
+                        return;
+                    }
+                    targetEnv = picked;
+                }
+
+                if (promptResult.kind === 'selected') {
+                    const pkg = promptResult.pkg;
+                    const spec = promptResult.spec;
+                    const isPypi = pkg.sourceType === 'pypi';
+
+                    const args = ['add'];
+                    if (isPypi) {
+                        args.push('--pypi');
+                    }
+                    if (targetEnv) {
+                        args.push('-e', targetEnv);
+                    }
+                    args.push(spec);
+
+                    const sourceLabel = isPypi ? 'PyPI' : `Conda (${pkg.channel || 'conda-forge'})`;
+                    await executeAddPackage(manager, projectPath, args, spec, sourceLabel, targetEnv || directEnvName);
                     return;
                 }
-                const selectedDir = folderUris[0].fsPath;
-                const relPath = path.relative(projectPath, selectedDir) || '.';
 
-                const modePick = await window.showQuickPick(
+                const specs = promptResult.specs;
+                if (specs.length === 0) {
+                    return;
+                }
+
+                const source = await window.showQuickPick<SourceQuickPickItem>(
                     [
                         {
-                            label: '$(edit) Editable Mode (--editable)',
-                            description: 'Changes to local source code reflect immediately (PyPI dependency)',
-                            isPypi: true,
-                            editable: true,
+                            label: '$(package) Conda (default)',
+                            description: 'Install as Conda package from project channels (writes to [dependencies])',
+                            mode: 'conda',
                         },
                         {
-                            label: '$(symbol-keyword) PyPI Path Dependency',
-                            description: 'Install as standard local PyPI dependency (non-editable)',
-                            isPypi: true,
-                            editable: false,
+                            label: '$(symbol-keyword) PyPI',
+                            description: 'Install from official Python Package Index (writes to [pypi-dependencies])',
+                            mode: 'pypi',
                         },
                         {
-                            label: '$(package) Conda Path Dependency',
-                            description: 'Install as local Conda path dependency',
-                            isPypi: false,
-                            editable: false,
+                            label: '$(globe) PyPI (Custom Index / Mirror...)',
+                            description: 'Install from custom PyPI index/mirror (e.g. Tsinghua, Aliyun, private index)',
+                            mode: 'pypi-custom',
+                        },
+                        {
+                            label: '$(folder) Local Path / Editable...',
+                            description: 'Install a local directory as a path or editable dependency',
+                            mode: 'path',
+                        },
+                        {
+                            label: '$(git-branch) Git Repository...',
+                            description: 'Install dependency directly from Git repository URL',
+                            mode: 'git',
                         },
                     ],
                     {
-                        title: 'Pixi: Select Path Dependency Type',
-                        placeHolder: 'Choose installation mode for local directory',
+                        title: 'Pixi: Select Package Source Channel',
+                        placeHolder: 'Choose package source channel or dependency type',
                     },
                 );
-                if (!modePick) {
+                if (!source) {
                     return;
                 }
 
-                if (modePick.isPypi) {
-                    args.push('--pypi');
-                }
-                if (modePick.editable) {
-                    args.push('--editable');
-                }
-                sourceLabel = modePick.editable ? `Local Path (Editable: ${relPath})` : `Local Path (${relPath})`;
-                args.push(...specs, '--path', relPath);
-            } else if (source.mode === 'git') {
-                const gitUrl = await window.showInputBox({
-                    title: 'Pixi: Git Repository URL',
-                    prompt: 'Enter Git repository URL (e.g. https://github.com/org/repo.git)',
-                    placeHolder: 'https://github.com/org/repo.git',
-                    ignoreFocusOut: true,
-                });
-                if (!gitUrl || !gitUrl.trim()) {
-                    return;
+                const args = ['add'];
+                if (targetEnv) {
+                    args.push('-e', targetEnv);
                 }
 
-                const rev = await window.showInputBox({
-                    title: 'Pixi: Git Branch, Tag, or Revision (Optional)',
-                    prompt: 'Enter branch, tag, or commit hash (leave empty for default branch)',
-                    placeHolder: 'e.g. main, v1.0.0, or commit hash',
-                    ignoreFocusOut: true,
-                });
+                let sourceLabel = 'Conda';
 
-                const revPart = rev && rev.trim() ? ` @ ${rev.trim()}` : '';
-                sourceLabel = `Git (${gitUrl.trim()}${revPart})`;
-                args.push(...specs, '--git', gitUrl.trim());
-                if (rev && rev.trim()) {
-                    args.push('--rev', rev.trim());
+                if (source.mode === 'conda') {
+                    const projectChannels = getProjectConfiguredChannels(projectPath);
+                    const primaryChannel = projectChannels[0] || 'conda-forge';
+                    sourceLabel = `Conda (${primaryChannel})`;
+                    args.push(...specs);
+                } else if (source.mode === 'pypi') {
+                    sourceLabel = 'PyPI';
+                    args.push('--pypi', ...specs);
+                } else if (source.mode === 'pypi-custom') {
+                    const indexUrl = await window.showInputBox({
+                        title: 'Pixi: Custom PyPI Index URL',
+                        prompt: 'Enter custom PyPI index/mirror URL',
+                        placeHolder: 'https://pypi.tuna.tsinghua.edu.cn/simple',
+                        value: 'https://pypi.tuna.tsinghua.edu.cn/simple',
+                        ignoreFocusOut: true,
+                    });
+                    if (!indexUrl || !indexUrl.trim()) {
+                        return;
+                    }
+                    sourceLabel = `PyPI (${indexUrl.trim()})`;
+                    args.push('--pypi', '--index', indexUrl.trim(), ...specs);
+                } else if (source.mode === 'path') {
+                    const folderUris = await window.showOpenDialog({
+                        canSelectFiles: false,
+                        canSelectFolders: true,
+                        canSelectMany: false,
+                        openLabel: 'Select Package Directory',
+                        title: 'Pixi: Select Local Package Directory',
+                        defaultUri: Uri.file(projectPath),
+                    });
+                    if (!folderUris || folderUris.length === 0) {
+                        return;
+                    }
+                    const selectedDir = folderUris[0].fsPath;
+                    const relPath = path.relative(projectPath, selectedDir) || '.';
+
+                    const modePick = await window.showQuickPick(
+                        [
+                            {
+                                label: '$(edit) Editable Mode (--editable)',
+                                description: 'Changes to local source code reflect immediately (PyPI dependency)',
+                                isPypi: true,
+                                editable: true,
+                            },
+                            {
+                                label: '$(symbol-keyword) PyPI Path Dependency',
+                                description: 'Install as standard local PyPI dependency (non-editable)',
+                                isPypi: true,
+                                editable: false,
+                            },
+                            {
+                                label: '$(package) Conda Path Dependency',
+                                description: 'Install as local Conda path dependency',
+                                isPypi: false,
+                                editable: false,
+                            },
+                        ],
+                        {
+                            title: 'Pixi: Select Path Dependency Type',
+                            placeHolder: 'Choose installation mode for local directory',
+                        },
+                    );
+                    if (!modePick) {
+                        return;
+                    }
+
+                    if (modePick.isPypi) {
+                        args.push('--pypi');
+                    }
+                    if (modePick.editable) {
+                        args.push('--editable');
+                    }
+                    sourceLabel = modePick.editable ? `Local Path (Editable: ${relPath})` : `Local Path (${relPath})`;
+                    args.push(...specs, '--path', relPath);
+                } else if (source.mode === 'git') {
+                    const gitUrl = await window.showInputBox({
+                        title: 'Pixi: Git Repository URL',
+                        prompt: 'Enter Git repository URL (e.g. https://github.com/org/repo.git)',
+                        placeHolder: 'https://github.com/org/repo.git',
+                        ignoreFocusOut: true,
+                    });
+                    if (!gitUrl || !gitUrl.trim()) {
+                        return;
+                    }
+
+                    const rev = await window.showInputBox({
+                        title: 'Pixi: Git Branch, Tag, or Revision (Optional)',
+                        prompt: 'Enter branch, tag, or commit hash (leave empty for default branch)',
+                        placeHolder: 'e.g. main, v1.0.0, or commit hash',
+                        ignoreFocusOut: true,
+                    });
+
+                    const revPart = rev && rev.trim() ? ` @ ${rev.trim()}` : '';
+                    sourceLabel = `Git (${gitUrl.trim()}${revPart})`;
+                    args.push(...specs, '--git', gitUrl.trim());
+                    if (rev && rev.trim()) {
+                        args.push('--rev', rev.trim());
+                    }
                 }
-            }
 
-            await executeAddPackage(
-                manager,
-                projectPath,
-                args,
-                specs.join(', '),
-                sourceLabel,
-                targetEnv || directEnvName,
-            );
-        }),
+                await executeAddPackage(
+                    manager,
+                    projectPath,
+                    args,
+                    specs.join(', '),
+                    sourceLabel,
+                    targetEnv || directEnvName,
+                );
+            },
+        ),
     );
 
     // Pixi: Remove Package...

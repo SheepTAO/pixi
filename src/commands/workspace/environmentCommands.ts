@@ -4,7 +4,7 @@ import { commands, Disposable, Uri, window, workspace } from 'vscode';
 
 import { runPixiWithProgress } from '../../cli/workspaceCli';
 import { getEnvironmentStatusBadge } from '../../core/environmentRules';
-import { findManifestPath, isPixiProject } from '../../core/projectDiscovery';
+import { findManifestPath } from '../../core/projectDiscovery';
 import { PixiProjectManager } from '../../core/projectManager';
 import {
     extractEnvironmentName,
@@ -53,64 +53,50 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
         }),
 
         // Pixi: Create Environment...
-        commands.registerCommand('pixi.createEnvironment', async (folderUri?: Uri) => {
-            const targetFolder = await resolveTargetFolder(folderUri, 'Select folder to create Pixi environment in');
-            if (!targetFolder) {
-                window.showWarningMessage('Please open a folder to create a Pixi environment.');
+        commands.registerCommand('pixi.createEnvironment', async (folderUri?: unknown) => {
+            const projectPath = await pickPixiProject(
+                manager,
+                'Select Pixi project to create environment in',
+                folderUri,
+            );
+            if (!projectPath) {
                 return;
             }
 
-            if (isPixiProject(targetFolder)) {
-                const existingEnvs = manager.getEnvironmentsForProject(targetFolder);
-                const envName = await window.showInputBox({
-                    title: 'Pixi: Create Environment',
-                    prompt: 'Enter a name for the new environment',
-                    placeHolder: 'e.g. dev, test, native',
-                    validateInput: (value) => {
-                        const trimmed = value?.trim();
-                        if (!trimmed) {
-                            return 'Environment name cannot be empty.';
-                        }
-                        if (!/^[a-zA-Z0-9_\-]+$/.test(trimmed)) {
-                            return 'Environment name must only contain alphanumeric characters, underscores, and hyphens.';
-                        }
-                        if (trimmed === 'default' || existingEnvs.some((e) => e.pixiEnvName === trimmed)) {
-                            return `Environment '${trimmed}' already exists in this project.`;
-                        }
-                        return null;
-                    },
-                });
-                if (!envName) {
-                    return;
-                }
-
-                const trimmedName = envName.trim();
-                await runPixiWithProgress(
-                    `Pixi: Creating and installing environment '${trimmedName}'...`,
-                    [
-                        ['workspace', 'environment', 'add', trimmedName],
-                        ['install', '-e', trimmedName],
-                    ],
-                    targetFolder,
-                    manager,
-                    `Pixi: Environment '${trimmedName}' created and ready.`,
-                );
-            } else {
-                const format = await pickManifestFormat(targetFolder);
-                if (!format) {
-                    return;
-                }
-
-                await runPixiWithProgress(
-                    'Pixi: Initializing project and environment...',
-                    [['init', '--format', format, '.'], ['install']],
-                    targetFolder,
-                    manager,
-                    'Pixi: Project and default environment initialized successfully.',
-                );
-
-                await openDocumentIfExists(getManifestPathForFormat(targetFolder, format));
+            const existingEnvs = manager.getEnvironmentsForProject(projectPath);
+            const envName = await window.showInputBox({
+                title: 'Pixi: Create Environment',
+                prompt: 'Enter a name for the new environment',
+                placeHolder: 'e.g. dev, test, native',
+                validateInput: (value) => {
+                    const trimmed = value?.trim();
+                    if (!trimmed) {
+                        return 'Environment name cannot be empty.';
+                    }
+                    if (!/^[a-zA-Z0-9_\-]+$/.test(trimmed)) {
+                        return 'Environment name must only contain alphanumeric characters, underscores, and hyphens.';
+                    }
+                    if (trimmed === 'default' || existingEnvs.some((e) => e.pixiEnvName === trimmed)) {
+                        return `Environment '${trimmed}' already exists in this project.`;
+                    }
+                    return null;
+                },
+            });
+            if (!envName) {
+                return;
             }
+
+            const trimmedName = envName.trim();
+            await runPixiWithProgress(
+                `Pixi: Creating and installing environment '${trimmedName}'...`,
+                [
+                    ['workspace', 'environment', 'add', trimmedName],
+                    ['install', '-e', trimmedName],
+                ],
+                projectPath,
+                manager,
+                `Pixi: Environment '${trimmedName}' created and ready.`,
+            );
         }),
 
         // Pixi: Delete Environment...

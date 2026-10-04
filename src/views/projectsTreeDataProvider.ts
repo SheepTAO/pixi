@@ -19,6 +19,13 @@ import { PixiProjectManager } from '../core/projectManager';
 import { PixiEnvironmentInfo, PixiPackage, PixiProject } from '../core/types';
 
 export class PixiProjectTreeItem extends TreeItem {
+    get projectPath(): string {
+        return this.project.projectPath;
+    }
+    get manifestPath(): string {
+        return this.project.manifestPath;
+    }
+
     constructor(public readonly project: PixiProject) {
         super(project.name, TreeItemCollapsibleState.Expanded);
         this.description = path.basename(project.manifestPath);
@@ -29,6 +36,16 @@ export class PixiProjectTreeItem extends TreeItem {
 }
 
 export class PixiTransitiveGroupTreeItem extends TreeItem {
+    get projectPath(): string {
+        return this.project.projectPath;
+    }
+    get manifestPath(): string {
+        return this.project.manifestPath;
+    }
+    get pixiEnvName(): string {
+        return this.env.pixiEnvName;
+    }
+
     constructor(
         public readonly packages: PixiPackage[],
         public readonly env: PixiEnvironmentInfo,
@@ -45,6 +62,19 @@ export class PixiTransitiveGroupTreeItem extends TreeItem {
 }
 
 export class PixiPackageTreeItem extends TreeItem {
+    get projectPath(): string {
+        return this.project?.projectPath || this.env.projectPath;
+    }
+    get manifestPath(): string {
+        return this.project?.manifestPath || path.join(this.env.projectPath, 'pixi.toml');
+    }
+    get pixiEnvName(): string {
+        return this.env.pixiEnvName;
+    }
+    get name(): string {
+        return this.pkg.name;
+    }
+
     constructor(
         public readonly pkg: PixiPackage,
         public readonly env: PixiEnvironmentInfo,
@@ -97,6 +127,16 @@ export class PixiPackageTreeItem extends TreeItem {
 }
 
 export class PixiEmptyTreeItem extends TreeItem {
+    get projectPath(): string | undefined {
+        return this.project?.projectPath || this.env?.projectPath;
+    }
+    get manifestPath(): string | undefined {
+        return this.project?.manifestPath;
+    }
+    get pixiEnvName(): string | undefined {
+        return this.env?.pixiEnvName;
+    }
+
     constructor(
         message: string,
         public readonly project?: PixiProject,
@@ -117,6 +157,16 @@ export class PixiEmptyTreeItem extends TreeItem {
 }
 
 export class PixiEnvironmentTreeItem extends TreeItem {
+    get projectPath(): string {
+        return this.project.projectPath;
+    }
+    get manifestPath(): string {
+        return this.project.manifestPath;
+    }
+    get pixiEnvName(): string {
+        return this.env.pixiEnvName;
+    }
+
     constructor(
         public readonly env: PixiEnvironmentInfo,
         public readonly project: PixiProject,
