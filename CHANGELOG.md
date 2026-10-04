@@ -5,6 +5,18 @@ All notable changes to the "pixi" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.2] - 2026-10-04
+
+- **Offline Manifest Schema Validation & IntelliSense**:
+    - Bundle official Pixi manifest JSON schema locally for 100% offline, zero-dependency autocompletion and hover documentation in `pixi.toml` and `pyproject.toml`.
+    - Provide `pixi.manifest.schemaSupport` user configuration setting (default `true`) allowing seamless coexistence with third-party TOML language servers like Even Better TOML.
+    - Intelligent quote and bracket replacement preventing duplicate closing brackets (`[workspace]]`) and double quotes (`""conda-forge""`).
+    - Dedicated completions for top-level sections, subtask property tables (`[tasks.<name>]`), activation scripts/env, system requirements, PyPI options, and target platforms.
+- **Native Package Search & Error Transparency**:
+    - Propagate and display raw native error messages directly in the QuickPick UI when registry search encounters offline, network, or SSL errors, eliminating artificial wrappers.
+    - Preserve direct manifest package addition (`$(edit) Add: "..."`) during registry search failures so offline users can add packages without interruptions.
+    - Guard against accidental submission when selecting informational search banners.
+
 ## [1.2.1] - 2026-10-03
 
 - **Windows Cache Measurement Performance**:
