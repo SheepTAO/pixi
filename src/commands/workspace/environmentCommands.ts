@@ -324,8 +324,59 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
             );
         }),
 
+        // Pixi: Install Environment (Single Environment)
+        commands.registerCommand('pixi.installEnvironment', async (targetItem?: unknown, presetEnv?: string) => {
+            const projectPath = await pickPixiProject(
+                manager,
+                'Select Pixi project to install environment for',
+                targetItem,
+            );
+            if (!projectPath) {
+                return;
+            }
+
+            const projectName = path.basename(projectPath);
+            let envName = (typeof presetEnv === 'string' && presetEnv.trim()) || extractEnvironmentName(targetItem);
+
+            if (!envName) {
+                const envs = manager.getEnvironmentsForProject(projectPath);
+                const candidateEnvs = envs.filter((e) => e.pixiStatus !== 'incompatible');
+                if (candidateEnvs.length === 0) {
+                    window.showInformationMessage(`No installable environments found in ${projectName}.`);
+                    return;
+                }
+
+                const pick = await window.showQuickPick(
+                    candidateEnvs.map((e) => {
+                        const { icon, text } = getEnvironmentStatusBadge(e.pixiStatus);
+                        return {
+                            label: `${icon} ${e.pixiEnvName}`,
+                            description: text,
+                            envName: e.pixiEnvName,
+                        };
+                    }),
+                    {
+                        title: 'Pixi: Install Environment',
+                        placeHolder: 'Select environment to install',
+                    },
+                );
+                if (!pick) {
+                    return;
+                }
+                envName = pick.envName;
+            }
+
+            await runPixiWithProgress(
+                `Pixi: Installing environment '${envName}' for ${projectName}...`,
+                ['install', '-e', envName],
+                projectPath,
+                manager,
+                `Pixi: Environment '${envName}' installed successfully for ${projectName}.`,
+            );
+        }),
+
         // Pixi: Install (Sync Environments)
-        commands.registerCommand('pixi.install', async (folderUri?: Uri, envName?: string) => {
+        commands.registerCommand('pixi.install', async (folderUri?: unknown, envName?: string) => {
             const projectPath = await pickPixiProject(
                 manager,
                 'Select Pixi project to install and sync environments',
@@ -336,22 +387,25 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
             }
 
             const projectName = path.basename(projectPath);
-            const validEnvName =
-                (typeof envName === 'string' && envName.trim()) || extractEnvironmentName(folderUri) || undefined;
-            const args = ['install'];
-            if (validEnvName) {
-                args.push('-e', validEnvName);
+            const explicitEnv = typeof envName === 'string' && envName.trim() ? envName.trim() : undefined;
+
+            if (explicitEnv) {
+                await runPixiWithProgress(
+                    `Pixi: Installing environment '${explicitEnv}' for ${projectName}...`,
+                    ['install', '-e', explicitEnv],
+                    projectPath,
+                    manager,
+                    `Pixi: Environment '${explicitEnv}' installed successfully for ${projectName}.`,
+                );
+                return;
             }
+
             await runPixiWithProgress(
-                validEnvName
-                    ? `Pixi: Installing environment '${validEnvName}' for ${projectName}...`
-                    : `Pixi: Installing environments for ${projectName}...`,
-                args,
+                `Pixi: Synchronizing environments for ${projectName}...`,
+                ['install', '--all'],
                 projectPath,
                 manager,
-                validEnvName
-                    ? `Pixi: Environment '${validEnvName}' installed successfully for ${projectName}.`
-                    : `Pixi: Environments synchronized successfully for ${projectName}.`,
+                `Pixi: Environments synchronized successfully for ${projectName}.`,
             );
         }),
 

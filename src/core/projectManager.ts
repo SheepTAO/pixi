@@ -150,6 +150,12 @@ export class PixiProjectManager implements Disposable {
             return this.packagesCache.get(cacheKey)!;
         }
 
+        const env = this.getEnvironmentsForProject(projectPath).find((e) => e.pixiEnvName === envName);
+        if (env && env.pixiStatus === 'incompatible') {
+            this.packagesCache.set(cacheKey, []);
+            return [];
+        }
+
         let inFlight = this.packagesInFlight.get(cacheKey);
         if (!inFlight) {
             inFlight = listPixiPackages(envName, projectPath)

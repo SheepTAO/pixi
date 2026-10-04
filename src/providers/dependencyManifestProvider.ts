@@ -361,7 +361,7 @@ export class PixiDependencyManifestProvider
         // Fallback for dependencies not present in active environment (e.g. feature-specific dependencies)
         if (missingDeps.length > 0 && !token.isCancellationRequested) {
             const allEnvs = this.projectManager.getEnvironmentsForProject(projectPath);
-            const otherEnvs = allEnvs.filter((e) => e.pixiEnvName !== activeEnvName);
+            const otherEnvs = allEnvs.filter((e) => e.pixiEnvName !== activeEnvName && e.pixiStatus !== 'incompatible');
 
             if (otherEnvs.length > 0) {
                 const otherResults = await Promise.all(
@@ -442,7 +442,7 @@ export class PixiDependencyManifestProvider
             envVersions.set(activeEnvName, targetPkg);
         }
 
-        const otherEnvs = allEnvs.filter((e) => e.pixiEnvName !== activeEnvName);
+        const otherEnvs = allEnvs.filter((e) => e.pixiEnvName !== activeEnvName && e.pixiStatus !== 'incompatible');
         if (otherEnvs.length > 0) {
             const otherResults = await Promise.all(
                 otherEnvs.map(async (e) => ({

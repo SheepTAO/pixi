@@ -180,7 +180,7 @@ export class PixiEnvironmentTreeItem extends TreeItem {
             this.description = '(not installed)';
             this.contextValue = 'pixiEnvUninstalled';
             this.command = {
-                command: 'pixi.install',
+                command: 'pixi.installEnvironment',
                 title: 'Install Environment',
                 arguments: [Uri.file(project.projectPath), env.pixiEnvName],
             };

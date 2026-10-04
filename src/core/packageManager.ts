@@ -3,7 +3,7 @@ import * as path from 'path';
 
 import { runPixi } from '../cli/pixiCli';
 import { safeJsonParse } from '../common/execUtils';
-import { traceError } from '../common/logging';
+import { traceError, traceVerbose } from '../common/logging';
 import { PixiPackage } from './types';
 
 export { PixiPackage };
@@ -104,7 +104,14 @@ export async function listPixiPackages(envName: string, projectPath: string): Pr
         try {
             stdout = await runPixi(baseArgs, { cwd: projectPath });
         } catch (error) {
-            traceError(`Failed to list packages for environment '${envName}' in ${projectPath}:`, error);
+            const msg = error instanceof Error ? error.message : String(error);
+            if (msg.includes('no platform supported') || msg.includes('unsupported-platform')) {
+                traceVerbose(
+                    `Skipping package listing for platform-incompatible environment '${envName}' in ${projectPath}`,
+                );
+            } else {
+                traceError(`Failed to list packages for environment '${envName}' in ${projectPath}:`, error);
+            }
             return [];
         }
     }
