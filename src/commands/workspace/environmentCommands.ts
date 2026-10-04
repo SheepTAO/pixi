@@ -1,9 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { commands, Disposable, QuickPickItem, Uri, window, workspace } from 'vscode';
+import { commands, Disposable, Uri, window, workspace } from 'vscode';
 
 import { runPixiWithProgress } from '../../cli/workspaceCli';
-import { normalizeFolderPath } from '../../common/execUtils';
 import { getEnvironmentStatusBadge } from '../../core/environmentRules';
 import { findManifestPath, isPixiProject } from '../../core/projectDiscovery';
 import { PixiProjectManager } from '../../core/projectManager';
@@ -181,27 +180,46 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
             }
 
             const envName = targetEnvName;
+            const targetEnvInfo = envs.find((e) => e.pixiEnvName === envName);
+            const isInstalled = targetEnvInfo ? targetEnvInfo.pixiStatus === 'installed' : true;
+
             if (envName === 'default') {
                 const confirmed = await window.showWarningMessage(
-                    "Delete the installed 'default' environment on disk? (Can be re-installed using pixi install)",
-                    'Delete',
+                    "Clean the installed 'default' environment on disk? (Can be re-installed using pixi install)",
+                    'Clean Environment',
                 );
-                if (confirmed !== 'Delete') {
+                if (confirmed !== 'Clean Environment') {
                     return;
                 }
 
                 await runPixiWithProgress(
-                    "Pixi: Deleting 'default' environment...",
+                    "Pixi: Cleaning 'default' environment...",
                     ['clean', '-e', 'default'],
                     projectPath,
                     manager,
-                    "Pixi: 'default' environment deleted from disk.",
+                    "Pixi: 'default' environment cleaned from disk.",
+                );
+            } else if (!isInstalled) {
+                const confirmed = await window.showWarningMessage(
+                    `Remove environment '${envName}' from project manifest?`,
+                    'Remove from Manifest',
+                );
+                if (confirmed !== 'Remove from Manifest') {
+                    return;
+                }
+
+                await runPixiWithProgress(
+                    `Pixi: Removing environment '${envName}' from manifest...`,
+                    [['workspace', 'environment', 'remove', envName]],
+                    projectPath,
+                    manager,
+                    `Pixi: Environment '${envName}' removed from manifest.`,
                 );
             } else {
                 const choice = await window.showWarningMessage(
-                    `Delete Pixi environment '${envName}'?`,
-                    'Delete from Disk & Manifest',
+                    `Delete or clean Pixi environment '${envName}'?`,
                     'Clean from Disk Only',
+                    'Delete from Disk & Manifest',
                 );
                 if (!choice) {
                     return;
@@ -213,98 +231,50 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                     cmds.push(['workspace', 'environment', 'remove', envName]);
                 }
                 await runPixiWithProgress(
-                    `Pixi: Deleting environment '${envName}'...`,
+                    removeManifest
+                        ? `Pixi: Deleting environment '${envName}' from disk and manifest...`
+                        : `Pixi: Cleaning environment '${envName}' from disk...`,
                     cmds,
                     projectPath,
                     manager,
                     removeManifest
                         ? `Pixi: Environment '${envName}' deleted from disk and manifest.`
-                        : `Pixi: Environment '${envName}' cleaned from disk.`,
+                        : `Pixi: Environment '${envName}' cleaned from disk (definition kept in manifest).`,
                 );
             }
         }),
 
-        // Pixi: Clean...
-        commands.registerCommand('pixi.clean', async (target?: unknown) => {
-            const envName = extractEnvironmentName(target);
-            const targetProjectPath = normalizeFolderPath(target);
-            if (envName && targetProjectPath) {
-                const confirmed = await window.showWarningMessage(
-                    `Are you sure you want to clean installed environment '${envName}' on disk?`,
-                    'Clean Environment',
-                );
-                if (confirmed === 'Clean Environment') {
-                    await runPixiWithProgress(
-                        `Pixi: Cleaning environment '${envName}'...`,
-                        ['clean', '-e', envName],
-                        targetProjectPath,
-                        manager,
-                        `Pixi: Environment '${envName}' cleaned.`,
-                    );
-                }
-                return;
-            }
-
-            const projectPath = await pickPixiProject(manager, 'Select Pixi project to clean', target);
+        // Pixi: Clean All Environments (.pixi)
+        commands.registerCommand('pixi.clean', async (targetItem?: unknown) => {
+            const projectPath = await pickPixiProject(manager, 'Select Pixi project to clean', targetItem);
             if (!projectPath) {
                 return;
             }
 
-            const envs = manager.getEnvironmentsForProject(projectPath);
-            const installedEnvs = envs.filter((e) => e.pixiStatus === 'installed');
-
-            interface CleanQuickPickItem extends QuickPickItem {
-                targetKind: 'env' | 'all' | 'global-cache';
-                envName?: string;
-            }
-
-            const items: CleanQuickPickItem[] = [
-                ...installedEnvs.map((e) => ({
-                    label: `$(layers) ${e.pixiEnvName}`,
-                    description: e.projectName,
-                    targetKind: 'env' as const,
-                    envName: e.pixiEnvName,
-                })),
-                {
-                    label: '$(trash) All Environments (.pixi)',
-                    description: 'Clean all installed environments in this project',
-                    targetKind: 'all' as const,
-                },
-                {
-                    label: '$(alert) Global Package Cache',
-                    description: 'Clean system-wide package tarball and repodata cache',
-                    targetKind: 'global-cache' as const,
-                },
-            ];
-
-            const selected = await window.showQuickPick(items, {
-                title: 'Pixi: Clean',
-                placeHolder: 'Select an environment or cache to clean',
-            });
-            if (!selected) {
+            const projectName = path.basename(projectPath);
+            const pixiDir = path.join(projectPath, '.pixi');
+            if (!fs.existsSync(pixiDir)) {
+                window.showInformationMessage(
+                    `No installed environments found in ${projectName} (.pixi directory does not exist).`,
+                );
                 return;
             }
 
-            if (selected.targetKind === 'env') {
-                const envName = selected.envName!;
-                await runPixiWithProgress(
-                    `Pixi: Cleaning environment '${envName}'...`,
-                    ['clean', '-e', envName],
-                    projectPath,
-                    manager,
-                    `Pixi: Environment '${envName}' cleaned.`,
-                );
-            } else if (selected.targetKind === 'all') {
-                await runPixiWithProgress(
-                    'Pixi: Cleaning all environments...',
-                    ['clean'],
-                    projectPath,
-                    manager,
-                    'Pixi: All environments cleaned in this project.',
-                );
-            } else if (selected.targetKind === 'global-cache') {
-                await commands.executeCommand('pixi.cleanCache');
+            const confirmed = await window.showWarningMessage(
+                `Are you sure you want to clean all installed Pixi environments in ${projectName}? (The .pixi directory will be removed)`,
+                'Clean All',
+            );
+            if (confirmed !== 'Clean All') {
+                return;
             }
+
+            await runPixiWithProgress(
+                `Pixi: Cleaning all environments for ${projectName}...`,
+                ['clean'],
+                projectPath,
+                manager,
+                `Pixi: All environments cleaned for ${projectName}.`,
+            );
         }),
 
         // Pixi: Lock Dependencies
@@ -409,8 +379,59 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
             );
         }),
 
-        // Pixi: Reinstall Environment...
-        commands.registerCommand('pixi.reinstall', async (folderUri?: Uri, envName?: string) => {
+        // Pixi: Reinstall Environment (Single Environment)
+        commands.registerCommand('pixi.reinstallEnvironment', async (targetItem?: unknown, presetEnv?: string) => {
+            const projectPath = await pickPixiProject(
+                manager,
+                'Select Pixi project to reinstall environment for',
+                targetItem,
+            );
+            if (!projectPath) {
+                return;
+            }
+
+            const projectName = path.basename(projectPath);
+            let envName = (typeof presetEnv === 'string' && presetEnv.trim()) || extractEnvironmentName(targetItem);
+
+            if (!envName) {
+                const envs = manager.getEnvironmentsForProject(projectPath);
+                const candidateEnvs = envs.filter((e) => e.pixiStatus !== 'incompatible');
+                if (candidateEnvs.length === 0) {
+                    window.showInformationMessage(`No reinstallable environments found in ${projectName}.`);
+                    return;
+                }
+
+                const pick = await window.showQuickPick(
+                    candidateEnvs.map((e) => {
+                        const { icon, text } = getEnvironmentStatusBadge(e.pixiStatus);
+                        return {
+                            label: `${icon} ${e.pixiEnvName}`,
+                            description: text,
+                            envName: e.pixiEnvName,
+                        };
+                    }),
+                    {
+                        title: 'Pixi: Reinstall Environment',
+                        placeHolder: 'Select environment to reinstall',
+                    },
+                );
+                if (!pick) {
+                    return;
+                }
+                envName = pick.envName;
+            }
+
+            await runPixiWithProgress(
+                `Pixi: Re-installing environment '${envName}' for ${projectName}...`,
+                ['reinstall', '-e', envName],
+                projectPath,
+                manager,
+                `Pixi: Environment '${envName}' re-installed successfully for ${projectName}.`,
+            );
+        }),
+
+        // Pixi: Reinstall All Environments
+        commands.registerCommand('pixi.reinstall', async (folderUri?: unknown, envName?: string) => {
             const projectPath = await pickPixiProject(
                 manager,
                 'Select Pixi project to reinstall environments',
@@ -421,92 +442,50 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
             }
 
             const projectName = path.basename(projectPath);
-            const validEnvName =
-                (typeof envName === 'string' && envName.trim()) || extractEnvironmentName(folderUri) || undefined;
+            const explicitEnv = typeof envName === 'string' && envName.trim() ? envName.trim() : undefined;
 
-            const runReinstall = async (target?: string, isAll?: boolean) => {
-                const title = target
-                    ? `Pixi: Re-installing environment '${target}' for ${projectName}...`
-                    : isAll
-                      ? `Pixi: Re-installing all environments for ${projectName}...`
-                      : `Pixi: Re-installing environments for ${projectName}...`;
-                const args = target ? ['reinstall', '-e', target] : isAll ? ['reinstall', '--all'] : ['reinstall'];
-                const successMsg = target
-                    ? `Pixi: Environment '${target}' re-installed successfully for ${projectName}.`
-                    : isAll
-                      ? `Pixi: All environments re-installed successfully for ${projectName}.`
-                      : `Pixi: Environments re-installed successfully for ${projectName}.`;
-                await runPixiWithProgress(title, args, projectPath, manager, successMsg);
-            };
-
-            if (validEnvName) {
-                return runReinstall(validEnvName);
-            }
-
-            const envs = manager.getEnvironmentsForProject(projectPath);
-            const validEnvs = envs.filter((e) => e.pixiStatus !== 'incompatible');
-
-            if (validEnvs.length <= 1) {
-                return runReinstall(validEnvs[0]?.pixiEnvName);
-            }
-
-            interface ReinstallQuickPickItem extends QuickPickItem {
-                targetKind: 'env' | 'all';
-                envName?: string;
-            }
-
-            const items: ReinstallQuickPickItem[] = [
-                ...validEnvs.map((e) => ({
-                    label: `$(layers) ${e.pixiEnvName}`,
-                    description: e.projectName,
-                    targetKind: 'env' as const,
-                    envName: e.pixiEnvName,
-                })),
-                {
-                    label: '$(sync) All Environments',
-                    description: `Re-install all environments in ${projectName}`,
-                    targetKind: 'all' as const,
-                },
-            ];
-
-            const selected = await window.showQuickPick(items, {
-                title: 'Pixi: Reinstall Environment',
-                placeHolder: `Select an environment to reinstall in ${projectName}`,
-            });
-            if (!selected) {
+            if (explicitEnv) {
+                await runPixiWithProgress(
+                    `Pixi: Re-installing environment '${explicitEnv}' for ${projectName}...`,
+                    ['reinstall', '-e', explicitEnv],
+                    projectPath,
+                    manager,
+                    `Pixi: Environment '${explicitEnv}' re-installed successfully for ${projectName}.`,
+                );
                 return;
             }
 
-            if (selected.targetKind === 'env') {
-                return runReinstall(selected.envName);
-            } else {
-                return runReinstall(undefined, true);
-            }
+            await runPixiWithProgress(
+                `Pixi: Re-installing all environments for ${projectName}...`,
+                ['reinstall', '--all'],
+                projectPath,
+                manager,
+                `Pixi: All environments re-installed successfully for ${projectName}.`,
+            );
         }),
 
         // Pixi: Update Dependencies
-        commands.registerCommand('pixi.update', async (folderUri?: Uri, envName?: string) => {
+        commands.registerCommand('pixi.update', async (folderUri?: unknown, envName?: string) => {
             const projectPath = await pickPixiProject(manager, 'Select Pixi project to update dependencies', folderUri);
             if (!projectPath) {
                 return;
             }
 
             const projectName = path.basename(projectPath);
-            const validEnvName =
-                (typeof envName === 'string' && envName.trim()) || extractEnvironmentName(folderUri) || undefined;
+            const explicitEnv = typeof envName === 'string' && envName.trim() ? envName.trim() : undefined;
             const args = ['update'];
-            if (validEnvName) {
-                args.push('-e', validEnvName);
+            if (explicitEnv) {
+                args.push('-e', explicitEnv);
             }
             await runPixiWithProgress(
-                validEnvName
-                    ? `Pixi: Updating dependencies for environment '${validEnvName}' in ${projectName}...`
+                explicitEnv
+                    ? `Pixi: Updating dependencies for environment '${explicitEnv}' in ${projectName}...`
                     : `Pixi: Updating dependencies for ${projectName}...`,
                 args,
                 projectPath,
                 manager,
-                validEnvName
-                    ? `Pixi: Dependencies updated successfully for environment '${validEnvName}' in ${projectName}.`
+                explicitEnv
+                    ? `Pixi: Dependencies updated successfully for environment '${explicitEnv}' in ${projectName}.`
                     : `Pixi: Dependencies updated successfully for ${projectName}.`,
             );
         }),

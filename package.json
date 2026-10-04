@@ -145,7 +145,7 @@
             },
             {
                 "command": "pixi.clean",
-                "title": "Clean ...",
+                "title": "Clean All Environments (.pixi)",
                 "category": "Pixi",
                 "icon": "$(clear-all)"
             },
@@ -157,7 +157,13 @@
             },
             {
                 "command": "pixi.reinstall",
-                "title": "Reinstall Environment ...",
+                "title": "Reinstall All Environments",
+                "category": "Pixi",
+                "icon": "$(debug-restart)"
+            },
+            {
+                "command": "pixi.reinstallEnvironment",
+                "title": "Reinstall Environment",
                 "category": "Pixi",
                 "icon": "$(debug-restart)"
             },
@@ -344,7 +350,7 @@
                 },
                 {
                     "command": "pixi.installEnvironment",
-                    "when": "pixi.hasPixiProject"
+                    "when": "false"
                 },
                 {
                     "command": "pixi.update",
@@ -353,6 +359,10 @@
                 {
                     "command": "pixi.reinstall",
                     "when": "pixi.hasPixiProject"
+                },
+                {
+                    "command": "pixi.reinstallEnvironment",
+                    "when": "false"
                 },
                 {
                     "command": "pixi.addPackage",
@@ -475,7 +485,7 @@
             ],
             "view/title": [
                 {
-                    "command": "pixi.addPackage",
+                    "command": "pixi.createEnvironment",
                     "when": "view == pixi.views.projects && pixi.hasPixiProject",
                     "group": "navigation@1"
                 },
@@ -493,6 +503,21 @@
                     "command": "pixi.lock",
                     "when": "view == pixi.views.projects && pixi.hasPixiProject",
                     "group": "1_manage@1"
+                },
+                {
+                    "command": "pixi.update",
+                    "when": "view == pixi.views.projects && pixi.hasPixiProject",
+                    "group": "1_manage@2"
+                },
+                {
+                    "command": "pixi.reinstall",
+                    "when": "view == pixi.views.projects && pixi.hasPixiProject",
+                    "group": "1_manage@3"
+                },
+                {
+                    "command": "pixi.clean",
+                    "when": "view == pixi.views.projects && pixi.hasPixiProject",
+                    "group": "2_clean@1"
                 },
                 {
                     "command": "pixi.init",
@@ -592,7 +617,7 @@
                     "group": "inline@1"
                 },
                 {
-                    "command": "pixi.reinstall",
+                    "command": "pixi.reinstallEnvironment",
                     "when": "view == pixi.views.projects && viewItem == pixiEnvInstalled",
                     "group": "inline@2"
                 },
@@ -660,6 +685,11 @@
                     "command": "pixi.copyPackageName",
                     "when": "view == pixi.views.projects && (viewItem == pixiPackageExplicit || viewItem == pixiPackageTransitive)",
                     "group": "3_copy@1"
+                },
+                {
+                    "command": "pixi.reinstallEnvironment",
+                    "when": "view == pixi.views.projects && viewItem == pixiEnvInstalled",
+                    "group": "2_manage@0"
                 },
                 {
                     "command": "pixi.deleteEnvironment",
