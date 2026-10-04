@@ -366,8 +366,12 @@ async function fetchPypiPackage(
             license: data.info.license || undefined,
             summary: data.info.summary || undefined,
         };
-    } catch {
-        return null;
+    } catch (err: unknown) {
+        if (token?.isCancellationRequested) {
+            return null;
+        }
+        traceError(`PyPI registry fetch failed for '${packageName}':`, err);
+        throw err;
     } finally {
         clearTimeout(timeoutId);
         cancelDisposable?.dispose();
@@ -492,7 +496,7 @@ export async function searchPixiPackages(
                 return [];
             }
             traceError(`Conda package search failed for '${cleanQuery}':`, err);
-            return [];
+            throw err;
         }
     })();
 
@@ -507,6 +511,13 @@ export async function searchPixiPackages(
     const [condaRes, pypiRes] = await Promise.allSettled([condaPromise, pypiPromise]);
     const condaResults = condaRes.status === 'fulfilled' ? condaRes.value : [];
     const pypiResult = pypiRes.status === 'fulfilled' ? pypiRes.value : null;
+
+    if (condaRes.status === 'rejected') {
+        if (pypiResult) {
+            return [pypiResult];
+        }
+        throw condaRes.reason;
+    }
 
     const combined: PixiPackageSearchResult[] = [...condaResults];
 

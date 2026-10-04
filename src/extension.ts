@@ -11,6 +11,7 @@ import { setPersistentState } from './common/persistentState';
 import { PixiProjectManager } from './core/projectManager';
 import { activatePythonSupport } from './languages/python';
 import { PixiDependencyManifestProvider } from './providers/dependencyManifestProvider';
+import { PixiManifestSchemaProvider } from './providers/manifestSchemaProvider';
 import { PixiTaskManifestProvider } from './providers/taskManifestProvider';
 import { PixiTaskProvider } from './providers/taskProvider';
 import { PixiTerminalProvider } from './providers/terminalProvider';
@@ -38,6 +39,9 @@ export async function activate(context: ExtensionContext): Promise<PixiExtension
 
     const dependencyManifestProvider = new PixiDependencyManifestProvider(projectManager);
     context.subscriptions.push(dependencyManifestProvider);
+
+    const manifestSchemaProvider = new PixiManifestSchemaProvider(context);
+    context.subscriptions.push(manifestSchemaProvider);
 
     const terminalProvider = new PixiTerminalProvider(projectManager, log);
     context.subscriptions.push(terminalProvider, terminalProvider.registerCommands());

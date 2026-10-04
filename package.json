@@ -1041,6 +1041,12 @@
                     "default": true,
                     "description": "Show locked dependency versions as inline hints in pixi.toml and pyproject.toml manifests.",
                     "scope": "resource"
+                },
+                "pixi.manifest.schemaSupport": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Enable offline schema-based autocompletion and hover documentation in pixi.toml and pyproject.toml manifests.",
+                    "scope": "resource"
                 }
             }
         },
@@ -1052,9 +1058,16 @@
                     "fontCharacter": "\\E800"
                 }
             }
-        }
+        },
+        "jsonValidation": [
+            {
+                "fileMatch": "**/pixi.toml",
+                "url": "./schemas/pixi.json"
+            }
+        ]
     },
     "scripts": {
+        "update-schema": "curl -sSL https://pixi.sh/latest/schema/manifest/schema.json -o schemas/pixi.json",
         "vscode:prepublish": "npm run package",
         "compile": "webpack",
         "watch": "webpack --watch",

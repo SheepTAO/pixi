@@ -328,10 +328,13 @@ export async function showPackageSearchPicker(
                 }
             } catch (err: unknown) {
                 if (!token.isCancellationRequested) {
+                    const rawMsg = (err instanceof Error ? err.message : String(err)).trim();
+                    const firstLine = rawMsg.split(/\r?\n/)[0] || rawMsg;
                     quickPick.items = [
                         {
                             label: '$(warning) Search failed',
-                            description: err instanceof Error ? err.message : String(err),
+                            description: firstLine,
+                            detail: rawMsg.length > firstLine.length ? rawMsg : undefined,
                             alwaysShow: true,
                         },
                     ];
@@ -585,9 +588,25 @@ async function promptAddPackageSpec(
 
                     const searchItems: AddPackageQuickPickItem[] = results.map(createPackageQuickPickItem);
                     quickPick.items = [...directItem, ...searchItems];
-                } catch {
+                } catch (err: unknown) {
                     if (!token.isCancellationRequested) {
-                        quickPick.items = [...directItem];
+                        const rawMsg = (err instanceof Error ? err.message : String(err)).trim();
+                        const firstLine = rawMsg.split(/\r?\n/)[0] || rawMsg;
+                        const errorItems: AddPackageQuickPickItem[] = [
+                            {
+                                label: `$(edit) Add: "${trimmed}"`,
+                                description: 'Press Enter to select source channel and add directly to manifest',
+                                alwaysShow: true,
+                                isDirectInput: true,
+                            },
+                            {
+                                label: '$(warning) Search failed',
+                                description: firstLine,
+                                detail: rawMsg.length > firstLine.length ? rawMsg : undefined,
+                                alwaysShow: true,
+                            },
+                        ];
+                        quickPick.items = errorItems;
                     }
                 } finally {
                     if (!token.isCancellationRequested) {
@@ -602,6 +621,15 @@ async function promptAddPackageSpec(
         quickPick.onDidAccept(async () => {
             const selected = quickPick.selectedItems[0];
             const currentVal = quickPick.value.trim();
+
+            if (
+                selected?.label &&
+                (selected.label.startsWith('$(warning) Search failed') ||
+                    selected.label.startsWith('$(info) No packages'))
+            ) {
+                return;
+            }
+
             quickPick.hide();
             resolved = true;
 
@@ -623,7 +651,7 @@ async function promptAddPackageSpec(
                     selected?.isDirectInput && currentVal
                         ? currentVal
                         : selected?.label && selected.label.startsWith('$(edit) Add: "')
-                          ? selected.label.slice('$(edit) Add: "'.length, -1)
+                          ? selected.label.slice('$(edit) Add: "'.length).replace(/["].*$/, '')
                           : currentVal;
                 const specs = rawSpec.trim().split(/\s+/).filter(Boolean);
                 if (specs.length === 0) {

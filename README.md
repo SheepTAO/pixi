@@ -56,6 +56,7 @@ A dedicated Activity Bar container providing complete visibility and control ove
 
 - **Automatic Project Discovery**: Instantly detects `pixi.toml` and `pyproject.toml` manifests across single-root and multi-root workspaces.
 - **Locked Dependency Inlay Hints & Navigation**: Displays actual locked package versions inline in manifests (`: 1.26.4`), rich hover inspection cards (build, channel, license, multi-environment matrix diffs), and `Ctrl`/`Cmd` + Click navigation directly to package entries in `pixi.lock`.
+- **Offline Schema Validation & Manifest IntelliSense**: Bundles official Pixi JSON schema definitions locally for 100% offline autocompletion of manifest sections (`[workspace]`, `[tasks]`, `[dependencies]`, etc.), properties, channels, platforms, and rich hover documentation.
 - **Manifest Editor Actions**: 1-click title bar buttons for manifest files to Lock, Install, Update, or Reinstall dependencies.
 - **File-Level Environment Routing**: Map glob patterns directly to specific Pixi environments via `pixi.environmentRules` (e.g. `tests/**=dev`).
 - **Lifecycle Diagnostics**: Categorizes environments into Installed (ready & executable), Uninstalled (declared in manifest, 1-click installable), and Incompatible (platform mismatch).
@@ -108,22 +109,23 @@ Launch any command via the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) by t
 
 ## Extension Settings
 
-| Setting                        | Type       | Default                       | Scope    | Description                                                                                          |
-| :----------------------------- | :--------- | :---------------------------- | :------- | :--------------------------------------------------------------------------------------------------- |
-| `pixi.executablePath`          | `string`   | `""`                          | Machine  | Path to the Pixi binary. Discovered from system `PATH` if empty.                                     |
-| `pixi.displayNameFormat`       | `string`   | `"${project}:${env}"`         | Resource | Display format for environments. Placeholders: `${project}`, `${env}`, `${version}`.                 |
-| `pixi.defaultManifestFormat`   | `string`   | `"ask"`                       | Resource | Default manifest format for project initialization (`"ask"`, `"pixi"`, or `"pyproject"`).            |
-| `pixi.autoInstallOnOpen`       | `string`   | `"prompt"`                    | Resource | Behavior when opening projects with uninstalled environments (`"prompt"`, `"always"`, `"never"`).    |
-| `pixi.environmentRules`        | `string[]` | `[]`                          | Resource | Map glob patterns to environment names (e.g. `tests/**=dev`, `train/**=gpu`).                        |
-| `pixi.packages.displayMode`    | `string`   | `"grouped"`                   | Resource | Package tree display mode (`"grouped"`, `"explicitOnly"`, or `"all"`).                               |
-| `pixi.cache.autoMeasureSize`   | `boolean`  | `true`                        | Window   | Automatically compute Pixi cache disk usage in Pixi Info.                                            |
-| `pixi.tasks.groupBy`           | `string`   | `"prefix"`                    | Resource | Task grouping mode in Tasks view (`"prefix"`, `"environment"`, `"none"`).                            |
-| `pixi.tasks.prefixSeparators`  | `string[]` | `["-", "_"]`                  | Resource | Delimiters used to parse namespace prefixes from task names.                                         |
-| `pixi.tasks.minGroupSize`      | `integer`  | `2`                           | Resource | Minimum tasks required to form a prefix group folder (isolated tasks stay flat).                     |
-| `pixi.tasks.maxDepth`          | `integer`  | `1`                           | Resource | Maximum nesting depth for prefix-based task groups (1–3).                                            |
-| `pixi.tasks.manifestActions`   | `string`   | `"hover"`                     | Resource | Display style for task actions in manifests (`"hover"`, `"compact"`, `"full"`, `"header"`, `"off"`). |
-| `pixi.dependencies.inlayHints` | `boolean`  | `true`                        | Resource | Show locked dependency versions as inline hints in manifests (`pixi.toml`, `pyproject.toml`).        |
-| `pixi.searchIgnorePatterns`    | `string[]` | `["**/node_modules/**", ...]` | Resource | Glob patterns to ignore when scanning workspace for Pixi projects.                                   |
+| Setting                        | Type       | Default                       | Scope    | Description                                                                                             |
+| :----------------------------- | :--------- | :---------------------------- | :------- | :------------------------------------------------------------------------------------------------------ |
+| `pixi.executablePath`          | `string`   | `""`                          | Machine  | Path to the Pixi binary. Discovered from system `PATH` if empty.                                        |
+| `pixi.displayNameFormat`       | `string`   | `"${project}:${env}"`         | Resource | Display format for environments. Placeholders: `${project}`, `${env}`, `${version}`.                    |
+| `pixi.defaultManifestFormat`   | `string`   | `"ask"`                       | Resource | Default manifest format for project initialization (`"ask"`, `"pixi"`, or `"pyproject"`).               |
+| `pixi.autoInstallOnOpen`       | `string`   | `"prompt"`                    | Resource | Behavior when opening projects with uninstalled environments (`"prompt"`, `"always"`, `"never"`).       |
+| `pixi.environmentRules`        | `string[]` | `[]`                          | Resource | Map glob patterns to environment names (e.g. `tests/**=dev`, `train/**=gpu`).                           |
+| `pixi.packages.displayMode`    | `string`   | `"grouped"`                   | Resource | Package tree display mode (`"grouped"`, `"explicitOnly"`, or `"all"`).                                  |
+| `pixi.cache.autoMeasureSize`   | `boolean`  | `true`                        | Window   | Automatically compute Pixi cache disk usage in Pixi Info.                                               |
+| `pixi.tasks.groupBy`           | `string`   | `"prefix"`                    | Resource | Task grouping mode in Tasks view (`"prefix"`, `"environment"`, `"none"`).                               |
+| `pixi.tasks.prefixSeparators`  | `string[]` | `["-", "_"]`                  | Resource | Delimiters used to parse namespace prefixes from task names.                                            |
+| `pixi.tasks.minGroupSize`      | `integer`  | `2`                           | Resource | Minimum tasks required to form a prefix group folder (isolated tasks stay flat).                        |
+| `pixi.tasks.maxDepth`          | `integer`  | `1`                           | Resource | Maximum nesting depth for prefix-based task groups (1–3).                                               |
+| `pixi.tasks.manifestActions`   | `string`   | `"hover"`                     | Resource | Display style for task actions in manifests (`"hover"`, `"compact"`, `"full"`, `"header"`, `"off"`).    |
+| `pixi.dependencies.inlayHints` | `boolean`  | `true`                        | Resource | Show locked dependency versions as inline hints in manifests (`pixi.toml`, `pyproject.toml`).           |
+| `pixi.manifest.schemaSupport`  | `boolean`  | `true`                        | Resource | Enable offline schema-based autocompletion and hover documentation in `pixi.toml` and `pyproject.toml`. |
+| `pixi.searchIgnorePatterns`    | `string[]` | `["**/node_modules/**", ...]` | Resource | Glob patterns to ignore when scanning workspace for Pixi projects.                                      |
 
 ### Example Configuration
 
