@@ -11,4 +11,5 @@ export interface PixiPythonEnvironment extends PythonEnvironment {
     projectName: string;
     manifestPath: string;
     coreInfo: PixiEnvironmentInfo;
+    hasIpykernel?: boolean;
 }

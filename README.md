@@ -69,7 +69,7 @@ A dedicated Activity Bar container providing complete visibility and control ove
 
 ### Python & Multi-Language Toolchains
 
-- **Deep Python Integration**: Connects with `@vscode/python-environments` for seamless interpreter switching, status bar indicators, and package inspection.
+- **Deep Python & Jupyter Integration**: Connects with `@vscode/python-environments` for seamless interpreter switching, status bar indicators, package inspection, and clean Pixi environment grouping in Jupyter notebook kernel selection with `ipykernel` safeguard detection.
 - **Multi-Language Toolchain Scanner**: Automatically scans installed environments for Python, C/C++ compilers (GCC, Clang, MSVC, CMake, Ninja, header paths), R (`R`, `Rscript`), and Rust (`rustc`, `cargo`).
 
 ### Native Tasks, Terminals & Global Tools

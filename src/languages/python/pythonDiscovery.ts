@@ -1,7 +1,10 @@
+import * as fs from 'fs';
 import * as path from 'path';
-import { MarkdownString, ThemeIcon, Uri } from 'vscode';
+import { MarkdownString, ThemeIcon, Uri, window } from 'vscode';
 
+import { runPixiWithProgress } from '../../cli/workspaceCli';
 import { promptToInstallEnvironment as promptCoreInstall } from '../../core/environmentRules';
+import { PixiProjectManager } from '../../core/projectManager';
 import { scanPythonToolchain } from '../../core/toolchains';
 import { PixiEnvironmentInfo } from '../../core/types';
 import { PIXI_MANAGER_ID } from './constants';
@@ -18,6 +21,64 @@ export async function promptToInstallEnvironment(env: PixiPythonEnvironment, tar
     const projectFolder = env.manifestPath ? Uri.file(path.dirname(env.manifestPath)) : undefined;
     const folder = targetFolder ?? projectFolder ?? env.environmentPath;
     return promptCoreInstall(env.pixiEnvName, folder);
+}
+
+export async function promptToInstallIpykernel(
+    env: PixiPythonEnvironment,
+    projectManager: PixiProjectManager,
+    altEnvs?: PixiPythonEnvironment[],
+    onSwitch?: (target: PixiPythonEnvironment) => Promise<void>,
+): Promise<boolean> {
+    const altWithKernel = altEnvs?.find(
+        (e) => e.hasIpykernel && e.pixiEnvName !== env.pixiEnvName && e.pixiStatus === 'installed',
+    );
+    const msg = `Pixi environment '${env.pixiEnvName}' does not have 'ipykernel' installed. Jupyter cannot execute notebook cells with this kernel until ipykernel is added.`;
+    const actions: string[] = ['Install ipykernel via Pixi'];
+    if (altWithKernel) {
+        actions.push(`Switch to '${altWithKernel.pixiEnvName}'`);
+    }
+
+    const selected = await window.showWarningMessage(msg, ...actions);
+    if (selected === 'Install ipykernel via Pixi') {
+        const args = ['add'];
+        if (env.pixiEnvName !== 'default') {
+            args.push('-e', env.pixiEnvName);
+        }
+        args.push('ipykernel');
+        const title = `Pixi: Adding 'ipykernel' to environment '${env.pixiEnvName}' in '${env.projectName}'...`;
+        const successMsg = `Pixi: Successfully added ipykernel to environment '${env.pixiEnvName}'.`;
+        return runPixiWithProgress(title, args, env.projectPath, projectManager, successMsg);
+    } else if (altWithKernel && selected === `Switch to '${altWithKernel.pixiEnvName}'`) {
+        if (onSwitch) {
+            await onSwitch(altWithKernel);
+            return true;
+        }
+    }
+    return false;
+}
+
+function checkHasIpykernel(envPath: string): boolean {
+    const kernelSpec = path.join(envPath, 'share', 'jupyter', 'kernels', 'python3', 'kernel.json');
+    if (fs.existsSync(kernelSpec)) {
+        return true;
+    }
+    const binPath =
+        process.platform === 'win32'
+            ? path.join(envPath, 'Scripts', 'ipykernel.exe')
+            : path.join(envPath, 'bin', 'ipykernel');
+    if (fs.existsSync(binPath)) {
+        return true;
+    }
+    const metaDir = path.join(envPath, 'conda-meta');
+    try {
+        if (fs.existsSync(metaDir)) {
+            const files = fs.readdirSync(metaDir);
+            return files.some((f) => f.startsWith('ipykernel-') && f.endsWith('.json'));
+        }
+    } catch {
+        // ignore
+    }
+    return false;
 }
 
 const PRIORITY_MAP: Record<string, number> = {
@@ -78,6 +139,7 @@ export async function createPythonEnvironment(
 ): Promise<PixiPythonEnvironment> {
     let pythonExecutable = '';
     let pythonVersion = '';
+    let hasIpykernel = false;
     let status = coreInfo.pixiStatus;
     let statusReason = coreInfo.statusReason;
     let statusDesc = 'pixi';
@@ -91,6 +153,7 @@ export async function createPythonEnvironment(
             pythonExecutable = py?.executable || '';
             pythonVersion = py?.version || '';
         }
+        hasIpykernel = checkHasIpykernel(coreInfo.prefix);
 
         if (!pythonExecutable) {
             statusReason = `No Python executable found in environment '${coreInfo.pixiEnvName}'. Ensure 'python' dependency is added.`;
@@ -122,7 +185,8 @@ export async function createPythonEnvironment(
         tooltip = md;
         iconPath = new ThemeIcon('circle-slash');
     } else {
-        tooltip = pythonExecutable;
+        const kernelTag = hasIpykernel ? ' (ipykernel)' : ' (no ipykernel)';
+        tooltip = `${pythonExecutable}${kernelTag}`;
         iconPath = new ThemeIcon('python');
     }
 
@@ -136,7 +200,7 @@ export async function createPythonEnvironment(
         description: statusDesc,
         tooltip,
         iconPath,
-        group: undefined,
+        group: 'Pixi',
         error: undefined,
         execInfo: {
             run: { executable: pythonExecutable || 'python' },
@@ -165,5 +229,6 @@ export async function createPythonEnvironment(
         projectName: coreInfo.projectName,
         manifestPath: coreInfo.manifestPath,
         coreInfo,
+        hasIpykernel,
     };
 }

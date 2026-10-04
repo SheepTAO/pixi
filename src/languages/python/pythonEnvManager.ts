@@ -28,6 +28,7 @@ import {
     createPythonEnvironment,
     isEnvironmentInvalid,
     promptToInstallEnvironment,
+    promptToInstallIpykernel,
     sortEnvironments,
 } from './pythonDiscovery';
 import { PixiPythonEnvironment } from './types';
@@ -306,7 +307,7 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
     async getEnvironments(scope: GetEnvironmentsScope): Promise<PythonEnvironment[]> {
         await this.initialize();
 
-        if (scope === 'all') {
+        if (scope === 'all' || !scope) {
             const all = Array.from(this.projectToEnvs.values()).flat();
             return sortEnvironments(all);
         }
@@ -364,6 +365,20 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
                     'The environment is incompatible with the current platform or missing Python.';
                 void window.showErrorMessage(`Cannot activate environment '${environment.displayName}': ${reason}`);
                 return;
+            }
+
+            // Check if user is selecting an environment for a Jupyter Notebook
+            const isNotebook =
+                (scope instanceof Uri && scope.fsPath.endsWith('.ipynb')) ||
+                (Array.isArray(scope) && scope.some((u) => u.fsPath.endsWith('.ipynb'))) ||
+                (!scope && (window.activeNotebookEditor?.notebook.uri.fsPath.endsWith('.ipynb') ?? false));
+
+            if (isNotebook && pyEnv.pixiStatus === 'installed' && pyEnv.hasIpykernel === false) {
+                const projectPath = pyEnv.projectPath;
+                const altEnvs = this.projectToEnvs.get(projectPath) || [];
+                void promptToInstallIpykernel(pyEnv, this.projectManager, altEnvs, async (target) => {
+                    await this.set(scope, target);
+                });
             }
         }
 
