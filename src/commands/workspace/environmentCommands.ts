@@ -15,6 +15,35 @@ import {
     resolveTargetFolder,
 } from './common';
 
+async function pickInstallableEnvironment(
+    manager: PixiProjectManager,
+    projectPath: string,
+    title: string,
+    placeHolder: string,
+): Promise<string | undefined> {
+    const projectName = path.basename(projectPath);
+    const envs = manager.getEnvironmentsForProject(projectPath);
+    const candidateEnvs = envs.filter((e) => e.pixiStatus !== 'incompatible');
+    if (candidateEnvs.length === 0) {
+        const noun = title.toLowerCase().includes('reinstall') ? 'reinstallable' : 'installable';
+        window.showInformationMessage(`No ${noun} environments found in ${projectName}.`);
+        return undefined;
+    }
+
+    const pick = await window.showQuickPick(
+        candidateEnvs.map((e) => {
+            const { icon, text } = getEnvironmentStatusBadge(e.pixiStatus);
+            return {
+                label: `${icon} ${e.pixiEnvName}`,
+                description: text,
+                envName: e.pixiEnvName,
+            };
+        }),
+        { title, placeHolder },
+    );
+    return pick?.envName;
+}
+
 export function registerEnvironmentCommands(manager: PixiProjectManager): Disposable[] {
     return [
         // Pixi: Initialize Project...
@@ -267,33 +296,16 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
 
             const projectName = path.basename(projectPath);
             let envName = (typeof presetEnv === 'string' && presetEnv.trim()) || extractEnvironmentName(targetItem);
-
             if (!envName) {
-                const envs = manager.getEnvironmentsForProject(projectPath);
-                const candidateEnvs = envs.filter((e) => e.pixiStatus !== 'incompatible');
-                if (candidateEnvs.length === 0) {
-                    window.showInformationMessage(`No installable environments found in ${projectName}.`);
-                    return;
-                }
-
-                const pick = await window.showQuickPick(
-                    candidateEnvs.map((e) => {
-                        const { icon, text } = getEnvironmentStatusBadge(e.pixiStatus);
-                        return {
-                            label: `${icon} ${e.pixiEnvName}`,
-                            description: text,
-                            envName: e.pixiEnvName,
-                        };
-                    }),
-                    {
-                        title: 'Pixi: Install Environment',
-                        placeHolder: 'Select environment to install',
-                    },
+                envName = await pickInstallableEnvironment(
+                    manager,
+                    projectPath,
+                    'Pixi: Install Environment',
+                    'Select environment to install',
                 );
-                if (!pick) {
+                if (!envName) {
                     return;
                 }
-                envName = pick.envName;
             }
 
             await runPixiWithProgress(
@@ -352,33 +364,16 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
 
             const projectName = path.basename(projectPath);
             let envName = (typeof presetEnv === 'string' && presetEnv.trim()) || extractEnvironmentName(targetItem);
-
             if (!envName) {
-                const envs = manager.getEnvironmentsForProject(projectPath);
-                const candidateEnvs = envs.filter((e) => e.pixiStatus !== 'incompatible');
-                if (candidateEnvs.length === 0) {
-                    window.showInformationMessage(`No reinstallable environments found in ${projectName}.`);
-                    return;
-                }
-
-                const pick = await window.showQuickPick(
-                    candidateEnvs.map((e) => {
-                        const { icon, text } = getEnvironmentStatusBadge(e.pixiStatus);
-                        return {
-                            label: `${icon} ${e.pixiEnvName}`,
-                            description: text,
-                            envName: e.pixiEnvName,
-                        };
-                    }),
-                    {
-                        title: 'Pixi: Reinstall Environment',
-                        placeHolder: 'Select environment to reinstall',
-                    },
+                envName = await pickInstallableEnvironment(
+                    manager,
+                    projectPath,
+                    'Pixi: Reinstall Environment',
+                    'Select environment to reinstall',
                 );
-                if (!pick) {
+                if (!envName) {
                     return;
                 }
-                envName = pick.envName;
             }
 
             await runPixiWithProgress(

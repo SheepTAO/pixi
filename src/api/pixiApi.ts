@@ -23,15 +23,7 @@ export class PixiExtensionApiImpl implements PixiExtensionApi, Disposable {
             this.projectManager.onDidProjectsChanged(() => {
                 this.loadSavedActiveEnvironments();
             }),
-            this.projectManager.onDidChangeEnvironments(async () => {
-                const storage = getWorkspacePersistentState();
-                for (const [projectPath, envName] of this.activeEnvNames) {
-                    const envs = this.projectManager.getEnvironmentsForProject(projectPath);
-                    if (envs.length > 0 && !envs.some((e) => e.pixiEnvName === envName)) {
-                        this.activeEnvNames.delete(projectPath);
-                        await storage.set(`projectEnvName:${projectPath}`, undefined);
-                    }
-                }
+            this.projectManager.onDidChangeEnvironments(() => {
                 this.loadSavedActiveEnvironments();
             }),
         );
@@ -196,18 +188,15 @@ export class PixiExtensionApiImpl implements PixiExtensionApi, Disposable {
             }
         }
 
+        const storage = getWorkspacePersistentState();
+
         if (projectPath) {
             if (!envName) {
                 if (!this.activeEnvNames.has(projectPath)) {
                     return true;
                 }
                 this.activeEnvNames.delete(projectPath);
-                try {
-                    const storage = getWorkspacePersistentState();
-                    await storage.set(`projectEnvName:${projectPath}`, undefined);
-                } catch {
-                    // ignore
-                }
+                await storage.set(`projectEnvName:${projectPath}`, undefined);
                 this._onDidChangeActiveEnvironment.fire({ scope, environment: undefined });
                 return true;
             }
@@ -224,12 +213,7 @@ export class PixiExtensionApiImpl implements PixiExtensionApi, Disposable {
             }
 
             this.activeEnvNames.set(projectPath, envName);
-            try {
-                const storage = getWorkspacePersistentState();
-                await storage.set(`projectEnvName:${projectPath}`, envName);
-            } catch {
-                // ignore
-            }
+            await storage.set(`projectEnvName:${projectPath}`, envName);
 
             this._onDidChangeActiveEnvironment.fire({ scope, environment: targetEnv });
             return true;
@@ -241,12 +225,7 @@ export class PixiExtensionApiImpl implements PixiExtensionApi, Disposable {
                 return true;
             }
             this.globalActiveEnvName = undefined;
-            try {
-                const storage = getWorkspacePersistentState();
-                await storage.set('globalEnvName', undefined);
-            } catch {
-                // ignore
-            }
+            await storage.set('globalEnvName', undefined);
             this._onDidChangeActiveEnvironment.fire({ scope, environment: undefined });
             return true;
         }
@@ -262,12 +241,7 @@ export class PixiExtensionApiImpl implements PixiExtensionApi, Disposable {
         }
 
         this.globalActiveEnvName = envName;
-        try {
-            const storage = getWorkspacePersistentState();
-            await storage.set('globalEnvName', envName);
-        } catch {
-            // ignore
-        }
+        await storage.set('globalEnvName', envName);
 
         this._onDidChangeActiveEnvironment.fire({ scope, environment: targetEnv });
         return true;

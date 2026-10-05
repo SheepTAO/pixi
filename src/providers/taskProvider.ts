@@ -29,6 +29,7 @@ export interface PixiTaskDefinition extends TaskDefinition {
     task: string;
     environment?: string;
     project?: string;
+    args?: string[];
 }
 
 export interface PixiTask {
@@ -41,6 +42,7 @@ export interface PixiTask {
     outputs?: string[];
     clean_env?: boolean;
     projectPath: string;
+    args?: string[];
 }
 
 export interface PickTaskOptions {
@@ -149,6 +151,7 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
             name: def.task,
             default_environment: def.environment,
             projectPath,
+            args: def.args,
         };
         return this.createVsCodeTask(pixiTask, def);
     }
@@ -240,6 +243,7 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
             task: t.name,
             environment: t.default_environment,
             project: t.projectPath,
+            args: t.args,
         };
 
         const args = ['run'];
@@ -247,6 +251,9 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
             args.push('-e', def.environment);
         }
         args.push(def.task);
+        if (def.args && def.args.length > 0) {
+            args.push(...def.args);
+        }
 
         const scope = workspace.getWorkspaceFolder(Uri.file(t.projectPath)) || TaskScope.Workspace;
         const task = new Task(def, scope, t.name, 'pixi', new ShellExecution(pixiBin, args, { cwd: t.projectPath }));
@@ -312,7 +319,7 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
         return selected?.pixiTask;
     }
 
-    public async executePixiTask(pixiTask: PixiTask, targetEnvName?: string): Promise<void> {
+    public async executePixiTask(pixiTask: PixiTask, targetEnvName?: string, extraArgs?: string[]): Promise<void> {
         const envName = targetEnvName || pixiTask.default_environment;
         if (envName) {
             const envs = this.projectManager.getEnvironmentsForProject(pixiTask.projectPath);
@@ -332,7 +339,12 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
             }
         }
 
-        const taskToRun: PixiTask = targetEnvName ? { ...pixiTask, default_environment: targetEnvName } : pixiTask;
+        const combinedArgs = extraArgs ? [...(pixiTask.args || []), ...extraArgs] : pixiTask.args;
+        const taskToRun: PixiTask = {
+            ...pixiTask,
+            ...(targetEnvName ? { default_environment: targetEnvName } : {}),
+            ...(combinedArgs ? { args: combinedArgs } : {}),
+        };
         const vsTask = await this.createVsCodeTask(taskToRun);
         await tasks.executeTask(vsTask);
     }

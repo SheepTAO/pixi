@@ -21,18 +21,29 @@ export interface TaskCommandArg {
     name?: string;
     projectPath?: string;
     project?: { projectPath?: string; manifestPath?: string };
+    environment?: string;
+    default_environment?: string;
+    args?: string[];
 }
 
 function extractTask(arg?: unknown): PixiTask | undefined {
     if (!arg || typeof arg !== 'object') {
         return undefined;
     }
-    const item = arg as { task?: PixiTask; name?: string; projectPath?: string };
+    const item = arg as TaskCommandArg;
     if (item.task) {
-        return item.task;
+        return item.args ? { ...item.task, args: item.args } : item.task;
     }
-    if (item.name && item.projectPath) {
-        return item as PixiTask;
+    const projectPath = item.projectPath || item.project?.projectPath;
+    if (item.name && projectPath) {
+        const rawTask = arg as PixiTask;
+        return {
+            ...rawTask,
+            name: item.name,
+            projectPath,
+            default_environment: item.environment ?? item.default_environment ?? rawTask.default_environment,
+            args: item.args ?? rawTask.args,
+        };
     }
     return undefined;
 }
@@ -40,10 +51,10 @@ function extractTask(arg?: unknown): PixiTask | undefined {
 export function registerTaskCommands(manager: PixiProjectManager, taskProvider: PixiTaskProvider): Disposable[] {
     return [
         // Pixi: Run Task
-        commands.registerCommand('pixi.runTask', async (arg?: unknown) => {
+        commands.registerCommand('pixi.runTask', async (arg?: unknown, extraArgs?: string[]) => {
             const targetTask = extractTask(arg);
             if (targetTask) {
-                return taskProvider.executePixiTask(targetTask);
+                return taskProvider.executePixiTask(targetTask, undefined, extraArgs);
             }
             const projectPath = await pickPixiProject(manager, 'Select Pixi project to run task in', arg);
             if (!projectPath) {
@@ -55,7 +66,7 @@ export function registerTaskCommands(manager: PixiProjectManager, taskProvider: 
                 targetProjectPath: projectPath,
             });
             if (selected) {
-                await taskProvider.executePixiTask(selected);
+                await taskProvider.executePixiTask(selected, undefined, extraArgs);
             }
         }),
 
