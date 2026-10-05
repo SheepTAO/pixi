@@ -3,7 +3,7 @@ import * as path from 'path';
 import { MarkdownString, ThemeIcon, Uri, window } from 'vscode';
 
 import { runPixiWithProgress } from '../../cli/workspaceCli';
-import { promptToInstallEnvironment as promptCoreInstall } from '../../core/environmentRules';
+import { promptToInstallEnvironment as promptCoreInstall, sortPixiEnvironments } from '../../core/environmentRules';
 import { PixiProjectManager } from '../../core/projectManager';
 import { scanPythonToolchain } from '../../core/toolchains';
 import { PixiEnvironmentInfo } from '../../core/types';
@@ -81,34 +81,7 @@ function checkHasIpykernel(envPath: string): boolean {
     return false;
 }
 
-const PRIORITY_MAP: Record<string, number> = {
-    installed: 0,
-    uninstalled: 1,
-    incompatible: 2,
-};
-
-export function getEnvironmentPriority(env: PixiPythonEnvironment): number {
-    if (env.error) {
-        return env.error.includes('not installed') ? 1 : 2;
-    }
-    return PRIORITY_MAP[env.pixiStatus] ?? 0;
-}
-
-export function sortEnvironments(envs: PixiPythonEnvironment[]): PixiPythonEnvironment[] {
-    return [...envs].sort((a, b) => {
-        const pA = getEnvironmentPriority(a);
-        const pB = getEnvironmentPriority(b);
-        if (pA !== pB) {
-            return pA - pB;
-        }
-        const aIsDefault = a.shortDisplayName === 'default';
-        const bIsDefault = b.shortDisplayName === 'default';
-        if (aIsDefault !== bIsDefault) {
-            return aIsDefault ? -1 : 1;
-        }
-        return a.displayName.localeCompare(b.displayName, undefined, { sensitivity: 'base' });
-    });
-}
+export const sortEnvironments = sortPixiEnvironments;
 
 export function formatDisplayName(template: string, projectName: string, envName: string, version?: string): string {
     const defaultName = projectName ? `${projectName}:${envName}` : envName || 'default';

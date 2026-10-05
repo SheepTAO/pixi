@@ -20,29 +20,16 @@ async function findPixi(): Promise<string | undefined> {
     try {
         return await which('pixi');
     } catch {
-        // Fall back to standard install paths
+        // Fall back to standard pixi install path (~/.pixi/bin)
     }
 
     const home = os.homedir();
     const isWindows = process.platform === 'win32';
     const binaryName = isWindows ? 'pixi.exe' : 'pixi';
-    const candidates: string[] = [path.join(home, '.pixi', 'bin', binaryName)];
+    const standardPath = path.join(home, '.pixi', 'bin', binaryName);
 
-    if (isWindows) {
-        if (process.env.LOCALAPPDATA) {
-            candidates.push(path.join(process.env.LOCALAPPDATA, 'pixi', 'bin', binaryName));
-        }
-        if (process.env.USERPROFILE) {
-            candidates.push(path.join(process.env.USERPROFILE, '.pixi', 'bin', binaryName));
-        }
-    } else {
-        candidates.push('/usr/local/bin/pixi', '/opt/homebrew/bin/pixi', path.join(home, '.local', 'bin', 'pixi'));
-    }
-
-    for (const candidate of candidates) {
-        if (fs.existsSync(candidate)) {
-            return candidate;
-        }
+    if (fs.existsSync(standardPath)) {
+        return standardPath;
     }
 
     return undefined;
@@ -62,13 +49,7 @@ export async function getPixi(): Promise<string> {
             const firstFolder = workspace.workspaceFolders[0].uri.fsPath;
             resolved = resolved.replace(/\$\{workspaceFolder\}/g, firstFolder);
             if (!path.isAbsolute(resolved)) {
-                for (const folder of workspace.workspaceFolders) {
-                    const candidate = path.resolve(folder.uri.fsPath, resolved);
-                    if (fs.existsSync(candidate)) {
-                        resolved = candidate;
-                        break;
-                    }
-                }
+                resolved = path.resolve(firstFolder, resolved);
             }
         }
         _cachedPixi = resolved;

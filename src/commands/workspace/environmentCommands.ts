@@ -117,21 +117,14 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                 return;
             }
 
-            const envItems = [
-                ...envs.map((e) => {
-                    const { icon, text } = getEnvironmentStatusBadge(e.pixiStatus);
-                    return {
-                        label: `${icon} ${e.pixiEnvName}`,
-                        description: text,
-                        envName: e.pixiEnvName,
-                    };
-                }),
-                {
-                    label: '$(trash) All Environments (.pixi)',
-                    description: 'Clean all installed environments in .pixi directory',
-                    envName: '__ALL__',
-                },
-            ];
+            const envItems = envs.map((e) => {
+                const { icon, text } = getEnvironmentStatusBadge(e.pixiStatus);
+                return {
+                    label: `${icon} ${e.pixiEnvName}`,
+                    description: text,
+                    envName: e.pixiEnvName,
+                };
+            });
 
             const targetEnvName =
                 extractEnvironmentName(folderUri) ??
@@ -146,28 +139,9 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                 return;
             }
 
-            if (targetEnvName === '__ALL__') {
-                const confirmed = await window.showWarningMessage(
-                    'Are you sure you want to clean all installed Pixi environments in this project? (Can be re-installed using pixi install)',
-                    'Clean All',
-                );
-                if (confirmed !== 'Clean All') {
-                    return;
-                }
-
-                await runPixiWithProgress(
-                    'Pixi: Cleaning all environments...',
-                    ['clean'],
-                    projectPath,
-                    manager,
-                    'Pixi: All environments cleaned.',
-                );
-                return;
-            }
-
             const envName = targetEnvName;
             const targetEnvInfo = envs.find((e) => e.pixiEnvName === envName);
-            const isInstalled = targetEnvInfo ? targetEnvInfo.pixiStatus === 'installed' : true;
+            const isInstalled = targetEnvInfo?.pixiStatus === 'installed';
 
             if (envName === 'default') {
                 const confirmed = await window.showWarningMessage(

@@ -34,15 +34,6 @@ interface SearchResultQuickPickItem extends QuickPickItem {
     pkg?: PixiPackageSearchResult;
 }
 
-interface PackageItemContextCandidate {
-    pkg?: PixiPackage;
-    env?: PixiEnvironmentInfo;
-    project?: { projectPath?: string; manifestPath?: string };
-    projectPath?: string;
-    manifestPath?: string;
-    name?: string;
-}
-
 interface ExtractedPackageContext {
     pkg?: PixiPackage;
     env?: PixiEnvironmentInfo;
@@ -59,7 +50,14 @@ function extractPackageContext(arg?: unknown): ExtractedPackageContext {
         return { name: arg };
     }
     if (typeof arg === 'object') {
-        const item = arg as PackageItemContextCandidate;
+        const item = arg as {
+            pkg?: PixiPackage;
+            env?: PixiEnvironmentInfo;
+            projectPath?: string;
+            manifestPath?: string;
+            project?: { projectPath?: string; manifestPath?: string };
+            name?: string;
+        };
         return {
             pkg: item.pkg,
             env: item.env,

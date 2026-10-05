@@ -8,7 +8,6 @@ import {
     PythonEnvironment,
     PythonEnvironmentApi,
 } from '@vscode/python-environments';
-import * as path from 'path';
 import { Disposable, Event, EventEmitter, LogOutputChannel, ProgressLocation, ThemeIcon, window } from 'vscode';
 
 import { runPixi } from '../../cli/pixiCli';
@@ -181,29 +180,9 @@ export class PixiPythonPackageManager implements PackageManager, Disposable {
             return { envName: pyEnv.pixiEnvName, projectPath: pyEnv.projectPath };
         }
 
-        const envId = environment.envId.id;
-        const pixiEnv = this.envManager?.getPixiEnvironment(envId);
-
-        let envName = pixiEnv?.pixiEnvName;
-        let projectPath = pixiEnv?.projectPath;
-
-        if (!envName || !projectPath) {
-            const normalized = path.normalize(envId);
-            const parsedEnvName = path.basename(normalized);
-            const envsDir = path.dirname(normalized);
-            const dotPixiDir = path.dirname(envsDir);
-
-            if (!envName) {
-                envName = parsedEnvName;
-            }
-
-            if (!projectPath && path.basename(envsDir) === 'envs' && path.basename(dotPixiDir) === '.pixi') {
-                projectPath = path.dirname(dotPixiDir);
-            }
-        }
-
-        if (envName && projectPath) {
-            return { envName, projectPath };
+        const pixiEnv = this.envManager?.getPixiEnvironment(environment.envId.id);
+        if (pixiEnv?.pixiEnvName && pixiEnv?.projectPath) {
+            return { envName: pixiEnv.pixiEnvName, projectPath: pixiEnv.projectPath };
         }
 
         return undefined;

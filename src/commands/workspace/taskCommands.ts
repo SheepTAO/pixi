@@ -27,11 +27,12 @@ function extractTask(arg?: unknown): PixiTask | undefined {
     if (!arg || typeof arg !== 'object') {
         return undefined;
     }
-    if ('task' in arg && (arg as { task?: PixiTask }).task) {
-        return (arg as { task: PixiTask }).task;
+    const item = arg as { task?: PixiTask; name?: string; projectPath?: string };
+    if (item.task) {
+        return item.task;
     }
-    if ('name' in arg && 'projectPath' in arg) {
-        return arg as PixiTask;
+    if (item.name && item.projectPath) {
+        return item as PixiTask;
     }
     return undefined;
 }
@@ -61,9 +62,14 @@ export function registerTaskCommands(manager: PixiProjectManager, taskProvider: 
         // Pixi: Run Task in Environment
         commands.registerCommand('pixi.runTaskInEnvironment', async (arg?: unknown) => {
             const targetTask = extractTask(arg);
-            const projectPath =
-                targetTask?.projectPath || (await pickPixiProject(manager, 'Select Pixi project to run task in', arg));
-            return taskProvider.promptAndRunTaskInEnvironment(targetTask, projectPath);
+            if (targetTask) {
+                return taskProvider.promptAndRunTaskInEnvironment(targetTask);
+            }
+            const projectPath = await pickPixiProject(manager, 'Select Pixi project to run task in', arg);
+            if (!projectPath) {
+                return;
+            }
+            return taskProvider.promptAndRunTaskInEnvironment(undefined, projectPath);
         }),
 
         // Pixi: Refresh Tasks
