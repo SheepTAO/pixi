@@ -472,6 +472,7 @@ export class PixiDependencyManifestProvider
         const lockExists = fs.existsSync(lockPath);
         const md = new MarkdownString();
         md.isTrusted = true;
+        md.supportThemeIcons = true;
 
         if (!targetPkg) {
             md.appendMarkdown(`### $(package) **${matched.name}**\n\n`);
@@ -683,6 +684,7 @@ export class PixiDependencyManifestProvider
 
         const md = new MarkdownString();
         md.isTrusted = true;
+        md.supportThemeIcons = true;
         md.appendMarkdown(`**${pkg.name}** \`${pkg.version}\`\n\n`);
         if (pkg.kind) {
             md.appendMarkdown(`- **Type**: \`${pkg.kind}\`\n`);
