@@ -5,6 +5,26 @@ All notable changes to the "pixi" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-10-05
+
+- **Jupyter Notebook Integration & Kernel Safeguards**:
+    - Automatically detect if target Pixi environment contains `ipykernel` when selecting environments for Jupyter notebooks (`.ipynb`).
+    - Provide interactive 1-click installation via Pixi (`pixi add -e <env> ipykernel`) or seamless switching to an alternative environment containing `ipykernel` to prevent runtime execution failures.
+- **Task Execution Arguments Pipeline**:
+    - Add runtime command-line arguments support (`args?: string[]`) across `PixiTask`, `PixiTaskDefinition`, and VS Code task runners.
+    - Enable passing arbitrary execution arguments dynamically to `pixi.runTask` (`pixi run -e <env> <task> <args...>`).
+    - Enhance manifest task parsing with environment alias fallbacks (`environment ?? default_environment`).
+- **Architecture Simplification & Performance Refinement (KISS)**:
+    - Streamline `persistentState` by eliminating asynchronous locks and normalizing synchronous state reads.
+    - Proactive synchronous toolchain discovery with compiled regexes and file inspection.
+    - Remove redundant directory-climbing heuristics in Python package management and unify environment sorting across the extension.
+    - Extract reusable `pickInstallableEnvironment` helper to deduplicate selection logic across installation workflows.
+- **Environment Lifecycle & Platform Compatibility**:
+    - Refine environment deletion and cleaning workflows (`pixi.clean`, `pixi.reinstall`, `pixi.deleteEnvironment`) with granular choices (clean disk vs delete from manifest).
+    - Decouple editor title bar actions from environment installation and gracefully skip incompatible platform queries.
+- **Manifest Hover Theme Icon Rendering**:
+    - Enable `supportThemeIcons` on dependency hover cards, rendering native VS Code Codicons (`$(package)`, `$(go-to-file)`, `$(lock)`, `$(link-external)`) instead of raw text placeholders.
+
 ## [1.2.2] - 2026-10-04
 
 - **Offline Manifest Schema Validation & IntelliSense**:
