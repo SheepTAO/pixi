@@ -1,47 +1,31 @@
 import { ExtensionContext, Memento } from 'vscode';
 
-import { createDeferred, Deferred } from './deferred';
-
 export interface PersistentState {
-    get<T>(key: string, defaultValue?: T): Promise<T | undefined>;
-    set<T>(key: string, value: T): Promise<void>;
-    clear(keys?: string[]): Promise<void>;
+    get<T>(key: string, defaultValue?: T): T | undefined;
+    set<T>(key: string, value: T): Thenable<void>;
 }
 
 class PersistentStateImpl implements PersistentState {
-    private clearing: Deferred<void>;
-    constructor(private readonly memento: Memento) {
-        this.clearing = createDeferred<void>();
-        this.clearing.resolve();
+    constructor(private readonly memento: Memento) {}
+
+    get<T>(key: string, defaultValue?: T): T | undefined {
+        return this.memento.get<T>(key, defaultValue as T);
     }
-    async get<T>(key: string, defaultValue?: T): Promise<T | undefined> {
-        await this.clearing.promise;
-        if (defaultValue === undefined) {
-            return this.memento.get<T>(key);
-        }
-        return this.memento.get<T>(key, defaultValue);
-    }
-    async set<T>(key: string, value: T): Promise<void> {
-        await this.clearing.promise;
-        await this.memento.update(key, value);
-    }
-    async clear(keys?: string[]): Promise<void> {
-        if (this.clearing.completed) {
-            this.clearing = createDeferred<void>();
-            const _keys = keys ?? this.memento.keys();
-            await Promise.all(_keys.map((key) => this.memento.update(key, undefined)));
-            this.clearing.resolve();
-        }
-        return this.clearing.promise;
+
+    set<T>(key: string, value: T): Thenable<void> {
+        return this.memento.update(key, value);
     }
 }
 
-const _workspace = createDeferred<PersistentState>();
+let _workspace: PersistentState | undefined;
 
 export function setPersistentState(context: ExtensionContext): void {
-    _workspace.resolve(new PersistentStateImpl(context.workspaceState));
+    _workspace = new PersistentStateImpl(context.workspaceState);
 }
 
-export function getWorkspacePersistentState(): Promise<PersistentState> {
-    return _workspace.promise;
+export function getWorkspacePersistentState(): PersistentState {
+    if (!_workspace) {
+        throw new Error('PersistentState has not been initialized.');
+    }
+    return _workspace;
 }

@@ -4,7 +4,6 @@ import { QuickPickItem, Uri, window, workspace } from 'vscode';
 
 import { normalizeFolderPath } from '../../common/execUtils';
 import { getEnvironmentStatusBadge } from '../../core/environmentRules';
-import { isPixiProject } from '../../core/projectDiscovery';
 import { PixiProjectManager } from '../../core/projectManager';
 import { PixiEnvironmentInfo } from '../../core/types';
 
@@ -167,9 +166,6 @@ export async function pickPixiProject(
         const matched = manager.findProjectForUri(Uri.file(direct));
         if (matched) {
             return matched;
-        }
-        if (isPixiProject(direct)) {
-            return direct;
         }
     }
 

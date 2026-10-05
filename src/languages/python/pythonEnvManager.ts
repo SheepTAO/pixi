@@ -230,10 +230,10 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
         }
 
         // Restore active environments from persistent state or re-link existing instances
-        const storage = await getWorkspacePersistentState();
+        const storage = getWorkspacePersistentState();
         for (const [projectPath, envs] of this.projectToEnvs) {
             const currentActive = this.activeEnv.get(projectPath);
-            const savedId = await storage.get<string>(`projectEnvId:${projectPath}`);
+            const savedId = storage.get<string>(`projectEnvId:${projectPath}`);
             const targetId = currentActive?.envId.id || savedId;
             if (targetId) {
                 const found = envs.find((e) => e.envId.id === targetId);
@@ -254,7 +254,7 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
             }
         }
 
-        const globalTargetId = this.globalEnv?.envId.id || (await storage.get<string>('globalEnvId'));
+        const globalTargetId = this.globalEnv?.envId.id || storage.get<string>('globalEnvId');
         if (globalTargetId) {
             const allEnvs = Array.from(this.projectToEnvs.values()).flat();
             const foundGlobal = allEnvs.find((e) => e.envId.id === globalTargetId);
@@ -382,7 +382,7 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
             }
         }
 
-        const storage = await getWorkspacePersistentState();
+        const storage = getWorkspacePersistentState();
 
         if (scope === undefined) {
             await storage.set('globalEnvId', environment?.envId.id);

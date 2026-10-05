@@ -33,9 +33,9 @@ export interface ExecutableCandidates {
 
 /**
  * Searches for an executable within a directory based on platform-specific candidate relative paths.
- * Returns the absolute path to the first matching executable, or null if none are found.
+ * Returns the absolute path to the first matching executable, or undefined if none are found.
  */
-export async function findExecutable(baseDir: string, candidates: ExecutableCandidates): Promise<string | null> {
+export function findExecutable(baseDir: string, candidates: ExecutableCandidates): string | undefined {
     const list = os.platform() === 'win32' ? candidates.win32 : candidates.posix;
     for (const rel of list) {
         const fullPath = path.join(baseDir, rel);
@@ -43,7 +43,7 @@ export async function findExecutable(baseDir: string, candidates: ExecutableCand
             return fullPath;
         }
     }
-    return null;
+    return undefined;
 }
 
 /**

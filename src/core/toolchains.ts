@@ -92,7 +92,7 @@ export async function scanPythonToolchain(
     envPath: string,
     metaFiles?: string[],
 ): Promise<PythonToolchainInfo | undefined> {
-    const executable = await findExecutable(envPath, {
+    const executable = findExecutable(envPath, {
         posix: ['bin/python', 'bin/python3', 'python', 'python3'],
         win32: [
             'Scripts/python.exe',
@@ -120,7 +120,7 @@ export async function scanPythonToolchain(
  */
 export async function scanCppToolchain(envPath: string, metaFiles?: string[]): Promise<CppToolchainInfo | undefined> {
     // 1. Detect compiler
-    const compiler = await findExecutable(envPath, {
+    const compiler = findExecutable(envPath, {
         posix: ['bin/g++', 'bin/gcc', 'bin/clang++', 'bin/clang'],
         win32: [
             'Library/bin/clang++.exe',
@@ -134,13 +134,13 @@ export async function scanCppToolchain(envPath: string, metaFiles?: string[]): P
     });
 
     // 2. Detect cmake
-    const cmake = await findExecutable(envPath, {
+    const cmake = findExecutable(envPath, {
         posix: ['bin/cmake'],
         win32: ['Scripts/cmake.exe', 'Library/bin/cmake.exe', 'bin/cmake.exe'],
     });
 
     // 3. Detect ninja
-    const ninja = await findExecutable(envPath, {
+    const ninja = findExecutable(envPath, {
         posix: ['bin/ninja'],
         win32: ['Scripts/ninja.exe', 'Library/bin/ninja.exe', 'bin/ninja.exe'],
     });
@@ -176,11 +176,11 @@ export async function scanCppToolchain(envPath: string, metaFiles?: string[]): P
     const version = versionPattern ? await findPackageVersion(envPath, versionPattern, metaFiles) : undefined;
 
     return {
-        compiler: compiler ?? undefined,
+        compiler,
         compilerType,
         version,
-        cmake: cmake ?? undefined,
-        ninja: ninja ?? undefined,
+        cmake,
+        ninja,
         includeDir,
     };
 }
@@ -189,7 +189,7 @@ export async function scanCppToolchain(envPath: string, metaFiles?: string[]): P
  * Scans an environment prefix for R toolchains (R, Rscript).
  */
 export async function scanRToolchain(envPath: string, metaFiles?: string[]): Promise<RToolchainInfo | undefined> {
-    const executable = await findExecutable(envPath, {
+    const executable = findExecutable(envPath, {
         posix: ['bin/R', 'bin/Rscript'],
         win32: ['bin/R.exe', 'bin/x64/R.exe', 'bin/Rscript.exe'],
     });
@@ -198,7 +198,7 @@ export async function scanRToolchain(envPath: string, metaFiles?: string[]): Pro
         return undefined;
     }
 
-    const rscript = await findExecutable(envPath, {
+    const rscript = findExecutable(envPath, {
         posix: ['bin/Rscript'],
         win32: ['bin/Rscript.exe', 'bin/x64/Rscript.exe'],
     });
@@ -207,7 +207,7 @@ export async function scanRToolchain(envPath: string, metaFiles?: string[]): Pro
 
     return {
         executable,
-        rscript: rscript ?? undefined,
+        rscript,
         version,
     };
 }
@@ -216,12 +216,12 @@ export async function scanRToolchain(envPath: string, metaFiles?: string[]): Pro
  * Scans an environment prefix for Rust toolchains (rustc, cargo).
  */
 export async function scanRustToolchain(envPath: string, metaFiles?: string[]): Promise<RustToolchainInfo | undefined> {
-    const rustc = await findExecutable(envPath, {
+    const rustc = findExecutable(envPath, {
         posix: ['bin/rustc'],
         win32: ['bin/rustc.exe', 'Library/bin/rustc.exe'],
     });
 
-    const cargo = await findExecutable(envPath, {
+    const cargo = findExecutable(envPath, {
         posix: ['bin/cargo'],
         win32: ['bin/cargo.exe', 'Library/bin/cargo.exe'],
     });
@@ -233,8 +233,8 @@ export async function scanRustToolchain(envPath: string, metaFiles?: string[]): 
     const version = await findPackageVersion(envPath, 'rust', metaFiles);
 
     return {
-        rustc: rustc ?? undefined,
-        cargo: cargo ?? undefined,
+        rustc,
+        cargo,
         version,
     };
 }
