@@ -103,7 +103,7 @@
             },
             {
                 "command": "pixi.runTask",
-                "title": "Run Task",
+                "title": "Run Task ...",
                 "category": "Pixi",
                 "icon": "$(play)"
             },
@@ -145,7 +145,7 @@
             },
             {
                 "command": "pixi.clean",
-                "title": "Clean All Environments (.pixi)",
+                "title": "Clean ...",
                 "category": "Pixi",
                 "icon": "$(clear-all)"
             },
@@ -157,7 +157,7 @@
             },
             {
                 "command": "pixi.reinstall",
-                "title": "Reinstall All Environments",
+                "title": "Reinstall ...",
                 "category": "Pixi",
                 "icon": "$(debug-restart)"
             },
@@ -302,47 +302,16 @@
         "menus": {
             "commandPalette": [
                 {
+                    "command": "pixi.init"
+                },
+                {
                     "command": "pixi.searchPackages"
-                },
-                {
-                    "command": "pixi.selfUpdate"
-                },
-                {
-                    "command": "pixi.refreshInfo"
-                },
-                {
-                    "command": "pixi.cleanCache",
-                    "when": "false"
-                },
-                {
-                    "command": "pixi.openLocation",
-                    "when": "false"
-                },
-                {
-                    "command": "pixi.measureCacheSize",
-                    "when": "false"
                 },
                 {
                     "command": "pixi.global"
                 },
                 {
-                    "command": "pixi.init",
-                    "when": "!pixi.hasPixiProject"
-                },
-                {
-                    "command": "pixi.createEnvironment"
-                },
-                {
-                    "command": "pixi.deleteEnvironment",
-                    "when": "pixi.hasPixiProject"
-                },
-                {
-                    "command": "pixi.clean",
-                    "when": "pixi.hasPixiProject"
-                },
-                {
-                    "command": "pixi.lock",
-                    "when": "pixi.hasPixiProject"
+                    "command": "pixi.selfUpdate"
                 },
                 {
                     "command": "pixi.install",
@@ -353,16 +322,32 @@
                     "when": "false"
                 },
                 {
-                    "command": "pixi.update",
-                    "when": "pixi.hasPixiProject"
-                },
-                {
                     "command": "pixi.reinstall",
                     "when": "pixi.hasPixiProject"
                 },
                 {
                     "command": "pixi.reinstallEnvironment",
                     "when": "false"
+                },
+                {
+                    "command": "pixi.update",
+                    "when": "pixi.hasPixiProject"
+                },
+                {
+                    "command": "pixi.lock",
+                    "when": "pixi.hasPixiProject"
+                },
+                {
+                    "command": "pixi.clean",
+                    "when": "pixi.hasPixiProject"
+                },
+                {
+                    "command": "pixi.createEnvironment",
+                    "when": "pixi.hasPixiProject"
+                },
+                {
+                    "command": "pixi.deleteEnvironment",
+                    "when": "pixi.hasPixiProject"
                 },
                 {
                     "command": "pixi.addPackage",
@@ -385,11 +370,19 @@
                     "when": "pixi.hasPixiProject"
                 },
                 {
-                    "command": "pixi.runTaskInEnvironment",
+                    "command": "pixi.tasks.addTask",
                     "when": "pixi.hasPixiProject"
                 },
                 {
                     "command": "pixi.openTerminal",
+                    "when": "pixi.hasPixiProject"
+                },
+                {
+                    "command": "pixi.openManifest",
+                    "when": "pixi.hasPixiProject"
+                },
+                {
+                    "command": "pixi.openLockfile",
                     "when": "pixi.hasPixiProject"
                 },
                 {
@@ -401,53 +394,36 @@
                     "when": "pixi.hasPixiProject"
                 },
                 {
-                    "command": "pixi.updatePackage",
-                    "when": "pixi.hasPixiProject"
+                    "command": "pixi.cleanCache",
+                    "when": "false"
                 },
                 {
-                    "command": "pixi.openManifest",
-                    "when": "pixi.hasPixiProject"
+                    "command": "pixi.openLocation",
+                    "when": "false"
                 },
                 {
-                    "command": "pixi.revealPackageInManifest",
-                    "when": "pixi.hasPixiProject"
+                    "command": "pixi.measureCacheSize",
+                    "when": "false"
                 },
                 {
-                    "command": "pixi.copyPackageName",
-                    "when": "pixi.hasPixiProject"
-                },
-                {
-                    "command": "pixi.tasks.refresh",
-                    "when": "pixi.hasPixiProject"
-                },
-                {
-                    "command": "pixi.tasks.revealInManifest",
-                    "when": "pixi.hasPixiProject"
-                },
-                {
-                    "command": "pixi.tasks.addTask",
-                    "when": "pixi.hasPixiProject"
-                },
-                {
-                    "command": "pixi.tasks.removeTask",
-                    "when": "pixi.hasPixiProject"
-                },
-                {
-                    "command": "pixi.tasks.changeGrouping",
+                    "command": "pixi.refreshInfo",
                     "when": "false"
                 },
                 {
                     "command": "pixi.refreshProjects",
-                    "when": "pixi.hasPixiProject"
+                    "when": "false"
                 },
                 {
-                    "command": "pixi.refreshGlobal"
+                    "command": "pixi.refreshGlobal",
+                    "when": "false"
                 },
                 {
-                    "command": "pixi.global.install"
+                    "command": "pixi.global.install",
+                    "when": "false"
                 },
                 {
-                    "command": "pixi.global.sync"
+                    "command": "pixi.global.sync",
+                    "when": "false"
                 },
                 {
                     "command": "pixi.global.updateTool",
@@ -458,7 +434,40 @@
                     "when": "false"
                 },
                 {
-                    "command": "pixi.global.openManifest"
+                    "command": "pixi.global.openManifest",
+                    "when": "false"
+                },
+                {
+                    "command": "pixi.updatePackage",
+                    "when": "false"
+                },
+                {
+                    "command": "pixi.revealPackageInManifest",
+                    "when": "false"
+                },
+                {
+                    "command": "pixi.copyPackageName",
+                    "when": "false"
+                },
+                {
+                    "command": "pixi.runTaskInEnvironment",
+                    "when": "false"
+                },
+                {
+                    "command": "pixi.tasks.refresh",
+                    "when": "false"
+                },
+                {
+                    "command": "pixi.tasks.revealInManifest",
+                    "when": "false"
+                },
+                {
+                    "command": "pixi.tasks.removeTask",
+                    "when": "false"
+                },
+                {
+                    "command": "pixi.tasks.changeGrouping",
+                    "when": "false"
                 }
             ],
             "editor/title": [
