@@ -5,6 +5,19 @@ All notable changes to the "pixi" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - 2026-10-05
+
+- **Command Palette Streamlining & Submenu Architecture**:
+    - Consolidate all environment and cache cleaning operations into a unified interactive `Pixi: Clean ...` secondary menu (clean project environments `.pixi`, clean specific environment on disk, clean global package cache).
+    - Consolidate environment re-installation into an interactive `Pixi: Reinstall ...` secondary menu (reinstall all project environments vs reinstall a specific target environment).
+    - Optimize global package cache cleaning to trigger immediately without prompting for project selection in multi-project workspaces.
+    - Cleanse the Command Palette by suppressing 21 internal/tree-item-specific commands, title bar refresh icons, and duplicate entries (`when: false`).
+- **Guard Conditions & Bug Fixes**:
+    - Fix `pixi.init` visibility condition so project initialization remains accessible from the Command Palette even when a Pixi project is already present.
+    - Add missing `pixi.hasPixiProject` guards to `pixi.openLockfile` and `pixi.createEnvironment`.
+    - Standardize command title ellipsis (`...`) across interactive prompts (`Pixi: Run Task ...`, `Pixi: Clean ...`, `Pixi: Reinstall ...`).
+    - Format and align `README.md` essential command table according to Prettier formatting rules.
+
 ## [1.4.0] - 2026-10-05
 
 - **Jupyter Notebook Integration & Kernel Safeguards**:
