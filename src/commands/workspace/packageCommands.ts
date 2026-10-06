@@ -1,11 +1,5 @@
 import * as path from 'path';
-import {
-    commands,
-    Disposable,
-    env as vscodeEnv,
-    QuickPickItem,
-    window,
-} from 'vscode';
+import { commands, Disposable, env as vscodeEnv, QuickPickItem, window } from 'vscode';
 
 import { PixiPackageSearchResult } from '../../cli/pixiCli';
 import { runPixiWithProgress } from '../../cli/workspaceCli';
@@ -27,11 +21,7 @@ import {
     promptPackageVersionConstraint,
     showPackageSearchPicker,
 } from './packageSearchPicker';
-import {
-    disposeTreeOutputChannel,
-    showDependencyTreeCommand,
-    whyPackageCommand,
-} from './packageTreeViewer';
+import { disposeTreeOutputChannel, showDependencyTreeCommand, whyPackageCommand } from './packageTreeViewer';
 
 export * from './packageSearchPicker';
 export * from './packageTreeViewer';

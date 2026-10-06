@@ -125,10 +125,7 @@ export async function displayTreeOutput(
     }
 }
 
-export async function showDependencyTreeCommand(
-    manager: PixiProjectManager,
-    targetItem?: unknown,
-): Promise<void> {
+export async function showDependencyTreeCommand(manager: PixiProjectManager, targetItem?: unknown): Promise<void> {
     const ctx = extractCommandContext(targetItem);
     if (ctx.pkg && ctx.env && ctx.projectPath) {
         const args = buildTreeArgs(ctx.env.pixiEnvName);
@@ -143,11 +140,7 @@ export async function showDependencyTreeCommand(
         return;
     }
 
-    const projectPath = await pickPixiProject(
-        manager,
-        'Select Pixi project to view dependency tree for',
-        targetItem,
-    );
+    const projectPath = await pickPixiProject(manager, 'Select Pixi project to view dependency tree for', targetItem);
     if (!projectPath) {
         return;
     }
@@ -299,12 +292,5 @@ export async function whyPackageCommand(manager: PixiProjectManager, targetItem?
 
     const args = buildTreeArgs(targetEnv, true);
     args.push(exactPackageRegex(targetPkgName));
-    await displayTreeOutput(
-        `package '${targetPkgName}' in '${envLabel}'`,
-        args,
-        projectPath,
-        true,
-        targetPkgName,
-    );
+    await displayTreeOutput(`package '${targetPkgName}' in '${envLabel}'`, args, projectPath, true, targetPkgName);
 }
-

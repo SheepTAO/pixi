@@ -636,4 +636,3 @@ export async function promptAddPackageSource(
 
     return { args, sourceLabel };
 }
-

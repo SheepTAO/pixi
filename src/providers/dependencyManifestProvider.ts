@@ -352,7 +352,7 @@ export class PixiDependencyManifestProvider
         for (const dep of visibleDeps) {
             const pkg = this.lookupPackage(activeMap, dep.name);
             if (pkg && pkg.version) {
-                hints.push(this.createInlayHint(dep, pkg, activeEnvName, projectPath));
+                hints.push(this.createInlayHint(dep, pkg, projectPath));
             } else {
                 missingDeps.push(dep);
             }
@@ -378,10 +378,10 @@ export class PixiDependencyManifestProvider
                 }
 
                 for (const dep of missingDeps) {
-                    for (const { envName, map } of otherResults) {
+                    for (const { map } of otherResults) {
                         const pkg = this.lookupPackage(map, dep.name);
                         if (pkg && pkg.version) {
-                            hints.push(this.createInlayHint(dep, pkg, envName, projectPath));
+                            hints.push(this.createInlayHint(dep, pkg, projectPath));
                             break;
                         }
                     }
@@ -679,27 +679,10 @@ export class PixiDependencyManifestProvider
         return map.get(name.toLowerCase()) || map.get(normalizePkgName(name));
     }
 
-    private createInlayHint(dep: ParsedDependency, pkg: PixiPackage, envName: string, projectPath: string): InlayHint {
+    private createInlayHint(dep: ParsedDependency, pkg: PixiPackage, projectPath: string): InlayHint {
         const tag = pkg.is_editable ? ' (editable)' : pkg.is_local ? ' (local)' : '';
 
-        const md = new MarkdownString();
-        md.isTrusted = true;
-        md.supportThemeIcons = true;
-        md.appendMarkdown(`**${pkg.name}** \`${pkg.version}\`\n\n`);
-        if (pkg.kind) {
-            md.appendMarkdown(`- **Type**: \`${pkg.kind}\`\n`);
-        }
-        if (pkg.build) {
-            md.appendMarkdown(`- **Build**: \`${pkg.build}\`\n`);
-        }
-        if (pkg.license) {
-            md.appendMarkdown(`- **License**: \`${pkg.license}\`\n`);
-        }
-        md.appendMarkdown(`- **Environment**: \`${envName}\`\n\n`);
-        md.appendMarkdown(`*Click to view in \`pixi.lock\`*`);
-
         const part = new InlayHintLabelPart(`: ${pkg.version}${tag}`);
-        part.tooltip = md;
         part.command = {
             title: 'Open in pixi.lock',
             command: 'pixi.openLockfile',

@@ -546,7 +546,8 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
 
             if (!manifestPath) {
                 const projectPath =
-                    ctx.projectPath || (await pickPixiProject(manager, 'Select Pixi project to open manifest', targetItem));
+                    ctx.projectPath ||
+                    (await pickPixiProject(manager, 'Select Pixi project to open manifest', targetItem));
                 if (!projectPath) {
                     return;
                 }

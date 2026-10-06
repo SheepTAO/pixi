@@ -48,7 +48,11 @@ export function parseCondaInfo(url?: string, pkgName?: string): { version?: stri
     if (!url) {
         return {};
     }
-    const filename = url.split('/').pop()?.replace(/(\.conda|\.tar\.bz2)$/, '') || '';
+    const filename =
+        url
+            .split('/')
+            .pop()
+            ?.replace(/(\.conda|\.tar\.bz2)$/, '') || '';
     const prefix = pkgName ? `${pkgName}-` : '';
     const rest = filename.startsWith(prefix) ? filename.slice(prefix.length) : filename;
     const lastDash = rest.lastIndexOf('-');
@@ -399,4 +403,3 @@ export function registerUpdateCommands(manager: PixiProjectManager): Disposable[
         }),
     ];
 }
-
