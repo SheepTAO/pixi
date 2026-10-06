@@ -5,7 +5,7 @@ import { QuickPickItem, Uri, window, workspace } from 'vscode';
 import { normalizeFolderPath } from '../../common/execUtils';
 import { getEnvironmentStatusBadge } from '../../core/environmentRules';
 import { PixiProjectManager } from '../../core/projectManager';
-import { PixiEnvironmentInfo } from '../../core/types';
+import { PixiEnvironmentInfo, PixiPackage } from '../../core/types';
 
 export interface ProjectQuickPickItem extends QuickPickItem {
     projectPath: string;
@@ -91,28 +91,68 @@ export async function pickTargetEnvironment(
     return selected.envName;
 }
 
-export interface EnvironmentContextCandidate {
-    pixiEnvName?: string;
+export interface ExtractedCommandContext {
+    projectPath?: string;
+    manifestPath?: string;
     envName?: string;
-    env?: { pixiEnvName?: string };
+    env?: PixiEnvironmentInfo;
+    pkg?: PixiPackage;
+    pkgName?: string;
 }
 
-export function extractEnvironmentName(target?: unknown): string | undefined {
+export type EnvironmentContextCandidate = ExtractedCommandContext;
+
+export function extractCommandContext(target?: unknown): ExtractedCommandContext {
     if (!target) {
-        return undefined;
+        return {};
     }
     if (typeof target === 'string') {
         const trimmed = target.trim();
-        if (trimmed && !trimmed.includes('/') && !trimmed.includes('\\')) {
-            return trimmed;
+        if (trimmed.includes('/') || trimmed.includes('\\')) {
+            return { projectPath: trimmed };
         }
-        return undefined;
+        return { envName: trimmed, pkgName: trimmed };
+    }
+    if (target instanceof Uri) {
+        return { projectPath: target.fsPath };
     }
     if (typeof target === 'object') {
-        const item = target as EnvironmentContextCandidate;
-        return item.pixiEnvName || item.env?.pixiEnvName || item.envName;
+        const item = target as {
+            pkg?: PixiPackage;
+            env?: PixiEnvironmentInfo;
+            projectPath?: string;
+            manifestPath?: string;
+            project?: { projectPath?: string; manifestPath?: string };
+            pixiEnvName?: string;
+            envName?: string;
+            name?: string;
+            uri?: Uri;
+        };
+
+        const projectPath =
+            item.projectPath ||
+            item.project?.projectPath ||
+            item.env?.projectPath ||
+            (item.uri instanceof Uri ? item.uri.fsPath : undefined);
+        const manifestPath = item.manifestPath || item.project?.manifestPath || item.env?.manifestPath;
+        const envName = item.pixiEnvName || item.env?.pixiEnvName || item.envName;
+        const pkg = item.pkg;
+        const pkgName = item.pkg?.name || item.name;
+
+        return {
+            projectPath,
+            manifestPath,
+            envName,
+            env: item.env,
+            pkg,
+            pkgName,
+        };
     }
-    return undefined;
+    return {};
+}
+
+export function extractEnvironmentName(target?: unknown): string | undefined {
+    return extractCommandContext(target).envName;
 }
 
 export async function resolveTargetEnvironment(

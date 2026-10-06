@@ -3,6 +3,7 @@ import { commands, Disposable, ProgressLocation, QuickPickItem, window } from 'v
 
 import { runPixi } from '../../cli/pixiCli';
 import { runPixiWithProgress } from '../../cli/workspaceCli';
+import { safeJsonParse } from '../../common/execUtils';
 import { PixiProjectManager } from '../../core/projectManager';
 import { extractEnvironmentName, pickPixiProject } from './common';
 
@@ -81,17 +82,7 @@ export function formatVersionDiff(pkg: DryRunPackageChange): string {
  * Parses the stdout JSON of `pixi update --dry-run --json`.
  */
 export function parseDryRunOutput(jsonStr: string): DryRunPackageChange[] {
-    const trimmed = jsonStr.trim();
-    if (!trimmed) {
-        return [];
-    }
-    let data: RawDryRunResult;
-    try {
-        data = JSON.parse(trimmed) as RawDryRunResult;
-    } catch {
-        return [];
-    }
-
+    const data = safeJsonParse<RawDryRunResult>(jsonStr, {});
     const envMap = data.environment || {};
     const result: DryRunPackageChange[] = [];
 

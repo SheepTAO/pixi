@@ -1,10 +1,109 @@
 import * as path from 'path';
-import { commands, Disposable, Uri, window } from 'vscode';
+import { commands, Disposable, QuickPickItem, Uri, window } from 'vscode';
 
-import { promptCondaChannel, runPixi } from '../../cli/pixiCli';
+import { runPixi } from '../../cli/pixiCli';
 import { runPixiWithProgress } from '../../cli/workspaceCli';
 import { PixiProjectManager } from '../../core/projectManager';
 import { pickPixiProject } from './common';
+
+export interface CondaChannelPreset {
+    label: string;
+    description: string;
+    channel?: string;
+}
+
+export const CONDA_CHANNEL_PRESETS: readonly CondaChannelPreset[] = [
+    {
+        label: '$(server) conda-forge (default)',
+        description: 'Community-driven Conda repository (default)',
+        channel: 'conda-forge',
+    },
+    {
+        label: '$(rocket) Tsinghua Mirror (conda-forge)',
+        description: 'https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge',
+        channel: 'https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge',
+    },
+    {
+        label: '$(rocket) BFSU Mirror (conda-forge)',
+        description: 'https://mirrors.bfsu.edu.cn/anaconda/cloud/conda-forge',
+        channel: 'https://mirrors.bfsu.edu.cn/anaconda/cloud/conda-forge',
+    },
+    {
+        label: '$(rocket) Aliyun Mirror (conda-forge)',
+        description: 'https://mirrors.aliyun.com/anaconda/cloud/conda-forge',
+        channel: 'https://mirrors.aliyun.com/anaconda/cloud/conda-forge',
+    },
+    {
+        label: '$(server) pytorch',
+        description: 'Official PyTorch Conda channel',
+        channel: 'pytorch',
+    },
+    {
+        label: '$(server) nvidia',
+        description: 'Official NVIDIA CUDA packages channel',
+        channel: 'nvidia',
+    },
+    {
+        label: '$(beaker) bioconda',
+        description: 'Bioinformatics and biology package channel',
+        channel: 'bioconda',
+    },
+];
+
+export interface PromptCondaChannelOptions {
+    title?: string;
+    placeHolder?: string;
+    defaultChannelValue?: string | undefined;
+}
+
+/**
+ * Prompts the user to select a Conda channel preset or enter a custom channel / mirror URL.
+ * Returns the selected channel string (or undefined if defaultChannelValue was undefined), or null if cancelled.
+ */
+export async function promptCondaChannel(options?: PromptCondaChannelOptions): Promise<string | undefined | null> {
+    const defaultVal = options?.defaultChannelValue !== undefined ? options.defaultChannelValue : 'conda-forge';
+
+    interface ChannelItem extends QuickPickItem {
+        channel?: string;
+        isCustom?: boolean;
+    }
+
+    const items: ChannelItem[] = [
+        ...CONDA_CHANNEL_PRESETS.map((p) => ({
+            label: p.label,
+            description: p.description,
+            channel: p.channel === 'conda-forge' ? defaultVal : p.channel,
+        })),
+        {
+            label: '$(globe) Custom Channel...',
+            description: 'Specify a custom channel name or mirror URL',
+            isCustom: true,
+        },
+    ];
+
+    const pick = await window.showQuickPick(items, {
+        title: options?.title || 'Select Conda Channel',
+        placeHolder: options?.placeHolder || 'Choose a channel preset or enter a custom channel / mirror URL',
+    });
+    if (!pick) {
+        return null;
+    }
+
+    if (pick.isCustom) {
+        const input = await window.showInputBox({
+            title: options?.title ? `${options.title}: Enter Custom Channel` : 'Enter Conda Channel Name or URL',
+            prompt: 'Enter Conda channel name or URL',
+            placeHolder: 'e.g. bioconda or https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge',
+            ignoreFocusOut: true,
+        });
+        if (!input || !input.trim()) {
+            return null;
+        }
+        return input.trim();
+    }
+
+    return pick.channel;
+}
 
 export function registerChannelCommands(manager: PixiProjectManager): Disposable[] {
     return [

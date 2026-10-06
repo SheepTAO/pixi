@@ -7,6 +7,7 @@ import { getEnvironmentStatusBadge } from '../../core/environmentRules';
 import { findManifestPath } from '../../core/projectDiscovery';
 import { PixiProjectManager } from '../../core/projectManager';
 import {
+    extractCommandContext,
     extractEnvironmentName,
     getManifestPathForFormat,
     openDocumentIfExists,
@@ -540,17 +541,12 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
 
         // Pixi: Open Manifest (pixi.toml / pyproject.toml)
         commands.registerCommand('pixi.openManifest', async (targetItem?: unknown) => {
-            interface ManifestCandidate {
-                manifestPath?: string;
-                project?: { manifestPath?: string };
-                env?: { manifestPath?: string };
-            }
-            const item = targetItem as ManifestCandidate | undefined;
-            let manifestPath: string | undefined =
-                item?.manifestPath || item?.project?.manifestPath || item?.env?.manifestPath;
+            const ctx = extractCommandContext(targetItem);
+            let manifestPath = ctx.manifestPath;
 
             if (!manifestPath) {
-                const projectPath = await pickPixiProject(manager, 'Select Pixi project to open manifest', targetItem);
+                const projectPath =
+                    ctx.projectPath || (await pickPixiProject(manager, 'Select Pixi project to open manifest', targetItem));
                 if (!projectPath) {
                     return;
                 }
