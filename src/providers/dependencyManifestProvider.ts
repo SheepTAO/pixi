@@ -13,7 +13,6 @@ import {
     HoverProvider,
     InlayHint,
     InlayHintKind,
-    InlayHintLabelPart,
     InlayHintsProvider,
     languages,
     Location,
@@ -352,7 +351,7 @@ export class PixiDependencyManifestProvider
         for (const dep of visibleDeps) {
             const pkg = this.lookupPackage(activeMap, dep.name);
             if (pkg && pkg.version) {
-                hints.push(this.createInlayHint(dep, pkg, projectPath));
+                hints.push(this.createInlayHint(dep, pkg));
             } else {
                 missingDeps.push(dep);
             }
@@ -381,7 +380,7 @@ export class PixiDependencyManifestProvider
                     for (const { map } of otherResults) {
                         const pkg = this.lookupPackage(map, dep.name);
                         if (pkg && pkg.version) {
-                            hints.push(this.createInlayHint(dep, pkg, projectPath));
+                            hints.push(this.createInlayHint(dep, pkg));
                             break;
                         }
                     }
@@ -679,20 +678,11 @@ export class PixiDependencyManifestProvider
         return map.get(name.toLowerCase()) || map.get(normalizePkgName(name));
     }
 
-    private createInlayHint(dep: ParsedDependency, pkg: PixiPackage, projectPath: string): InlayHint {
+    private createInlayHint(dep: ParsedDependency, pkg: PixiPackage): InlayHint {
         const tag = pkg.is_editable ? ' (editable)' : pkg.is_local ? ' (local)' : '';
-
-        const part = new InlayHintLabelPart(`: ${pkg.version}${tag}`);
-        part.command = {
-            title: 'Open in pixi.lock',
-            command: 'pixi.openLockfile',
-            arguments: [{ projectPath, packageName: dep.name }],
-        };
-
-        const hint = new InlayHint(dep.insertPosition, [part], InlayHintKind.Type);
+        const hint = new InlayHint(dep.insertPosition, `: ${pkg.version}${tag}`, InlayHintKind.Type);
         hint.paddingLeft = true;
         hint.paddingRight = false;
-
         return hint;
     }
 }

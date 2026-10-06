@@ -186,13 +186,48 @@ async function handleCheckOutdated(
         return;
     }
 
-    changes.sort((a, b) => a.name.localeCompare(b.name));
+    // Collect explicit (manifest) dependency names to filter out transitive packages
+    const envExplicitMap = new Map<string, Set<string>>();
+    const allExplicitSet = new Set<string>();
+
+    const targetEnvs = targetEnv
+        ? [targetEnv]
+        : manager.getEnvironmentsForProject(projectPath).map((e) => e.pixiEnvName);
+
+    await Promise.all(
+        targetEnvs.map(async (env) => {
+            const pkgs = await manager.getPackagesForEnvironment(env, projectPath);
+            const explicitNames = new Set(pkgs.filter((p) => p.is_explicit).map((p) => p.name.toLowerCase()));
+            envExplicitMap.set(env, explicitNames);
+            for (const name of explicitNames) {
+                allExplicitSet.add(name);
+            }
+        }),
+    );
+
+    const explicitChanges = changes.filter((c) => {
+        const lowerName = c.name.toLowerCase();
+        const envSet = c.environment ? envExplicitMap.get(c.environment) : undefined;
+        return envSet ? envSet.has(lowerName) : allExplicitSet.has(lowerName);
+    });
+
+    const displayChanges = allExplicitSet.size > 0 ? explicitChanges : changes;
+    if (displayChanges.length === 0) {
+        window.showInformationMessage(
+            changes.length > 0
+                ? `All manifest dependencies in ${projectName} (${envLabel}) are up to date!`
+                : `All dependencies in ${projectName} (${envLabel}) are up to date!`,
+        );
+        return;
+    }
+
+    displayChanges.sort((a, b) => a.name.localeCompare(b.name));
 
     interface PackagePickItem extends QuickPickItem {
         pkgChange: DryRunPackageChange;
     }
 
-    const items: PackagePickItem[] = changes.map((c) => {
+    const items: PackagePickItem[] = displayChanges.map((c) => {
         let icon = '$(arrow-up)';
         if (c.isNew) {
             icon = '$(diff-added)';
@@ -210,7 +245,7 @@ async function handleCheckOutdated(
     });
 
     const picked = await window.showQuickPick(items, {
-        title: `Pixi: Outdated Packages (${projectName} - ${envLabel}) [${changes.length} Available]`,
+        title: `Pixi: Outdated Packages (${projectName} - ${envLabel}) [${displayChanges.length} Available]`,
         placeHolder: 'Select package(s) to update, or press Esc to cancel',
         canPickMany: true,
         matchOnDescription: true,
