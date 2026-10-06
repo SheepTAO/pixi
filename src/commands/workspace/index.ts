@@ -6,18 +6,21 @@ import { registerChannelCommands } from './channelCommands';
 import { registerEnvironmentCommands } from './environmentCommands';
 import { registerPackageCommands } from './packageCommands';
 import { registerTaskCommands } from './taskCommands';
+import { registerUpdateCommands } from './updateCommands';
 
 export * from './channelCommands';
 export * from './common';
 export * from './environmentCommands';
 export * from './packageCommands';
 export * from './taskCommands';
+export * from './updateCommands';
 
 export function registerWorkspaceCommands(manager: PixiProjectManager, taskProvider?: PixiTaskProvider): Disposable {
     const disposables: Disposable[] = [
         ...registerEnvironmentCommands(manager),
         ...registerPackageCommands(manager),
         ...registerChannelCommands(manager),
+        ...registerUpdateCommands(manager),
     ];
 
     if (taskProvider) {

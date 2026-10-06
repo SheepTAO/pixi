@@ -1,0 +1,411 @@
+import * as path from 'path';
+import { commands, Disposable, ProgressLocation, QuickPickItem, window } from 'vscode';
+
+import { runPixi } from '../../cli/pixiCli';
+import { runPixiWithProgress } from '../../cli/workspaceCli';
+import { PixiProjectManager } from '../../core/projectManager';
+import { extractEnvironmentName, pickPixiProject } from './common';
+
+export interface DryRunPackageChange {
+    name: string;
+    type: 'conda' | 'pypi';
+    beforeVer?: string;
+    afterVer?: string;
+    beforeBuild?: string;
+    afterBuild?: string;
+    isNew: boolean;
+    isRemoved: boolean;
+    platforms: string[];
+    environment: string;
+}
+
+interface RawPackageItem {
+    name: string;
+    type?: 'conda' | 'pypi';
+    before?: {
+        conda?: string;
+        pypi?: string;
+        version?: string;
+    };
+    after?: {
+        conda?: string;
+        pypi?: string;
+        version?: string;
+    };
+}
+
+interface RawDryRunResult {
+    version?: number;
+    environment?: Record<string, Record<string, RawPackageItem[]>>;
+}
+
+/**
+ * Extracts version and build strings from a Conda package URL or filename.
+ * e.g., '.../bzip2-1.0.8-hda65f42_9.conda' -> { version: '1.0.8', build: 'hda65f42_9' }
+ */
+export function parseCondaInfo(url?: string, pkgName?: string): { version?: string; build?: string } {
+    if (!url) {
+        return {};
+    }
+    const filename = url.split('/').pop()?.replace(/(\.conda|\.tar\.bz2)$/, '') || '';
+    const prefix = pkgName ? `${pkgName}-` : '';
+    const rest = filename.startsWith(prefix) ? filename.slice(prefix.length) : filename;
+    const lastDash = rest.lastIndexOf('-');
+    if (lastDash > 0) {
+        return {
+            version: rest.substring(0, lastDash),
+            build: rest.substring(lastDash + 1),
+        };
+    }
+    return { version: rest };
+}
+
+/**
+ * Formats a human-readable version diff for a package change.
+ */
+export function formatVersionDiff(pkg: DryRunPackageChange): string {
+    const typeBadge = pkg.type === 'pypi' ? '[PyPI]' : '[Conda]';
+    if (pkg.isNew) {
+        return `(new) -> v${pkg.afterVer || 'unknown'} ${typeBadge}`;
+    }
+    if (pkg.isRemoved) {
+        return `v${pkg.beforeVer || 'unknown'} -> (removed) ${typeBadge}`;
+    }
+    if (pkg.beforeVer && pkg.afterVer && pkg.beforeVer === pkg.afterVer && pkg.beforeBuild && pkg.afterBuild) {
+        return `v${pkg.beforeVer} (${pkg.beforeBuild} -> ${pkg.afterBuild}) ${typeBadge}`;
+    }
+    return `v${pkg.beforeVer || '?'} -> v${pkg.afterVer || '?'} ${typeBadge}`;
+}
+
+/**
+ * Parses the stdout JSON of `pixi update --dry-run --json`.
+ */
+export function parseDryRunOutput(jsonStr: string): DryRunPackageChange[] {
+    const trimmed = jsonStr.trim();
+    if (!trimmed) {
+        return [];
+    }
+    let data: RawDryRunResult;
+    try {
+        data = JSON.parse(trimmed) as RawDryRunResult;
+    } catch {
+        return [];
+    }
+
+    const envMap = data.environment || {};
+    const result: DryRunPackageChange[] = [];
+
+    for (const [envName, platformMap] of Object.entries(envMap)) {
+        const pkgMap = new Map<string, DryRunPackageChange>();
+
+        for (const [platform, pkgs] of Object.entries(platformMap)) {
+            if (!Array.isArray(pkgs)) {
+                continue;
+            }
+            for (const p of pkgs) {
+                if (!p || !p.name) {
+                    continue;
+                }
+                const isPypi = p.type === 'pypi';
+                const beforeVer = isPypi ? p.before?.version : parseCondaInfo(p.before?.conda, p.name).version;
+                const afterVer = isPypi ? p.after?.version : parseCondaInfo(p.after?.conda, p.name).version;
+                const beforeBuild = !isPypi ? parseCondaInfo(p.before?.conda, p.name).build : undefined;
+                const afterBuild = !isPypi ? parseCondaInfo(p.after?.conda, p.name).build : undefined;
+
+                const existing = pkgMap.get(p.name);
+                if (!existing) {
+                    pkgMap.set(p.name, {
+                        name: p.name,
+                        type: isPypi ? 'pypi' : 'conda',
+                        beforeVer,
+                        afterVer,
+                        beforeBuild,
+                        afterBuild,
+                        isNew: !p.before && !!p.after,
+                        isRemoved: !!p.before && !p.after,
+                        platforms: [platform],
+                        environment: envName,
+                    });
+                } else {
+                    if (!existing.platforms.includes(platform)) {
+                        existing.platforms.push(platform);
+                    }
+                    if (!existing.beforeVer && beforeVer) {
+                        existing.beforeVer = beforeVer;
+                    }
+                    if (!existing.afterVer && afterVer) {
+                        existing.afterVer = afterVer;
+                    }
+                    if (!existing.beforeBuild && beforeBuild) {
+                        existing.beforeBuild = beforeBuild;
+                    }
+                    if (!existing.afterBuild && afterBuild) {
+                        existing.afterBuild = afterBuild;
+                    }
+                }
+            }
+        }
+
+        result.push(...pkgMap.values());
+    }
+
+    return result;
+}
+
+async function handleCheckOutdated(
+    manager: PixiProjectManager,
+    projectPath: string,
+    projectName: string,
+    targetEnv?: string,
+): Promise<void> {
+    const envLabel = targetEnv || 'All Environments';
+    let stdout = '';
+    try {
+        stdout = await window.withProgress(
+            {
+                location: ProgressLocation.Notification,
+                title: `Pixi: Checking for updates in ${projectName} (${envLabel})...`,
+                cancellable: true,
+            },
+            async (_progress, token) => {
+                const args = ['update', '--dry-run', '--json'];
+                if (targetEnv) {
+                    args.push('-e', targetEnv);
+                }
+                return runPixi(args, { cwd: projectPath }, token);
+            },
+        );
+    } catch (err) {
+        if (err instanceof Error && err.name === 'CancellationError') {
+            return;
+        }
+        window.showErrorMessage(
+            `Failed to check for updates in ${projectName}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        return;
+    }
+
+    const changes = parseDryRunOutput(stdout);
+    if (changes.length === 0) {
+        window.showInformationMessage(`All dependencies in ${projectName} (${envLabel}) are up to date!`);
+        return;
+    }
+
+    changes.sort((a, b) => a.name.localeCompare(b.name));
+
+    interface PackagePickItem extends QuickPickItem {
+        pkgChange: DryRunPackageChange;
+    }
+
+    const items: PackagePickItem[] = changes.map((c) => {
+        let icon = '$(arrow-up)';
+        if (c.isNew) {
+            icon = '$(diff-added)';
+        } else if (c.isRemoved) {
+            icon = '$(diff-removed)';
+        }
+        const envPrefix = !targetEnv && c.environment ? `[${c.environment}] ` : '';
+        return {
+            label: `${icon} ${c.name}`,
+            description: `${envPrefix}${formatVersionDiff(c)}`,
+            detail: `Platforms: ${c.platforms.join(', ')}`,
+            picked: !c.isRemoved,
+            pkgChange: c,
+        };
+    });
+
+    const picked = await window.showQuickPick(items, {
+        title: `Pixi: Outdated Packages (${projectName} - ${envLabel}) [${changes.length} Available]`,
+        placeHolder: 'Select package(s) to update, or press Esc to cancel',
+        canPickMany: true,
+        matchOnDescription: true,
+        matchOnDetail: true,
+    });
+
+    if (!picked || picked.length === 0) {
+        return;
+    }
+
+    const selectedPkgNames = Array.from(
+        new Set(picked.filter((p) => !p.pkgChange.isRemoved).map((p) => p.pkgChange.name)),
+    );
+    if (selectedPkgNames.length === 0) {
+        return;
+    }
+
+    const confirmMsg =
+        selectedPkgNames.length === 1
+            ? `Update package '${selectedPkgNames[0]}' in ${projectName}${targetEnv ? ` (${targetEnv})` : ''}?`
+            : `Update ${selectedPkgNames.length} selected packages in ${projectName}${targetEnv ? ` (${targetEnv})` : ''}?`;
+
+    const confirm = await window.showInformationMessage(confirmMsg, { modal: true }, 'Update Now');
+    if (confirm !== 'Update Now') {
+        return;
+    }
+
+    const updateArgs = ['update'];
+    if (targetEnv) {
+        updateArgs.push('-e', targetEnv);
+    }
+    updateArgs.push(...selectedPkgNames);
+
+    await runPixiWithProgress(
+        `Pixi: Updating ${selectedPkgNames.length} packages in ${projectName}...`,
+        updateArgs,
+        projectPath,
+        manager,
+        `Pixi: Successfully updated ${selectedPkgNames.length} packages in ${projectName}.`,
+    );
+}
+
+async function handleUpdateDependencies(
+    manager: PixiProjectManager,
+    projectPath: string,
+    projectName: string,
+    targetEnv?: string,
+): Promise<void> {
+    const updateArgs = ['update'];
+    if (targetEnv) {
+        updateArgs.push('-e', targetEnv);
+    }
+
+    await runPixiWithProgress(
+        targetEnv
+            ? `Pixi: Updating dependencies for environment '${targetEnv}' in ${projectName}...`
+            : `Pixi: Updating all dependencies for ${projectName}...`,
+        updateArgs,
+        projectPath,
+        manager,
+        targetEnv
+            ? `Pixi: Dependencies updated successfully for environment '${targetEnv}' in ${projectName}.`
+            : `Pixi: All dependencies updated successfully for ${projectName}.`,
+    );
+}
+
+async function handleUpgradeDependencies(
+    manager: PixiProjectManager,
+    projectPath: string,
+    projectName: string,
+): Promise<void> {
+    const warning =
+        `Upgrade dependencies will loosen and bump version constraints in manifest (pixi.toml / pyproject.toml) to latest available versions.` +
+        `\n\nAre you sure you want to proceed for ${projectName}?`;
+
+    const confirmed = await window.showWarningMessage(warning, { modal: true }, 'Upgrade Manifest');
+    if (confirmed !== 'Upgrade Manifest') {
+        return;
+    }
+
+    const upgradeArgs = ['upgrade'];
+
+    await runPixiWithProgress(
+        `Pixi: Upgrading dependencies for ${projectName}...`,
+        upgradeArgs,
+        projectPath,
+        manager,
+        `Pixi: All dependencies upgraded successfully for ${projectName}.`,
+    );
+}
+
+export async function executeUnifiedUpdate(
+    manager: PixiProjectManager,
+    folderUri?: unknown,
+    envName?: string,
+): Promise<void> {
+    const projectPath = await pickPixiProject(manager, 'Select Pixi project to update dependencies', folderUri);
+    if (!projectPath) {
+        return;
+    }
+
+    const projectName = path.basename(projectPath);
+    const directEnv = (typeof envName === 'string' && envName.trim()) || extractEnvironmentName(folderUri);
+
+    interface UpdateActionItem extends QuickPickItem {
+        action: 'check' | 'update' | 'upgrade';
+    }
+
+    const actionItems: UpdateActionItem[] = [
+        {
+            label: '$(search) Check for Outdated Packages (Dry Run)',
+            description: 'Inspect available updates without modifying files',
+            detail: 'Runs pixi update --dry-run and previews version diffs in a selectable list',
+            action: 'check',
+        },
+        {
+            label: '$(sync) Update Dependencies (Within Constraints)',
+            description: 'Update lockfile and environments within existing version constraints',
+            detail: 'Safe update: Keeps version rules in pixi.toml / pyproject.toml intact',
+            action: 'update',
+        },
+        {
+            label: '$(rocket) Upgrade Dependencies (Bump Manifest)',
+            description: 'Loosen and bump version constraints in manifest to latest versions',
+            detail: 'Caution: Modifies pixi.toml / pyproject.toml with new version requirements',
+            action: 'upgrade',
+        },
+    ];
+
+    const chosenAction = await window.showQuickPick(actionItems, {
+        title: `Pixi: Update / Upgrade (${projectName}${directEnv ? ` - ${directEnv}` : ''})`,
+        placeHolder: 'Select update mode',
+    });
+
+    if (!chosenAction) {
+        return;
+    }
+
+    if (chosenAction.action === 'upgrade') {
+        await handleUpgradeDependencies(manager, projectPath, projectName);
+        return;
+    }
+
+    let selectedEnv: string | undefined = directEnv;
+    if (!selectedEnv) {
+        const envs = manager.getEnvironmentsForProject(projectPath);
+        if (envs.length > 1) {
+            interface ScopeItem extends QuickPickItem {
+                envName?: string;
+            }
+            const scopeItems: ScopeItem[] = [
+                {
+                    label: '$(globe) All Environments',
+                    description: `All ${envs.length} environments in ${projectName}`,
+                    envName: undefined,
+                },
+                ...envs.map((e) => ({
+                    label: `$(layers) ${e.pixiEnvName}`,
+                    description: `Environment '${e.pixiEnvName}' (${e.pixiStatus})`,
+                    envName: e.pixiEnvName,
+                })),
+            ];
+
+            const chosenScope = await window.showQuickPick(scopeItems, {
+                title: `Pixi: Select Target Environment (${projectName})`,
+                placeHolder: `Select environment scope for ${chosenAction.label}`,
+            });
+
+            if (!chosenScope) {
+                return;
+            }
+            selectedEnv = chosenScope.envName;
+        }
+    }
+
+    switch (chosenAction.action) {
+        case 'check':
+            await handleCheckOutdated(manager, projectPath, projectName, selectedEnv);
+            break;
+        case 'update':
+            await handleUpdateDependencies(manager, projectPath, projectName, selectedEnv);
+            break;
+    }
+}
+
+export function registerUpdateCommands(manager: PixiProjectManager): Disposable[] {
+    return [
+        commands.registerCommand('pixi.update', async (folderUri?: unknown, envName?: string) => {
+            await executeUnifiedUpdate(manager, folderUri, envName);
+        }),
+    ];
+}
+

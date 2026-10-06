@@ -475,7 +475,7 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
             }
 
             const projectName = path.basename(projectPath);
-            const explicitEnv = typeof envName === 'string' && envName.trim() ? envName.trim() : undefined;
+            const explicitEnv = (typeof envName === 'string' && envName.trim()) || extractEnvironmentName(folderUri);
 
             if (explicitEnv) {
                 await runPixiWithProgress(
@@ -536,32 +536,6 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                     `Pixi: Environment '${targetEnv}' re-installed successfully for ${projectName}.`,
                 );
             }
-        }),
-
-        // Pixi: Update Dependencies
-        commands.registerCommand('pixi.update', async (folderUri?: unknown, envName?: string) => {
-            const projectPath = await pickPixiProject(manager, 'Select Pixi project to update dependencies', folderUri);
-            if (!projectPath) {
-                return;
-            }
-
-            const projectName = path.basename(projectPath);
-            const explicitEnv = typeof envName === 'string' && envName.trim() ? envName.trim() : undefined;
-            const args = ['update'];
-            if (explicitEnv) {
-                args.push('-e', explicitEnv);
-            }
-            await runPixiWithProgress(
-                explicitEnv
-                    ? `Pixi: Updating dependencies for environment '${explicitEnv}' in ${projectName}...`
-                    : `Pixi: Updating dependencies for ${projectName}...`,
-                args,
-                projectPath,
-                manager,
-                explicitEnv
-                    ? `Pixi: Dependencies updated successfully for environment '${explicitEnv}' in ${projectName}.`
-                    : `Pixi: Dependencies updated successfully for ${projectName}.`,
-            );
         }),
 
         // Pixi: Open Manifest (pixi.toml / pyproject.toml)

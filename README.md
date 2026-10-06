@@ -87,21 +87,21 @@ A dedicated Activity Bar container providing complete visibility and control ove
 
 Launch any command via the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) by typing `Pixi:`:
 
-| Command                                    | Identifier            | Description                                                                      |
-| :----------------------------------------- | :-------------------- | :------------------------------------------------------------------------------- |
-| **Pixi: Search Packages ...**              | `pixi.searchPackages` | Search Conda & PyPI packages to inspect platforms, licenses, metadata, and docs. |
-| **Pixi: Install (Sync Environments)**      | `pixi.install`        | Install dependencies and synchronize all project environments.                   |
-| **Pixi: Reinstall ...**                    | `pixi.reinstall`      | Interactive menu to rebuild all environments or a specific environment.          |
-| **Pixi: Clean ...**                        | `pixi.clean`          | Interactive menu to clean project environments, a single environment, or cache.  |
-| **Pixi: Add Package ...**                  | `pixi.addPackage`     | Add packages to the project with interactive channel and version picking.        |
-| **Pixi: Update Dependencies**              | `pixi.update`         | Update dependencies and refresh `pixi.lock`.                                     |
-| **Pixi: Lock Dependencies**                | `pixi.lock`           | Solve dependencies and update the lockfile without modifying environments.       |
-| **Pixi: Add Task ...**                     | `pixi.tasks.addTask`  | Guided wizard to create a new runnable task in the project manifest.             |
-| **Pixi: Run Task ...**                     | `pixi.runTask`        | QuickPick menu to search and run any task defined in the project.                |
-| **Pixi: Open Terminal in Environment ...** | `pixi.openTerminal`   | Open an integrated terminal pre-activated in a selected environment.             |
-| **Pixi: Open Manifest**                    | `pixi.openManifest`   | Open the project manifest file (`pixi.toml` or `pyproject.toml`).                |
-| **Pixi: Open Lockfile**                    | `pixi.openLockfile`   | Open `pixi.lock` and inspect resolved package records.                           |
-| **Pixi: Global Tools ...**                 | `pixi.global`         | Interactive menu to install, list, update, and uninstall global CLI tools.       |
+| Command                                    | Identifier            | Description                                                                                  |
+| :----------------------------------------- | :-------------------- | :------------------------------------------------------------------------------------------- |
+| **Pixi: Search Packages ...**              | `pixi.searchPackages` | Search Conda & PyPI packages to inspect platforms, licenses, metadata, and docs.             |
+| **Pixi: Install (Sync Environments)**      | `pixi.install`        | Install dependencies and synchronize all project environments.                               |
+| **Pixi: Reinstall ...**                    | `pixi.reinstall`      | Interactive menu to rebuild all environments or a specific environment.                      |
+| **Pixi: Clean ...**                        | `pixi.clean`          | Interactive menu to clean project environments, a single environment, or cache.              |
+| **Pixi: Add Package ...**                  | `pixi.addPackage`     | Add packages to the project with interactive channel and version picking.                    |
+| **Pixi: Update / Upgrade ...**             | `pixi.update`         | Unified menu to check outdated packages (dry-run), update dependencies, or upgrade manifest. |
+| **Pixi: Lock Dependencies**                | `pixi.lock`           | Solve dependencies and update the lockfile without modifying environments.                   |
+| **Pixi: Add Task ...**                     | `pixi.tasks.addTask`  | Guided wizard to create a new runnable task in the project manifest.                         |
+| **Pixi: Run Task ...**                     | `pixi.runTask`        | QuickPick menu to search and run any task defined in the project.                            |
+| **Pixi: Open Terminal in Environment ...** | `pixi.openTerminal`   | Open an integrated terminal pre-activated in a selected environment.                         |
+| **Pixi: Open Manifest**                    | `pixi.openManifest`   | Open the project manifest file (`pixi.toml` or `pyproject.toml`).                            |
+| **Pixi: Open Lockfile**                    | `pixi.openLockfile`   | Open `pixi.lock` and inspect resolved package records.                                       |
+| **Pixi: Global Tools ...**                 | `pixi.global`         | Interactive menu to install, list, update, and uninstall global CLI tools.                   |
 
 > [!TIP]
 > Contextual actions (such as adding/removing tasks, removing packages, jumping to manifest declarations, running tasks in custom environments, and inspecting dependency trees) are also directly available via inline icon buttons in the Pixi Explorer tree views and editor title bar.
