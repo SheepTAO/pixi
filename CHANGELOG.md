@@ -5,6 +5,24 @@ All notable changes to the "pixi" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.2] - 2026-10-07
+
+- **Unified Dependency Update & Upgrade Workflows**:
+    - Introduce an interactive `Pixi: Update / Upgrade ...` secondary menu with dry-run outdated package inspection, constraint-respecting lockfile updates, and manifest upgrade options.
+    - Enhance dry-run QuickPick with pre-selected outdated items, build/version diff tracking, and cascade removal filtering.
+    - Aggregate multi-environment package updates by name into single picker items, displaying affected environments and platforms cleanly in the detail line.
+- **Inlay Hints & Hover Refinements**:
+    - Filter outdated package inspection (`pixi update --dry-run`) strictly to explicit dependencies declared in the project manifest (`is_explicit === true`).
+    - Streamline dependency inlay hints into clean passive annotations (e.g. `: 1.26.4`), eliminating duplicate hover tooltip cards and preserving full hover cards on package names.
+- **Polymorphic Command Context & UI Polish**:
+    - Centralize tree view, menu, and palette context extraction via `extractCommandContext`, improving support for multi-selection and editor title bar actions.
+    - Provide intuitive Conda channel addition placement options (prepend with highest priority vs append).
+    - Hide `pixi.init` from the Command Palette when a Pixi project is already present in the workspace.
+- **Performance & Architectural Simplification**:
+    - Optimize lockfile line search by eliminating redundant scans and using normalized canonical package keys.
+    - Deduplicate task object instantiation in manifest task provider.
+    - Flatten package spec parsing logic and unify regular expression escaping in task tree prefix grouping.
+
 ## [1.4.1] - 2026-10-05
 
 - **Command Palette Streamlining & Submenu Architecture**:
