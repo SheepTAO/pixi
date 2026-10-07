@@ -27,6 +27,7 @@ import {
     workspace,
 } from 'vscode';
 
+import { escapeRegex } from '../common/execUtils';
 import { PixiProjectManager } from '../core/projectManager';
 import { PixiPackage } from '../core/types';
 
@@ -78,9 +79,9 @@ export async function findPackageLineInLockfile(lockPath: string, pkgName: strin
         return -1;
     }
 
-    const escaped = pkgName.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+    const escaped = escapeRegex(pkgName);
     const altName = pkgName.includes('_') ? pkgName.replace(/_/g, '-') : pkgName.replace(/-/g, '_');
-    const altEscaped = altName.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+    const altEscaped = escapeRegex(altName);
 
     const regCondaOrPypi = new RegExp(
         `^\\s*-\\s*(?:conda|pypi):\\s*.*[/\\\\](?:${escaped}|${altEscaped})(?:-[0-9]|[/\\\\]?\\s*$)`,
@@ -89,23 +90,18 @@ export async function findPackageLineInLockfile(lockPath: string, pkgName: strin
     const regName = new RegExp(`^\\s*name:\\s*["']?(?:${escaped}|${altEscaped})["']?\\s*$`, 'i');
 
     const packagesIndex = lines.findIndex((l) => /^packages:\s*$/.test(l));
-    if (packagesIndex !== -1) {
-        for (let i = packagesIndex; i < lines.length; i++) {
-            if (regCondaOrPypi.test(lines[i]) || regName.test(lines[i])) {
-                return i;
-            }
-        }
-    }
+    const searchStartIndex = packagesIndex !== -1 ? packagesIndex : 0;
 
-    for (let i = 0; i < lines.length; i++) {
+    // 1. Prioritize detailed package definitions in the packages section
+    for (let i = searchStartIndex; i < lines.length; i++) {
         if (regCondaOrPypi.test(lines[i]) || regName.test(lines[i])) {
             return i;
         }
     }
 
-    const broadReg = new RegExp(`[/\\\\](?:${escaped}|${altEscaped})(?:-[0-9]|[/\\\\]?\\s*$)`, 'i');
-    for (let i = 0; i < lines.length; i++) {
-        if (broadReg.test(lines[i])) {
+    // 2. Fallback to environment references before the packages section
+    for (let i = 0; i < searchStartIndex; i++) {
+        if (regCondaOrPypi.test(lines[i]) || regName.test(lines[i])) {
             return i;
         }
     }
@@ -668,14 +664,13 @@ export class PixiDependencyManifestProvider
     private createPackageMap(packages: PixiPackage[]): Map<string, PixiPackage> {
         const map = new Map<string, PixiPackage>();
         for (const pkg of packages) {
-            map.set(pkg.name.toLowerCase(), pkg);
             map.set(normalizePkgName(pkg.name), pkg);
         }
         return map;
     }
 
     private lookupPackage(map: Map<string, PixiPackage>, name: string): PixiPackage | undefined {
-        return map.get(name.toLowerCase()) || map.get(normalizePkgName(name));
+        return map.get(normalizePkgName(name));
     }
 
     private createInlayHint(dep: ParsedDependency, pkg: PixiPackage): InlayHint {

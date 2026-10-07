@@ -137,17 +137,7 @@ export class PixiTaskManifestProvider implements CodeLensProvider, HoverProvider
             const range = new Range(parsed.line, 0, parsed.line, 0);
             const knownTask = taskMap.get(parsed.name);
             const taskEnv = parsed.env || knownTask?.default_environment;
-
-            const pixiTask: PixiTask = knownTask
-                ? {
-                      ...knownTask,
-                      default_environment: taskEnv,
-                  }
-                : {
-                      name: parsed.name,
-                      projectPath,
-                      default_environment: taskEnv,
-                  };
+            const pixiTask = this.resolvePixiTask(parsed.name, projectPath, taskEnv, knownTask);
 
             const depDetails =
                 pixiTask.depends_on && pixiTask.depends_on.length > 0
@@ -217,17 +207,7 @@ export class PixiTaskManifestProvider implements CodeLensProvider, HoverProvider
 
         const knownTask = projectTasks.find((t) => t.name === matched.name);
         const taskEnv = matched.env || knownTask?.default_environment;
-
-        const pixiTask: PixiTask = knownTask
-            ? {
-                  ...knownTask,
-                  default_environment: taskEnv,
-              }
-            : {
-                  name: matched.name,
-                  projectPath,
-                  default_environment: taskEnv,
-              };
+        const pixiTask = this.resolvePixiTask(matched.name, projectPath, taskEnv, knownTask);
 
         const md = new MarkdownString('', true);
         md.isTrusted = true;
@@ -271,6 +251,12 @@ export class PixiTaskManifestProvider implements CodeLensProvider, HoverProvider
 
         const highlightRange = new Range(matched.line, matched.startCol, matched.line, matched.endCol);
         return new Hover(md, highlightRange);
+    }
+
+    private resolvePixiTask(name: string, projectPath: string, taskEnv?: string, knownTask?: PixiTask): PixiTask {
+        return knownTask
+            ? { ...knownTask, default_environment: taskEnv || knownTask.default_environment }
+            : { name, projectPath, default_environment: taskEnv };
     }
 
     private getManifestActionMode(document: TextDocument): ManifestActionMode {

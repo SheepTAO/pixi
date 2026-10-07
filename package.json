@@ -302,7 +302,8 @@
         "menus": {
             "commandPalette": [
                 {
-                    "command": "pixi.init"
+                    "command": "pixi.init",
+                    "when": "!pixi.hasPixiProject"
                 },
                 {
                     "command": "pixi.searchPackages"
