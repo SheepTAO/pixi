@@ -13,7 +13,7 @@ import {
     workspace,
 } from 'vscode';
 
-import { updateProjectTreeViewDescription } from '../common/execUtils';
+import { escapeRegex, updateProjectTreeViewDescription } from '../common/execUtils';
 import { PixiProjectManager } from '../core/projectManager';
 import { PixiProject } from '../core/types';
 import { PixiTask, PixiTaskProvider } from '../providers/taskProvider';
@@ -331,7 +331,7 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
             .filter(Boolean)
             .slice()
             .sort((a, b) => b.length - a.length)
-            .map((s) => s.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'));
+            .map(escapeRegex);
         const sepRegex = patterns.length > 0 ? new RegExp(patterns.join('|')) : /[-_]/;
 
         for (const task of tasks) {

@@ -453,12 +453,10 @@ export async function promptAddPackageSpec(
                     spec: finalSpec,
                 });
             } else if (selected?.isDirectInput || currentVal) {
-                const rawSpec =
-                    selected?.isDirectInput && currentVal
-                        ? currentVal
-                        : selected?.label && selected.label.startsWith('$(edit) Add: "')
-                          ? selected.label.slice('$(edit) Add: "'.length).replace(/["].*$/, '')
-                          : currentVal;
+                let rawSpec = currentVal;
+                if (!rawSpec && selected?.label?.startsWith('$(edit) Add: "')) {
+                    rawSpec = selected.label.slice('$(edit) Add: "'.length).replace(/["].*$/, '');
+                }
                 const specs = rawSpec.trim().split(/\s+/).filter(Boolean);
                 if (specs.length === 0) {
                     resolve(undefined);
