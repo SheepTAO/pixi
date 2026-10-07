@@ -221,31 +221,65 @@ async function handleCheckOutdated(
         return;
     }
 
-    displayChanges.sort((a, b) => a.name.localeCompare(b.name));
+    // Aggregate package changes by name across environments
+    const pkgChangeMap = new Map<string, DryRunPackageChange & { environments: string[] }>();
+
+    for (const c of displayChanges) {
+        const existing = pkgChangeMap.get(c.name);
+        if (!existing) {
+            pkgChangeMap.set(c.name, {
+                ...c,
+                environments: c.environment ? [c.environment] : [],
+                platforms: Array.from(new Set(c.platforms)),
+            });
+        } else {
+            if (c.environment && !existing.environments.includes(c.environment)) {
+                existing.environments.push(c.environment);
+            }
+            for (const plat of c.platforms) {
+                if (!existing.platforms.includes(plat)) {
+                    existing.platforms.push(plat);
+                }
+            }
+            if (!existing.afterVer && c.afterVer) {
+                existing.afterVer = c.afterVer;
+            }
+            if (!existing.beforeVer && c.beforeVer) {
+                existing.beforeVer = c.beforeVer;
+            }
+        }
+    }
+
+    const aggregatedChanges = Array.from(pkgChangeMap.values());
+    aggregatedChanges.sort((a, b) => a.name.localeCompare(b.name));
 
     interface PackagePickItem extends QuickPickItem {
         pkgChange: DryRunPackageChange;
     }
 
-    const items: PackagePickItem[] = displayChanges.map((c) => {
+    const items: PackagePickItem[] = aggregatedChanges.map((c) => {
         let icon = '$(arrow-up)';
         if (c.isNew) {
             icon = '$(diff-added)';
         } else if (c.isRemoved) {
             icon = '$(diff-removed)';
         }
-        const envPrefix = !targetEnv && c.environment ? `[${c.environment}] ` : '';
+
+        const envText = !targetEnv && c.environments.length > 0 ? `Environments: ${c.environments.join(', ')}` : '';
+        const platformText = c.platforms.length > 0 ? `Platforms: ${c.platforms.join(', ')}` : '';
+        const detail = [envText, platformText].filter(Boolean).join(' | ');
+
         return {
             label: `${icon} ${c.name}`,
-            description: `${envPrefix}${formatVersionDiff(c)}`,
-            detail: `Platforms: ${c.platforms.join(', ')}`,
+            description: formatVersionDiff(c),
+            detail,
             picked: !c.isRemoved,
             pkgChange: c,
         };
     });
 
     const picked = await window.showQuickPick(items, {
-        title: `Pixi: Outdated Packages (${projectName} - ${envLabel}) [${displayChanges.length} Available]`,
+        title: `Pixi: Outdated Packages (${projectName} - ${envLabel}) [${aggregatedChanges.length} Available]`,
         placeHolder: 'Select package(s) to update, or press Esc to cancel',
         canPickMany: true,
         matchOnDescription: true,
@@ -356,21 +390,18 @@ export async function executeUnifiedUpdate(
 
     const actionItems: UpdateActionItem[] = [
         {
-            label: '$(search) Check for Outdated Packages (Dry Run)',
-            description: 'Inspect available updates without modifying files',
-            detail: 'Runs pixi update --dry-run and previews version diffs in a selectable list',
+            label: '$(search) Check Outdated Packages (Dry Run)',
+            detail: 'Preview available package updates without modifying files or environments',
             action: 'check',
         },
         {
             label: '$(sync) Update Dependencies (Within Constraints)',
-            description: 'Update lockfile and environments within existing version constraints',
-            detail: 'Safe update: Keeps version rules in pixi.toml / pyproject.toml intact',
+            detail: 'Update lockfile and environments within existing manifest version rules',
             action: 'update',
         },
         {
             label: '$(rocket) Upgrade Dependencies (Bump Manifest)',
-            description: 'Loosen and bump version constraints in manifest to latest versions',
-            detail: 'Caution: Modifies pixi.toml / pyproject.toml with new version requirements',
+            detail: 'Loosen and bump version requirements in manifest (pixi.toml / pyproject.toml)',
             action: 'upgrade',
         },
     ];
