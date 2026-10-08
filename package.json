@@ -138,6 +138,12 @@
                 "icon": "$(plus)"
             },
             {
+                "command": "pixi.createFeature",
+                "title": "Create Feature ...",
+                "category": "Pixi",
+                "icon": "$(plus)"
+            },
+            {
                 "command": "pixi.deleteEnvironment",
                 "title": "Delete Environment ...",
                 "category": "Pixi",
@@ -344,6 +350,10 @@
                 },
                 {
                     "command": "pixi.createEnvironment",
+                    "when": "pixi.hasPixiProject"
+                },
+                {
+                    "command": "pixi.createFeature",
                     "when": "pixi.hasPixiProject"
                 },
                 {
@@ -602,9 +612,14 @@
                     "group": "1_manage@1"
                 },
                 {
-                    "command": "pixi.lock",
+                    "command": "pixi.createFeature",
                     "when": "view == pixi.views.projects && viewItem == pixiProject",
                     "group": "1_manage@2"
+                },
+                {
+                    "command": "pixi.lock",
+                    "when": "view == pixi.views.projects && viewItem == pixiProject",
+                    "group": "1_manage@3"
                 },
                 {
                     "command": "pixi.addChannel",

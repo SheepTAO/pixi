@@ -10,9 +10,12 @@ import { PixiPackage } from '../../core/types';
 import {
     extractCommandContext,
     extractEnvironmentName,
+    findPackageScope,
+    PackageScopeResult,
     pickPixiProject,
-    pickTargetEnvironment,
+    pickTargetScope,
     resolveTargetEnvironment,
+    TargetScope,
 } from './common';
 import {
     AddPackagePromptResult,
@@ -93,15 +96,15 @@ export async function executeAddPackage(
     args: string[],
     specsLabel: string,
     sourceLabel: string,
-    targetEnv?: string,
+    targetScopeLabel?: string,
 ): Promise<boolean> {
     const projectName = path.basename(projectPath);
-    const displayEnv = targetEnv || 'default';
-    const progressTitle = `Pixi: Adding '${specsLabel}' (${sourceLabel}) to environment '${displayEnv}' in '${projectName}'...`;
+    const displayScope = targetScopeLabel || 'default';
+    const progressTitle = `Pixi: Adding '${specsLabel}' (${sourceLabel}) to ${displayScope} in '${projectName}'...`;
 
     const successMsg = (output: string) => {
         const resolvedSpec = parseAddedSpecsFromOutput(output, specsLabel);
-        return `Pixi: Successfully added ${resolvedSpec} (${sourceLabel}) to environment '${displayEnv}' in '${projectName}'.`;
+        return `Pixi: Successfully added ${resolvedSpec} (${sourceLabel}) to ${displayScope} in '${projectName}'.`;
     };
 
     return runPixiWithProgress(progressTitle, args, projectPath, manager, successMsg);
@@ -111,27 +114,42 @@ export async function executeRemovePackage(
     manager: PixiProjectManager,
     projectPath: string,
     pkg: Pick<PixiPackage, 'name' | 'kind'>,
-    targetEnv?: string,
+    scopeOverride?: PackageScopeResult,
 ): Promise<void> {
-    const isPypi = pkg.kind === 'pypi';
+    const scope = scopeOverride ?? (await findPackageScope(projectPath, pkg.name));
+    if (!scope) {
+        window.showInformationMessage(
+            `Pixi: '${pkg.name}' is a transitive dependency (installed automatically) and cannot be removed directly from the manifest.`,
+        );
+        return;
+    }
+
+    const isPypi = scope.isPypi || pkg.kind === 'pypi';
     const args = ['remove'];
     if (isPypi) {
         args.push('--pypi');
     }
-    if (targetEnv && targetEnv !== 'default') {
-        args.push('-e', targetEnv);
+    if (scope.kind === 'feature' && scope.scopeName) {
+        args.push('-f', scope.scopeName);
+    } else if (scope.kind === 'environment' && scope.scopeName) {
+        args.push('-e', scope.scopeName);
     }
     args.push(pkg.name);
 
     const projectName = path.basename(projectPath);
-    const displayEnv = targetEnv || 'default';
+    const scopeLabel =
+        scope.kind === 'feature'
+            ? `feature '${scope.scopeName}'`
+            : scope.kind === 'environment'
+              ? `environment '${scope.scopeName}'`
+              : 'global dependencies';
     const sourceLabel = isPypi ? 'PyPI' : 'Conda';
     await runPixiWithProgress(
-        `Pixi: Removing '${pkg.name}' (${sourceLabel}) from environment '${displayEnv}' in '${projectName}'...`,
+        `Pixi: Removing '${pkg.name}' (${sourceLabel}) from ${scopeLabel} in '${projectName}'...`,
         args,
         projectPath,
         manager,
-        `Pixi: Successfully removed '${pkg.name}' (${sourceLabel}) from environment '${displayEnv}' in '${projectName}'.`,
+        `Pixi: Successfully removed '${pkg.name}' (${sourceLabel}) from ${scopeLabel} in '${projectName}'.`,
     );
 }
 
@@ -172,7 +190,11 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
     disposables.push(
         commands.registerCommand(
             'pixi.addPackage',
-            async (targetItem?: unknown, presetEnv?: string, initialPkg?: string | PixiPackageSearchResult) => {
+            async (
+                targetItem?: unknown,
+                presetEnvOrScope?: string | TargetScope,
+                initialPkg?: string | PixiPackageSearchResult,
+            ) => {
                 const projectPath = await pickPixiProject(manager, 'Select Pixi project to add package to', targetItem);
                 if (!projectPath) {
                     return;
@@ -180,15 +202,15 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
 
                 const envs = manager.getEnvironmentsForProject(projectPath);
 
-                const directEnvName =
-                    (typeof presetEnv === 'string' && presetEnv.trim()) || extractEnvironmentName(targetItem);
+                const explicitScope: TargetScope | undefined =
+                    typeof presetEnvOrScope === 'object' && presetEnvOrScope !== null && 'kind' in presetEnvOrScope
+                        ? presetEnvOrScope
+                        : undefined;
 
-                let targetEnv: string | undefined;
-                let isTargetEnvLocked = false;
-                if (directEnvName) {
-                    isTargetEnvLocked = true;
-                    targetEnv = directEnvName === 'default' ? undefined : directEnvName;
-                }
+                const directScopeName =
+                    explicitScope?.name ||
+                    (typeof presetEnvOrScope === 'string' && presetEnvOrScope.trim()) ||
+                    extractEnvironmentName(targetItem);
 
                 let promptResult: AddPackagePromptResult | undefined;
                 if (initialPkg && typeof initialPkg === 'object') {
@@ -201,7 +223,7 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
                 } else {
                     promptResult = await promptAddPackageSpec(
                         projectPath,
-                        directEnvName,
+                        directScopeName,
                         typeof initialPkg === 'string' ? initialPkg : undefined,
                     );
                 }
@@ -209,12 +231,19 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
                     return;
                 }
 
-                if (!isTargetEnvLocked) {
-                    const picked = await pickTargetEnvironment(envs, 'add');
-                    if (picked === null) {
-                        return;
-                    }
-                    targetEnv = picked;
+                const targetScope = explicitScope ?? (await pickTargetScope(projectPath, envs, directScopeName));
+                if (targetScope === null) {
+                    return;
+                }
+
+                const scopeArgs: string[] = [];
+                let scopeLabel = 'global dependencies';
+                if (targetScope.kind === 'feature' && targetScope.name) {
+                    scopeArgs.push('-f', targetScope.name);
+                    scopeLabel = `feature '${targetScope.name}'`;
+                } else if (targetScope.kind === 'environment' && targetScope.name) {
+                    scopeArgs.push('-e', targetScope.name);
+                    scopeLabel = `environment '${targetScope.name}'`;
                 }
 
                 if (promptResult.kind === 'selected') {
@@ -226,13 +255,10 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
                     if (isPypi) {
                         args.push('--pypi');
                     }
-                    if (targetEnv) {
-                        args.push('-e', targetEnv);
-                    }
-                    args.push(spec);
+                    args.push(...scopeArgs, spec);
 
                     const sourceLabel = isPypi ? 'PyPI' : `Conda (${pkg.channel || 'conda-forge'})`;
-                    await executeAddPackage(manager, projectPath, args, spec, sourceLabel, targetEnv || directEnvName);
+                    await executeAddPackage(manager, projectPath, args, spec, sourceLabel, scopeLabel);
                     return;
                 }
 
@@ -246,19 +272,14 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
                     return;
                 }
 
-                const args = ['add'];
-                if (targetEnv) {
-                    args.push('-e', targetEnv);
-                }
-                args.push(...sourceConfig.args);
-
+                const args = ['add', ...scopeArgs, ...sourceConfig.args];
                 await executeAddPackage(
                     manager,
                     projectPath,
                     args,
                     specs.join(', '),
                     sourceConfig.sourceLabel,
-                    targetEnv || directEnvName,
+                    scopeLabel,
                 );
             },
         ),
@@ -268,14 +289,14 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
     disposables.push(
         commands.registerCommand('pixi.removePackage', async (targetItem?: unknown) => {
             const ctx = extractCommandContext(targetItem);
-            if (ctx.pkg && ctx.env && ctx.projectPath) {
-                const { pkg, env, projectPath } = ctx;
-                const envName = env.pixiEnvName;
+            if (ctx.pkg && ctx.projectPath) {
+                const { pkg, projectPath } = ctx;
 
-                if (!pkg.is_explicit) {
+                const scope = await findPackageScope(projectPath, pkg.name, ctx.envName);
+                if (!scope) {
                     window
                         .showWarningMessage(
-                            `'${pkg.name}' is a transitive dependency (installed automatically by another package) and cannot be removed directly. Remove the top-level package that depends on it.`,
+                            `'${pkg.name}' is a transitive dependency (installed automatically by another package) and cannot be removed directly from the manifest.`,
                             'Why is this installed?',
                         )
                         .then((action) => {
@@ -286,15 +307,22 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
                     return;
                 }
 
+                const scopeDesc =
+                    scope.kind === 'feature'
+                        ? `feature '${scope.scopeName}'`
+                        : scope.kind === 'environment'
+                          ? `environment '${scope.scopeName}'`
+                          : 'global dependencies';
+
                 const confirmed = await window.showWarningMessage(
-                    `Are you sure you want to remove package '${pkg.name}' from environment '${envName}'?`,
+                    `Are you sure you want to remove package '${pkg.name}' from ${scopeDesc}?`,
                     'Remove',
                 );
                 if (confirmed !== 'Remove') {
                     return;
                 }
 
-                return executeRemovePackage(manager, projectPath, pkg, envName);
+                return executeRemovePackage(manager, projectPath, pkg, scope);
             }
 
             const projectPath = await pickPixiProject(
@@ -327,17 +355,26 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
                 return;
             }
 
-            if (!picked.pkg.is_explicit) {
-                const proceed = await window.showWarningMessage(
-                    `'${picked.pkg.name}' is marked as a transitive dependency. Removing it directly may fail if it is not declared in the manifest. Continue?`,
-                    'Remove Anyway',
-                );
-                if (proceed !== 'Remove Anyway') {
-                    return;
-                }
+            const scope = await findPackageScope(projectPath, picked.pkg.name, picked.targetEnv);
+            if (!scope) {
+                window
+                    .showWarningMessage(
+                        `'${picked.pkg.name}' is a transitive dependency (installed automatically by another package) and cannot be removed directly from the manifest.`,
+                        'Why is this installed?',
+                    )
+                    .then((action) => {
+                        if (action === 'Why is this installed?') {
+                            commands.executeCommand('pixi.whyPackage', {
+                                pkg: picked.pkg,
+                                projectPath,
+                                envName: picked.targetEnv,
+                            });
+                        }
+                    });
+                return;
             }
 
-            return executeRemovePackage(manager, projectPath, picked.pkg, picked.targetEnv);
+            return executeRemovePackage(manager, projectPath, picked.pkg, scope);
         }),
     );
 

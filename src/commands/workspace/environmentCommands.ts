@@ -10,6 +10,7 @@ import {
     extractCommandContext,
     extractEnvironmentName,
     getManifestPathForFormat,
+    getWorkspaceFeatures,
     openDocumentIfExists,
     pickManifestFormat,
     pickPixiProject,
@@ -82,6 +83,45 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
             await openDocumentIfExists(getManifestPathForFormat(targetFolder, format));
         }),
 
+        // Pixi: Create Feature...
+        commands.registerCommand('pixi.createFeature', async (folderUri?: unknown) => {
+            const projectPath = await pickPixiProject(manager, 'Select Pixi project to create feature in', folderUri);
+            if (!projectPath) {
+                return;
+            }
+
+            const existingFeatures = await getWorkspaceFeatures(projectPath);
+            const featureName = await window.showInputBox({
+                title: 'Pixi: Create Feature',
+                prompt: 'Enter a name for the new feature',
+                placeHolder: 'e.g. test, dev, cuda, docs',
+                validateInput: (value) => {
+                    const trimmed = value?.trim();
+                    if (!trimmed) {
+                        return 'Feature name cannot be empty.';
+                    }
+                    if (!/^[a-zA-Z0-9_\-]+$/.test(trimmed)) {
+                        return 'Feature name must only contain alphanumeric characters, underscores, and hyphens.';
+                    }
+                    if (trimmed === 'default' || existingFeatures.some((f) => f.name === trimmed)) {
+                        return `Feature '${trimmed}' already exists in this project.`;
+                    }
+                    return null;
+                },
+            });
+            if (!featureName) {
+                return;
+            }
+
+            const trimmedName = featureName.trim();
+            // In Pixi, a feature is created natively via CLI by adding a dependency or task to it.
+            // Dispatch to pixi.addPackage with explicit feature scope to run `pixi add -f <feature> <spec>`.
+            await commands.executeCommand('pixi.addPackage', Uri.file(projectPath), {
+                kind: 'feature',
+                name: trimmedName,
+            });
+        }),
+
         // Pixi: Create Environment...
         commands.registerCommand('pixi.createEnvironment', async (folderUri?: unknown) => {
             const projectPath = await pickPixiProject(
@@ -117,6 +157,136 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
             }
 
             const trimmedName = envName.trim();
+            const existingFeatures = (await getWorkspaceFeatures(projectPath)).filter((f) => f.name !== 'default');
+            const companionFeatureExists = existingFeatures.some((f) => f.name === trimmedName);
+
+            interface EnvModeQuickPickItem {
+                label: string;
+                description: string;
+                action: 'companion' | 'select' | 'empty';
+            }
+
+            const modeItems: EnvModeQuickPickItem[] = [];
+
+            if (companionFeatureExists) {
+                modeItems.push({
+                    label: `$(symbol-namespace) Bind existing feature '${trimmedName}' (Recommended)`,
+                    description: `Environment '${trimmedName}' will include existing feature '${trimmedName}'`,
+                    action: 'companion',
+                });
+            } else {
+                modeItems.push({
+                    label: `$(symbol-namespace) Create with companion feature '${trimmedName}' (Recommended)`,
+                    description: `Add initial package to create feature '${trimmedName}' and bind to environment`,
+                    action: 'companion',
+                });
+            }
+
+            if (existingFeatures.length > 0) {
+                modeItems.push({
+                    label: '$(list-unordered) Select from existing features ...',
+                    description: `Assemble '${trimmedName}' using existing features (${existingFeatures.map((f) => f.name).join(', ')})`,
+                    action: 'select',
+                });
+            }
+
+            modeItems.push({
+                label: '$(server-environment) Empty environment without features',
+                description: `Create standalone '${trimmedName}' without feature bindings`,
+                action: 'empty',
+            });
+
+            const selectedMode = await window.showQuickPick(modeItems, {
+                title: `Pixi: Feature Composition for '${trimmedName}'`,
+                placeHolder: 'Select how features should be associated with this environment',
+            });
+
+            if (!selectedMode) {
+                return;
+            }
+
+            if (selectedMode.action === 'companion') {
+                if (companionFeatureExists) {
+                    await runPixiWithProgress(
+                        `Pixi: Creating environment '${trimmedName}' with feature '${trimmedName}'...`,
+                        [
+                            ['workspace', 'environment', 'add', trimmedName, '--feature', trimmedName],
+                            ['install', '-e', trimmedName],
+                        ],
+                        projectPath,
+                        manager,
+                        `Pixi: Environment '${trimmedName}' created and ready.`,
+                    );
+                } else {
+                    const initialPkg = await window.showInputBox({
+                        title: `Pixi: Companion Feature '${trimmedName}'`,
+                        prompt: `Enter initial package(s) to create feature '${trimmedName}' (or press Enter to create without package)`,
+                        placeHolder: 'e.g. pytest, python=3.11, ruff',
+                    });
+                    if (initialPkg === undefined) {
+                        return;
+                    }
+                    const pkgSpec = initialPkg.trim();
+                    const commandsToRun: string[][] = [];
+                    const pkgs = pkgSpec.split(/[\s,]+/).filter(Boolean);
+                    if (pkgs.length > 0) {
+                        commandsToRun.push(['add', '-f', trimmedName, ...pkgs]);
+                    }
+                    commandsToRun.push(
+                        [
+                            'workspace',
+                            'environment',
+                            'add',
+                            trimmedName,
+                            ...(pkgs.length > 0 ? ['--feature', trimmedName] : []),
+                        ],
+                        ['install', '-e', trimmedName],
+                    );
+                    await runPixiWithProgress(
+                        `Pixi: Creating environment '${trimmedName}'${pkgs.length > 0 ? ` with companion feature '${trimmedName}'` : ''}...`,
+                        commandsToRun,
+                        projectPath,
+                        manager,
+                        `Pixi: Environment '${trimmedName}' created and ready.`,
+                    );
+                }
+                return;
+            }
+
+            if (selectedMode.action === 'select') {
+                const pickedFeatures = await window.showQuickPick(
+                    existingFeatures.map((f) => ({
+                        label: `$(symbol-namespace) ${f.name}`,
+                        description: `${f.dependencies.length + f.pypiDependencies.length} dependencies`,
+                        featureName: f.name,
+                    })),
+                    {
+                        title: `Pixi: Select Features for '${trimmedName}'`,
+                        placeHolder: 'Select features to include in this environment',
+                        canPickMany: true,
+                    },
+                );
+                if (!pickedFeatures || pickedFeatures.length === 0) {
+                    return;
+                }
+                const envAddArgs = [
+                    'workspace',
+                    'environment',
+                    'add',
+                    trimmedName,
+                    ...pickedFeatures.flatMap((p) => ['--feature', p.featureName]),
+                ];
+                await runPixiWithProgress(
+                    `Pixi: Creating and installing environment '${trimmedName}'...`,
+                    [envAddArgs, ['install', '-e', trimmedName]],
+                    projectPath,
+                    manager,
+                    `Pixi: Environment '${trimmedName}' created and ready.`,
+                );
+                return;
+            }
+
+            // empty mode
             await runPixiWithProgress(
                 `Pixi: Creating and installing environment '${trimmedName}'...`,
                 [
