@@ -110,6 +110,48 @@ export async function findPackageLineInLockfile(lockPath: string, pkgName: strin
 }
 
 /**
+ * Fast in-memory resolution of locked package version directly from pixi.lock.
+ */
+export async function getLockedPackageVersion(lockPath: string, pkgName: string): Promise<string | undefined> {
+    const lineIndex = await findPackageLineInLockfile(lockPath, pkgName);
+    if (lineIndex < 0) {
+        return undefined;
+    }
+    const lines = await getLockfileLines(lockPath);
+    if (!lines || lineIndex >= lines.length) {
+        return undefined;
+    }
+    const targetLine = lines[lineIndex];
+
+    const escaped = escapeRegex(pkgName);
+    const altName = pkgName.includes('_') ? pkgName.replace(/_/g, '-') : pkgName.replace(/-/g, '_');
+    const altEscaped = escapeRegex(altName);
+
+    const urlMatch = targetLine.match(
+        new RegExp(
+            `[/\\\\](?:${escaped}|${altEscaped})-([0-9][^/\\\\\\s]*?)(?:-[^/\\\\\\s]+)?\\.(?:conda|tar\\.bz2|whl|tar\\.gz)`,
+            'i',
+        ),
+    );
+    if (urlMatch && urlMatch[1]) {
+        const rawVer = urlMatch[1];
+        const lastDash = rawVer.lastIndexOf('-');
+        return lastDash > 0 ? rawVer.substring(0, lastDash) : rawVer;
+    }
+
+    const start = Math.max(0, lineIndex - 3);
+    const end = Math.min(lines.length, lineIndex + 8);
+    for (let i = start; i < end; i++) {
+        const vMatch = lines[i].match(/^\s*version:\s*["']?([^"'\s]+)["']?/);
+        if (vMatch && vMatch[1]) {
+            return vMatch[1];
+        }
+    }
+
+    return undefined;
+}
+
+/**
  * Locates comment start in a TOML line, ignoring '#' characters inside quotes.
  */
 function findCommentIndex(line: string): number {
@@ -355,30 +397,27 @@ export class PixiDependencyManifestProvider
 
         // Fallback for dependencies not present in active environment (e.g. feature-specific dependencies)
         if (missingDeps.length > 0 && !token.isCancellationRequested) {
-            const allEnvs = this.projectManager.getEnvironmentsForProject(projectPath);
-            const otherEnvs = allEnvs.filter((e) => e.pixiEnvName !== activeEnvName && e.pixiStatus !== 'incompatible');
+            // Fast in-memory path: check pixi.lock directly without spawning child processes
+            const lockPath = path.join(projectPath, 'pixi.lock');
+            const stillMissing: ParsedDependency[] = [];
 
-            if (otherEnvs.length > 0) {
-                const otherResults = await Promise.all(
-                    otherEnvs.map(async (e) => ({
-                        envName: e.pixiEnvName,
-                        map: this.createPackageMap(
-                            await this.projectManager.getPackagesForEnvironment(e.pixiEnvName, projectPath),
-                        ),
-                    })),
-                );
-
-                if (token.isCancellationRequested) {
-                    return hints;
+            for (const dep of missingDeps) {
+                const lockedVer = await getLockedPackageVersion(lockPath, dep.name);
+                if (lockedVer) {
+                    hints.push(this.createInlayHint(dep, { version: lockedVer } as PixiPackage));
+                } else {
+                    stillMissing.push(dep);
                 }
+            }
 
-                for (const dep of missingDeps) {
-                    for (const { map } of otherResults) {
-                        const pkg = this.lookupPackage(map, dep.name);
-                        if (pkg && pkg.version) {
-                            hints.push(this.createInlayHint(dep, pkg));
-                            break;
-                        }
+            // Fallback for any dependencies still missing: check default environment if not active
+            if (stillMissing.length > 0 && activeEnvName !== 'default' && !token.isCancellationRequested) {
+                const defaultPkgs = await this.projectManager.getPackagesForEnvironment('default', projectPath);
+                const defaultMap = this.createPackageMap(defaultPkgs);
+                for (const dep of stillMissing) {
+                    const pkg = this.lookupPackage(defaultMap, dep.name);
+                    if (pkg && pkg.version) {
+                        hints.push(this.createInlayHint(dep, pkg));
                     }
                 }
             }

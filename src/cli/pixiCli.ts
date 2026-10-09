@@ -208,7 +208,6 @@ export function clearSearchCache(): void {
  */
 export async function cleanGlobalCache(token?: CancellationToken, cwd?: string): Promise<string> {
     const output = await runPixi(['clean', 'cache', '-y'], cwd ? { cwd } : undefined, token);
-    clearPixiCache();
     clearSearchCache();
     return output;
 }

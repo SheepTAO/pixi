@@ -3,7 +3,7 @@ import * as path from 'path';
 import { QuickPickItem, Uri, window, workspace } from 'vscode';
 
 import { runPixi } from '../../cli/pixiCli';
-import { normalizeFolderPath } from '../../common/execUtils';
+import { normalizeFolderPath, normalizeLocationPath } from '../../common/execUtils';
 import { getEnvironmentStatusBadge } from '../../core/environmentRules';
 import { PixiProjectManager } from '../../core/projectManager';
 import { PixiEnvironmentInfo, PixiPackage } from '../../core/types';
@@ -401,11 +401,7 @@ export function extractCommandContext(target?: unknown): ExtractedCommandContext
             uri?: Uri;
         };
 
-        const projectPath =
-            item.projectPath ||
-            item.project?.projectPath ||
-            item.env?.projectPath ||
-            (item.uri instanceof Uri ? item.uri.fsPath : undefined);
+        const projectPath = normalizeLocationPath(target);
         const manifestPath = item.manifestPath || item.project?.manifestPath || item.env?.manifestPath;
         const envName = item.pixiEnvName || item.env?.pixiEnvName || item.envName;
         const pkg = item.pkg;

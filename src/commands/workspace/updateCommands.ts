@@ -52,9 +52,16 @@ export function parseCondaInfo(url?: string, pkgName?: string): { version?: stri
         url
             .split('/')
             .pop()
-            ?.replace(/(\.conda|\.tar\.bz2)$/, '') || '';
-    const prefix = pkgName ? `${pkgName}-` : '';
-    const rest = filename.startsWith(prefix) ? filename.slice(prefix.length) : filename;
+            ?.replace(/(\.conda|\.tar\.bz2|\.whl|\.tar\.gz)$/, '') || '';
+    let rest = filename;
+    if (pkgName) {
+        const altPkg = pkgName.includes('_') ? pkgName.replace(/_/g, '-') : pkgName.replace(/-/g, '_');
+        if (rest.toLowerCase().startsWith(`${pkgName.toLowerCase()}-`)) {
+            rest = rest.slice(pkgName.length + 1);
+        } else if (rest.toLowerCase().startsWith(`${altPkg.toLowerCase()}-`)) {
+            rest = rest.slice(altPkg.length + 1);
+        }
+    }
     const lastDash = rest.lastIndexOf('-');
     if (lastDash > 0) {
         return {

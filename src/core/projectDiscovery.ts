@@ -103,15 +103,7 @@ function getSearchPaths(key: 'workspaceSearchPaths' | 'globalSearchPaths'): stri
     try {
         const config = workspace.getConfiguration('pixi');
         const paths = config.get<string[]>(key);
-        if (paths && paths.length > 0) {
-            return paths;
-        }
-        // Fallback to python-envs if configured there
-        const pyConfig = workspace.getConfiguration('python-envs');
-        const inspection = pyConfig.inspect<string[]>(key);
-        return key === 'workspaceSearchPaths'
-            ? (inspection?.workspaceFolderValue ?? inspection?.workspaceValue ?? inspection?.defaultValue ?? [])
-            : (inspection?.globalValue ?? []);
+        return paths && paths.length > 0 ? paths : [];
     } catch (error) {
         traceError(`Error reading ${key}:`, error);
         return [];
