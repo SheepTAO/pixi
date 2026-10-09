@@ -55,6 +55,8 @@ A dedicated Activity Bar container providing complete visibility and control ove
 ### Workspace & Environment Lifecycle
 
 - **Automatic Project Discovery**: Instantly detects `pixi.toml` and `pyproject.toml` manifests across single-root and multi-root workspaces.
+- **Dual Perspective Tree View**: Toggle between **Environment View** (runtime status, toolchains, installed packages) and **Feature View** (declared features, reusable dependencies, environment references) with 1-click (`$(layers)`).
+- **Environment & Feature Management Hubs**: Centralized command hubs (`Pixi: Environment ...` and `Pixi: Feature ...`) to create, install, reinstall, configure environment features (`--force`), or remove features without writing raw TOML.
 - **Locked Dependency Inlay Hints & Navigation**: Displays actual locked package versions inline in manifests (`: 1.26.4`), rich hover inspection cards (build, channel, license, multi-environment matrix diffs), and `Ctrl`/`Cmd` + Click navigation directly to package entries in `pixi.lock`.
 - **Offline Schema Validation & Manifest IntelliSense**: Bundles official Pixi JSON schema definitions locally for 100% offline autocompletion of manifest sections (`[workspace]`, `[tasks]`, `[dependencies]`, etc.), properties, channels, platforms, and rich hover documentation.
 - **Manifest Editor Actions**: 1-click title bar buttons for manifest files to Lock, Install, Update, or Reinstall dependencies.
@@ -87,24 +89,29 @@ A dedicated Activity Bar container providing complete visibility and control ove
 
 Launch any command via the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) by typing `Pixi:`:
 
-| Command                                    | Identifier               | Description                                                                                  |
-| :----------------------------------------- | :----------------------- | :------------------------------------------------------------------------------------------- |
-| **Pixi: Search Packages ...**              | `pixi.searchPackages`    | Search Conda & PyPI packages to inspect platforms, licenses, metadata, and docs.             |
-| **Pixi: Install (Sync Environments)**      | `pixi.install`           | Install dependencies and synchronize all project environments.                               |
-| **Pixi: Reinstall ...**                    | `pixi.reinstall`         | Interactive menu to rebuild all environments or a specific environment.                      |
-| **Pixi: Clean ...**                        | `pixi.clean`             | Interactive menu to clean project environments, a single environment, or cache.              |
-| **Pixi: Create Feature ...**               | `pixi.createFeature`     | Declare a new feature in the project manifest with guided package and environment creation.  |
-| **Pixi: Create Environment ...**           | `pixi.createEnvironment` | Create a new environment with guided feature composition or companion feature setup.         |
-| **Pixi: Add Package ...**                  | `pixi.addPackage`        | Add packages to features, inline environments, or global scope with channel/version picking. |
-| **Pixi: Remove Package ...**               | `pixi.removePackage`     | Remove packages from manifest with automatic feature/environment scope resolution.           |
-| **Pixi: Update / Upgrade ...**             | `pixi.update`            | Unified menu to check outdated packages (dry-run), update dependencies, or upgrade manifest. |
-| **Pixi: Lock Dependencies**                | `pixi.lock`              | Solve dependencies and update the lockfile without modifying environments.                   |
-| **Pixi: Add Task ...**                     | `pixi.tasks.addTask`     | Guided wizard to create a new runnable task in the project manifest.                         |
-| **Pixi: Run Task ...**                     | `pixi.runTask`           | QuickPick menu to search and run any task defined in the project.                            |
-| **Pixi: Open Terminal in Environment ...** | `pixi.openTerminal`      | Open an integrated terminal pre-activated in a selected environment.                         |
-| **Pixi: Open Manifest**                    | `pixi.openManifest`      | Open the project manifest file (`pixi.toml` or `pyproject.toml`).                            |
-| **Pixi: Open Lockfile**                    | `pixi.openLockfile`      | Open `pixi.lock` and inspect resolved package records.                                       |
-| **Pixi: Global Tools ...**                 | `pixi.global`            | Interactive menu to install, list, update, and uninstall global CLI tools.                   |
+| Command                                      | Identifier                          | Description                                                                                   |
+| :------------------------------------------- | :---------------------------------- | :-------------------------------------------------------------------------------------------- |
+| **Pixi: Environment ...**                    | `pixi.environment`                  | Centralized management hub for environment creation, installation, configuration, & terminal. |
+| **Pixi: Feature ...**                        | `pixi.feature`                      | Centralized management hub for feature creation, dependency installation, & removal.          |
+| **Pixi: Configure Environment Features ...** | `pixi.configureEnvironmentFeatures` | Configure and update feature composition for an environment (`pixi workspace environment`).   |
+| **Pixi: Remove Feature ...**                 | `pixi.removeFeature`                | Remove a declared feature from the project manifest (`pixi workspace feature remove`).        |
+| **Pixi: Change View Mode ...**               | `pixi.projects.changeViewMode`      | Change Environments tree view organization between Environment View and Feature View.         |
+| **Pixi: Search Packages ...**                | `pixi.searchPackages`               | Search Conda & PyPI packages to inspect platforms, licenses, metadata, and docs.              |
+| **Pixi: Install (Sync Environments)**        | `pixi.install`                      | Install dependencies and synchronize all project environments.                                |
+| **Pixi: Reinstall ...**                      | `pixi.reinstall`                    | Interactive menu to rebuild all environments or a specific environment.                       |
+| **Pixi: Clean ...**                          | `pixi.clean`                        | Interactive menu to clean project environments, a single environment, or cache.               |
+| **Pixi: Create Feature ...**                 | `pixi.createFeature`                | Declare a new feature in the project manifest with guided package and environment creation.   |
+| **Pixi: Create Environment ...**             | `pixi.createEnvironment`            | Create a new environment with guided feature composition or companion feature setup.          |
+| **Pixi: Add Package ...**                    | `pixi.addPackage`                   | Add packages to features, inline environments, or global scope with channel/version picking.  |
+| **Pixi: Remove Package ...**                 | `pixi.removePackage`                | Remove packages from manifest with automatic feature/environment scope resolution.            |
+| **Pixi: Update / Upgrade ...**               | `pixi.update`                       | Unified menu to check outdated packages (dry-run), update dependencies, or upgrade manifest.  |
+| **Pixi: Lock Dependencies**                  | `pixi.lock`                         | Solve dependencies and update the lockfile without modifying environments.                    |
+| **Pixi: Add Task ...**                       | `pixi.tasks.addTask`                | Guided wizard to create a new runnable task in the project manifest.                          |
+| **Pixi: Run Task ...**                       | `pixi.runTask`                      | QuickPick menu to search and run any task defined in the project.                             |
+| **Pixi: Open Terminal in Environment ...**   | `pixi.openTerminal`                 | Open an integrated terminal pre-activated in a selected environment.                          |
+| **Pixi: Open Manifest**                      | `pixi.openManifest`                 | Open the project manifest file (`pixi.toml` or `pyproject.toml`).                             |
+| **Pixi: Open Lockfile**                      | `pixi.openLockfile`                 | Open `pixi.lock` and inspect resolved package records.                                        |
+| **Pixi: Global Tools ...**                   | `pixi.global`                       | Interactive menu to install, list, update, and uninstall global CLI tools.                    |
 
 > [!TIP]
 > Contextual actions (such as adding/removing tasks, removing packages, jumping to manifest declarations, running tasks in custom environments, and inspecting dependency trees) are also directly available via inline icon buttons in the Pixi Explorer tree views and editor title bar.
@@ -121,6 +128,7 @@ Launch any command via the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) by t
 | `pixi.autoInstallOnOpen`       | `string`   | `"prompt"`                    | Resource | Behavior when opening projects with uninstalled environments (`"prompt"`, `"always"`, `"never"`).       |
 | `pixi.environmentRules`        | `string[]` | `[]`                          | Resource | Map glob patterns to environment names (e.g. `tests/**=dev`, `train/**=gpu`).                           |
 | `pixi.packages.displayMode`    | `string`   | `"grouped"`                   | Resource | Package tree display mode (`"grouped"`, `"explicitOnly"`, or `"all"`).                                  |
+| `pixi.environments.viewMode`   | `string`   | `"environment"`               | Resource | Environments view grouping mode (`"environment"` or `"feature"`).                                       |
 | `pixi.cache.autoMeasureSize`   | `boolean`  | `true`                        | Window   | Automatically compute Pixi cache disk usage in Pixi Info.                                               |
 | `pixi.tasks.groupBy`           | `string`   | `"prefix"`                    | Resource | Task grouping mode in Tasks view (`"prefix"`, `"environment"`, `"none"`).                               |
 | `pixi.tasks.prefixSeparators`  | `string[]` | `["-", "_"]`                  | Resource | Delimiters used to parse namespace prefixes from task names.                                            |

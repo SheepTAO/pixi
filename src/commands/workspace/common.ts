@@ -370,6 +370,7 @@ export interface ExtractedCommandContext {
     env?: PixiEnvironmentInfo;
     pkg?: PixiPackage;
     pkgName?: string;
+    featureName?: string;
 }
 
 export type EnvironmentContextCandidate = ExtractedCommandContext;
@@ -383,7 +384,7 @@ export function extractCommandContext(target?: unknown): ExtractedCommandContext
         if (trimmed.includes('/') || trimmed.includes('\\')) {
             return { projectPath: trimmed };
         }
-        return { envName: trimmed, pkgName: trimmed };
+        return { envName: trimmed, pkgName: trimmed, featureName: trimmed };
     }
     if (target instanceof Uri) {
         return { projectPath: target.fsPath };
@@ -398,6 +399,8 @@ export function extractCommandContext(target?: unknown): ExtractedCommandContext
             pixiEnvName?: string;
             envName?: string;
             name?: string;
+            featureName?: string;
+            feature?: { name?: string };
             uri?: Uri;
         };
 
@@ -406,6 +409,7 @@ export function extractCommandContext(target?: unknown): ExtractedCommandContext
         const envName = item.pixiEnvName || item.env?.pixiEnvName || item.envName;
         const pkg = item.pkg;
         const pkgName = item.pkg?.name || item.name;
+        const featureName = item.featureName || item.feature?.name;
 
         return {
             projectPath,
@@ -414,6 +418,7 @@ export function extractCommandContext(target?: unknown): ExtractedCommandContext
             env: item.env,
             pkg,
             pkgName,
+            featureName,
         };
     }
     return {};
@@ -421,6 +426,10 @@ export function extractCommandContext(target?: unknown): ExtractedCommandContext
 
 export function extractEnvironmentName(target?: unknown): string | undefined {
     return extractCommandContext(target).envName;
+}
+
+export function extractFeatureName(target?: unknown): string | undefined {
+    return extractCommandContext(target).featureName;
 }
 
 export async function resolveTargetEnvironment(

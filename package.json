@@ -132,16 +132,52 @@
                 "icon": "$(plus)"
             },
             {
+                "command": "pixi.environment",
+                "title": "Environment ...",
+                "category": "Pixi",
+                "icon": "$(server-environment)"
+            },
+            {
+                "command": "pixi.feature",
+                "title": "Feature ...",
+                "category": "Pixi",
+                "icon": "$(symbol-namespace)"
+            },
+            {
                 "command": "pixi.createEnvironment",
                 "title": "Create Environment ...",
                 "category": "Pixi",
                 "icon": "$(plus)"
             },
             {
+                "command": "pixi.configureEnvironmentFeatures",
+                "title": "Configure Environment Features ...",
+                "category": "Pixi",
+                "icon": "$(symbol-namespace)"
+            },
+            {
                 "command": "pixi.createFeature",
                 "title": "Create Feature ...",
                 "category": "Pixi",
                 "icon": "$(plus)"
+            },
+            {
+                "command": "pixi.removeFeature",
+                "title": "Remove Feature ...",
+                "category": "Pixi",
+                "icon": "$(trash)"
+            },
+            {
+                "command": "pixi.feature.revealInManifest",
+                "title": "Go to Feature Definition in Manifest",
+                "category": "Pixi",
+                "icon": "$(go-to-file)"
+            },
+            {
+                "command": "pixi.projects.changeViewMode",
+                "title": "Change View Mode ...",
+                "category": "Pixi",
+                "icon": "$(layers)"
             },
             {
                 "command": "pixi.deleteEnvironment",
@@ -505,6 +541,21 @@
             ],
             "view/title": [
                 {
+                    "command": "pixi.projects.changeViewMode",
+                    "when": "view == pixi.views.projects && pixi.hasPixiProject",
+                    "group": "navigation@0"
+                },
+                {
+                    "command": "pixi.environment",
+                    "when": "view == pixi.views.projects && pixi.hasPixiProject",
+                    "group": "1_manage@0"
+                },
+                {
+                    "command": "pixi.feature",
+                    "when": "view == pixi.views.projects && pixi.hasPixiProject",
+                    "group": "1_manage@1"
+                },
+                {
                     "command": "pixi.createEnvironment",
                     "when": "view == pixi.views.projects && pixi.hasPixiProject",
                     "group": "navigation@1"
@@ -522,7 +573,7 @@
                 {
                     "command": "pixi.lock",
                     "when": "view == pixi.views.projects && pixi.hasPixiProject",
-                    "group": "1_manage@1"
+                    "group": "1_manage@2"
                 },
                 {
                     "command": "pixi.update",
@@ -717,14 +768,49 @@
                     "group": "2_manage@0"
                 },
                 {
-                    "command": "pixi.deleteEnvironment",
+                    "command": "pixi.configureEnvironmentFeatures",
                     "when": "view == pixi.views.projects && (viewItem == pixiEnvInstalled || viewItem == pixiEnvUninstalled)",
                     "group": "2_manage@1"
+                },
+                {
+                    "command": "pixi.deleteEnvironment",
+                    "when": "view == pixi.views.projects && (viewItem == pixiEnvInstalled || viewItem == pixiEnvUninstalled)",
+                    "group": "2_manage@2"
                 },
                 {
                     "command": "pixi.installEnvironment",
                     "when": "view == pixi.views.projects && viewItem == pixiEnvUninstalled",
                     "group": "inline@1"
+                },
+                {
+                    "command": "pixi.addPackage",
+                    "when": "view == pixi.views.projects && (viewItem == pixiFeatureItem || viewItem == pixiFeatureDefault)",
+                    "group": "inline@1"
+                },
+                {
+                    "command": "pixi.feature.revealInManifest",
+                    "when": "view == pixi.views.projects && (viewItem == pixiFeatureItem || viewItem == pixiFeatureDefault)",
+                    "group": "1_navigate@1"
+                },
+                {
+                    "command": "pixi.removeFeature",
+                    "when": "view == pixi.views.projects && viewItem == pixiFeatureItem",
+                    "group": "2_manage@1"
+                },
+                {
+                    "command": "pixi.revealPackageInManifest",
+                    "when": "view == pixi.views.projects && viewItem == pixiDeclaredPackage",
+                    "group": "inline@1"
+                },
+                {
+                    "command": "pixi.revealPackageInManifest",
+                    "when": "view == pixi.views.projects && viewItem == pixiDeclaredPackage",
+                    "group": "1_item@1"
+                },
+                {
+                    "command": "pixi.removePackage",
+                    "when": "view == pixi.views.projects && viewItem == pixiDeclaredPackage",
+                    "group": "1_item@2"
                 },
                 {
                     "command": "pixi.global.updateTool",
@@ -1030,6 +1116,20 @@
                     ],
                     "default": "grouped",
                     "description": "Control how installed packages are displayed in the Environments tree view.",
+                    "scope": "resource"
+                },
+                "pixi.environments.viewMode": {
+                    "type": "string",
+                    "enum": [
+                        "environment",
+                        "feature"
+                    ],
+                    "enumDescriptions": [
+                        "Group project view by environment and display installed packages (default)",
+                        "Group project view by declared feature and display declared dependencies"
+                    ],
+                    "default": "environment",
+                    "description": "Control how the Environments tree view is organized: by environment or by feature.",
                     "scope": "resource"
                 },
                 "pixi.cache.autoMeasureSize": {

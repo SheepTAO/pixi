@@ -1,5 +1,6 @@
 import * as path from 'path';
 import {
+    commands,
     Disposable,
     Event,
     EventEmitter,
@@ -13,6 +14,7 @@ import {
     workspace,
 } from 'vscode';
 
+import { getWorkspaceEnvironments, getWorkspaceFeatures, WorkspaceListEntry } from '../commands/workspace/common';
 import { updateProjectTreeViewDescription } from '../common/execUtils';
 import { sortPixiPackages } from '../core/packageManager';
 import { PixiProjectManager } from '../core/projectManager';
@@ -170,6 +172,7 @@ export class PixiEnvironmentTreeItem extends TreeItem {
     constructor(
         public readonly env: PixiEnvironmentInfo,
         public readonly project: PixiProject,
+        public readonly envFeatures?: string[],
     ) {
         const isInstalled = env.pixiStatus === 'installed';
         super(env.pixiEnvName, isInstalled ? TreeItemCollapsibleState.Collapsed : TreeItemCollapsibleState.None);
@@ -246,6 +249,9 @@ export class PixiEnvironmentTreeItem extends TreeItem {
             `Project: ${project.name}`,
             `Prefix: ${env.prefix}`,
         ];
+        if (envFeatures && envFeatures.length > 0) {
+            lines.push(`Features: ${envFeatures.join(', ')}`);
+        }
         if (env.statusReason) {
             lines.push(`Reason: ${env.statusReason}`);
         }
@@ -289,12 +295,91 @@ export class PixiEnvironmentTreeItem extends TreeItem {
     }
 }
 
+export class PixiFeatureTreeItem extends TreeItem {
+    get projectPath(): string {
+        return this.project.projectPath;
+    }
+    get manifestPath(): string {
+        return this.project.manifestPath;
+    }
+    get featureName(): string {
+        return this.feature.name;
+    }
+
+    constructor(
+        public readonly feature: WorkspaceListEntry,
+        public readonly project: PixiProject,
+        public readonly usedByEnvs: string[],
+    ) {
+        const totalDeps = feature.dependencies.length + feature.pypiDependencies.length;
+        super(feature.name, totalDeps > 0 ? TreeItemCollapsibleState.Collapsed : TreeItemCollapsibleState.None);
+
+        const isDefault = feature.name === 'default';
+        this.iconPath = new ThemeIcon('symbol-namespace');
+
+        if (isDefault) {
+            this.description = '(Global)';
+            this.contextValue = 'pixiFeatureDefault';
+        } else {
+            this.description = usedByEnvs.length > 0 ? `Used by: ${usedByEnvs.join(', ')}` : '(Unused)';
+            this.contextValue = 'pixiFeatureItem';
+        }
+
+        const lines = [
+            `Feature: ${feature.name}`,
+            `Project: ${project.name}`,
+            isDefault
+                ? 'Scope: Global (available to all environments)'
+                : `Used by: ${usedByEnvs.length > 0 ? usedByEnvs.join(', ') : 'None'}`,
+            `Conda Dependencies: ${feature.dependencies.length}`,
+            `PyPI Dependencies: ${feature.pypiDependencies.length}`,
+        ];
+        this.tooltip = lines.join('\n');
+    }
+}
+
+export class PixiDeclaredPackageTreeItem extends TreeItem {
+    get projectPath(): string {
+        return this.project.projectPath;
+    }
+    get manifestPath(): string {
+        return this.project.manifestPath;
+    }
+    get name(): string {
+        return this.pkgName;
+    }
+    get featureName(): string {
+        return this.feature.name;
+    }
+    get pkg(): { name: string; kind: 'conda' | 'pypi' } {
+        return { name: this.pkgName, kind: this.kind };
+    }
+
+    constructor(
+        public readonly pkgName: string,
+        public readonly kind: 'conda' | 'pypi',
+        public readonly feature: WorkspaceListEntry,
+        public readonly project: PixiProject,
+    ) {
+        super(pkgName, TreeItemCollapsibleState.None);
+        this.description = kind === 'pypi' ? 'pypi' : 'conda';
+        this.iconPath =
+            kind === 'pypi' ? new ThemeIcon('symbol-keyword', new ThemeColor('charts.blue')) : new ThemeIcon('package');
+        this.contextValue = 'pixiDeclaredPackage';
+        this.tooltip = `${pkgName}\nSource: ${kind.toUpperCase()}\nDeclared in feature: ${feature.name}\nProject: ${project.name}`;
+    }
+}
+
+export type ProjectsViewMode = 'environment' | 'feature';
+
 export type PixiProjectsTreeItem =
     | PixiProjectTreeItem
     | PixiEnvironmentTreeItem
     | PixiPackageTreeItem
     | PixiEmptyTreeItem
-    | PixiTransitiveGroupTreeItem;
+    | PixiTransitiveGroupTreeItem
+    | PixiFeatureTreeItem
+    | PixiDeclaredPackageTreeItem;
 
 export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjectsTreeItem>, Disposable {
     private readonly _onDidChangeTreeData = new EventEmitter<PixiProjectsTreeItem | undefined | null | void>();
@@ -303,8 +388,12 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
     private readonly disposables: Disposable[] = [];
 
     private treeView?: TreeView<PixiProjectsTreeItem>;
+    private currentViewMode: ProjectsViewMode = 'environment';
 
     constructor(private readonly projectManager: PixiProjectManager) {
+        const config = workspace.getConfiguration('pixi.environments');
+        this.currentViewMode = config.get<ProjectsViewMode>('viewMode', 'environment');
+
         this.disposables.push(
             this.projectManager.onDidProjectsChanged(() => this.refresh()),
             this.projectManager.onDidChangeEnvironments(() => this.refresh()),
@@ -312,18 +401,34 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
                 if (e.affectsConfiguration('pixi.packages.displayMode')) {
                     this._onDidChangeTreeData.fire();
                 }
+                if (e.affectsConfiguration('pixi.environments.viewMode')) {
+                    const newMode = workspace
+                        .getConfiguration('pixi.environments')
+                        .get<ProjectsViewMode>('viewMode', 'environment');
+                    if (newMode !== this.currentViewMode) {
+                        this.currentViewMode = newMode;
+                        commands.executeCommand('setContext', 'pixi.projects.viewMode', this.currentViewMode);
+                        this.refresh();
+                    }
+                }
             }),
         );
+        commands.executeCommand('setContext', 'pixi.projects.viewMode', this.currentViewMode);
+    }
+
+    public getViewMode(): ProjectsViewMode {
+        return this.currentViewMode;
     }
 
     public bindView(treeView: TreeView<PixiProjectsTreeItem>): void {
         this.treeView = treeView;
-        updateProjectTreeViewDescription(this.treeView, this.projectManager);
+        commands.executeCommand('setContext', 'pixi.projects.viewMode', this.currentViewMode);
+        updateProjectTreeViewDescription(this.treeView, this.projectManager, this.currentViewMode);
     }
 
     public refresh(): void {
         this.projectManager.clearPackagesCache();
-        updateProjectTreeViewDescription(this.treeView, this.projectManager);
+        updateProjectTreeViewDescription(this.treeView, this.projectManager, this.currentViewMode);
         this._onDidChangeTreeData.fire();
     }
 
@@ -338,6 +443,34 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
         return element;
     }
 
+    private async getFeatureItemsForProject(project: PixiProject): Promise<PixiProjectsTreeItem[]> {
+        const [features, envs] = await Promise.all([
+            getWorkspaceFeatures(project.projectPath),
+            getWorkspaceEnvironments(project.projectPath),
+        ]);
+        if (features.length === 0) {
+            return [new PixiEmptyTreeItem('No features declared in project', project)];
+        }
+        return features.map((f) => {
+            const usedByEnvs = envs.filter((e) => e.features && e.features.includes(f.name)).map((e) => e.name);
+            return new PixiFeatureTreeItem(f, project, usedByEnvs);
+        });
+    }
+
+    private async getEnvironmentItemsForProject(project: PixiProject): Promise<PixiProjectsTreeItem[]> {
+        const [envs, wsEnvs] = await Promise.all([
+            Promise.resolve(this.projectManager.getEnvironmentsForProject(project.projectPath)),
+            getWorkspaceEnvironments(project.projectPath),
+        ]);
+        const envFeaturesMap = new Map<string, string[]>();
+        for (const we of wsEnvs) {
+            if (we.features) {
+                envFeaturesMap.set(we.name, we.features);
+            }
+        }
+        return envs.map((e) => new PixiEnvironmentTreeItem(e, project, envFeaturesMap.get(e.pixiEnvName)));
+    }
+
     public async getChildren(element?: PixiProjectsTreeItem): Promise<PixiProjectsTreeItem[]> {
         const projects = this.projectManager.getProjects();
 
@@ -347,15 +480,31 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
             }
             if (projects.length === 1) {
                 const singleProject = projects[0];
-                const envs = this.projectManager.getEnvironmentsForProject(singleProject.projectPath);
-                return envs.map((e) => new PixiEnvironmentTreeItem(e, singleProject));
+                return this.currentViewMode === 'feature'
+                    ? this.getFeatureItemsForProject(singleProject)
+                    : this.getEnvironmentItemsForProject(singleProject);
             }
             return projects.map((p) => new PixiProjectTreeItem(p));
         }
 
         if (element instanceof PixiProjectTreeItem) {
-            const envs = this.projectManager.getEnvironmentsForProject(element.project.projectPath);
-            return envs.map((e) => new PixiEnvironmentTreeItem(e, element.project));
+            return this.currentViewMode === 'feature'
+                ? this.getFeatureItemsForProject(element.project)
+                : this.getEnvironmentItemsForProject(element.project);
+        }
+
+        if (element instanceof PixiFeatureTreeItem) {
+            const items: PixiProjectsTreeItem[] = [];
+            for (const dep of element.feature.dependencies) {
+                items.push(new PixiDeclaredPackageTreeItem(dep, 'conda', element.feature, element.project));
+            }
+            for (const dep of element.feature.pypiDependencies) {
+                items.push(new PixiDeclaredPackageTreeItem(dep, 'pypi', element.feature, element.project));
+            }
+            if (items.length === 0) {
+                items.push(new PixiEmptyTreeItem('No dependencies declared in this feature', element.project));
+            }
+            return items;
         }
 
         if (element instanceof PixiEnvironmentTreeItem) {

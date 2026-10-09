@@ -1,15 +1,18 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { commands, Disposable, Uri, window, workspace } from 'vscode';
+import { commands, ConfigurationTarget, Disposable, QuickPickItem, Uri, window, workspace } from 'vscode';
 
 import { runPixiWithProgress } from '../../cli/workspaceCli';
+import { revealDefinitionInManifest } from '../../common/execUtils';
 import { getEnvironmentStatusBadge } from '../../core/environmentRules';
 import { findManifestPath } from '../../core/projectDiscovery';
 import { PixiProjectManager } from '../../core/projectManager';
 import {
     extractCommandContext,
     extractEnvironmentName,
+    extractFeatureName,
     getManifestPathForFormat,
+    getWorkspaceEnvironments,
     getWorkspaceFeatures,
     openDocumentIfExists,
     pickManifestFormat,
@@ -723,6 +726,354 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
         // Pixi: Refresh Projects
         commands.registerCommand('pixi.refreshProjects', async () => {
             await manager.refresh(undefined);
+        }),
+
+        // Pixi: Environment Management (Hub)
+        commands.registerCommand('pixi.environment', async (targetItem?: unknown) => {
+            const actions: Array<{
+                label: string;
+                description: string;
+                command: string;
+            }> = [
+                {
+                    label: '$(plus) Create New Environment...',
+                    description: 'Create an environment composed of one or more features',
+                    command: 'pixi.createEnvironment',
+                },
+                {
+                    label: '$(symbol-namespace) Configure Environment Features...',
+                    description: 'Manage and update feature bindings for an existing environment',
+                    command: 'pixi.configureEnvironmentFeatures',
+                },
+                {
+                    label: '$(cloud-download) Install Environment...',
+                    description: 'Install or synchronize dependencies for a specific environment',
+                    command: 'pixi.installEnvironment',
+                },
+                {
+                    label: '$(debug-restart) Reinstall Environment...',
+                    description: 'Force reinstall of environment prefix (pixi reinstall -e <env>)',
+                    command: 'pixi.reinstallEnvironment',
+                },
+                {
+                    label: '$(terminal) Open Terminal in Environment...',
+                    description: 'Open a dedicated terminal with the environment activated',
+                    command: 'pixi.openTerminal',
+                },
+                {
+                    label: '$(repo-sync) Sync All Environments',
+                    description: 'Synchronize all declared environments across the project (pixi install)',
+                    command: 'pixi.install',
+                },
+                {
+                    label: '$(debug-restart) Reinstall All Environments...',
+                    description: 'Reinstall all environments declared in the project (pixi reinstall --all)',
+                    command: 'pixi.reinstall',
+                },
+                {
+                    label: '$(trash) Delete Environment...',
+                    description: 'Clean an installed environment prefix on disk',
+                    command: 'pixi.deleteEnvironment',
+                },
+            ];
+
+            const pick = await window.showQuickPick(actions, {
+                title: 'Pixi: Environment Management',
+                placeHolder: 'Select environment operation',
+            });
+            if (pick) {
+                await commands.executeCommand(pick.command, targetItem);
+            }
+        }),
+
+        // Pixi: Feature Management (Hub)
+        commands.registerCommand('pixi.feature', async (targetItem?: unknown) => {
+            const actions: Array<{
+                label: string;
+                description: string;
+                command: string;
+            }> = [
+                {
+                    label: '$(plus) Create New Feature...',
+                    description: 'Define a new reusable feature and add initial package(s)',
+                    command: 'pixi.createFeature',
+                },
+                {
+                    label: '$(package) Add Package to Feature...',
+                    description: 'Install dependencies into a specific feature',
+                    command: 'pixi.addPackage',
+                },
+                {
+                    label: '$(go-to-file) Reveal Feature in Manifest',
+                    description: 'Jump to feature definition section in pixi.toml / pyproject.toml',
+                    command: 'pixi.feature.revealInManifest',
+                },
+                {
+                    label: '$(trash) Remove Feature from Manifest...',
+                    description: 'Remove a feature from the project manifest (pixi workspace feature remove)',
+                    command: 'pixi.removeFeature',
+                },
+            ];
+
+            const pick = await window.showQuickPick(actions, {
+                title: 'Pixi: Feature Management',
+                placeHolder: 'Select feature operation',
+            });
+            if (pick) {
+                await commands.executeCommand(pick.command, targetItem);
+            }
+        }),
+
+        // Pixi: Configure Features for Environment...
+        commands.registerCommand(
+            'pixi.configureEnvironmentFeatures',
+            async (targetItem?: unknown, presetEnv?: string) => {
+                const projectPath = await pickPixiProject(
+                    manager,
+                    'Select Pixi project to configure environment features for',
+                    targetItem,
+                );
+                if (!projectPath) {
+                    return;
+                }
+
+                const projectName = path.basename(projectPath);
+                let envName = (typeof presetEnv === 'string' && presetEnv.trim()) || extractEnvironmentName(targetItem);
+                if (!envName) {
+                    const envs = manager.getEnvironmentsForProject(projectPath);
+                    const namedEnvs = envs.filter((e) => e.pixiEnvName !== 'default');
+                    if (namedEnvs.length === 0) {
+                        window.showInformationMessage(
+                            `No custom environments found in ${projectName} to configure features.`,
+                        );
+                        return;
+                    }
+                    const pick = await window.showQuickPick(
+                        namedEnvs.map((e) => {
+                            const { icon, text } = getEnvironmentStatusBadge(e.pixiStatus);
+                            return {
+                                label: `${icon} ${e.pixiEnvName}`,
+                                description: text,
+                                envName: e.pixiEnvName,
+                            };
+                        }),
+                        {
+                            title: 'Pixi: Select Environment to Configure Features',
+                            placeHolder: 'Select environment',
+                        },
+                    );
+                    if (!pick) {
+                        return;
+                    }
+                    envName = pick.envName;
+                }
+
+                const allFeatures = await getWorkspaceFeatures(projectPath);
+                const allEnvs = await getWorkspaceEnvironments(projectPath);
+                const envEntry = allEnvs.find((e) => e.name === envName);
+                const currentBoundFeatures = envEntry?.features || ['default'];
+
+                const featureItems = allFeatures.map((f) => {
+                    const isDefault = f.name === 'default';
+                    const isBound = currentBoundFeatures.includes(f.name);
+                    const depCount = f.dependencies.length + f.pypiDependencies.length;
+                    return {
+                        label: `$(symbol-namespace) ${f.name}`,
+                        description: isDefault ? 'Default global feature' : `${depCount} dependencies`,
+                        featureName: f.name,
+                        picked: isBound,
+                    };
+                });
+
+                if (featureItems.length === 0) {
+                    window.showInformationMessage(`No features found in ${projectName}.`);
+                    return;
+                }
+
+                const selected = await window.showQuickPick(featureItems, {
+                    title: `Pixi: Configure Features for '${envName}'`,
+                    placeHolder: 'Select features to include in this environment (Check/Uncheck)',
+                    canPickMany: true,
+                });
+
+                if (!selected) {
+                    return;
+                }
+
+                if (selected.length === 0) {
+                    window.showWarningMessage(
+                        'An environment must contain at least one feature (or the default feature).',
+                    );
+                    return;
+                }
+
+                const selectedFeatureNames = selected.map((s) => s.featureName);
+                const includesDefault = selectedFeatureNames.includes('default');
+                const customFeatures = selectedFeatureNames.filter((fn) => fn !== 'default');
+
+                const args = [
+                    'workspace',
+                    'environment',
+                    'add',
+                    envName,
+                    ...(customFeatures.length > 0
+                        ? customFeatures.flatMap((fn) => ['--feature', fn])
+                        : includesDefault
+                          ? ['--feature', 'default']
+                          : []),
+                    ...(includesDefault ? [] : ['--no-default-feature']),
+                    '--force',
+                ];
+
+                await runPixiWithProgress(
+                    `Pixi: Updating features for environment '${envName}' in ${projectName}...`,
+                    [args, ['install', '-e', envName]],
+                    projectPath,
+                    manager,
+                    `Pixi: Environment '${envName}' updated with features: ${selectedFeatureNames.join(', ') || 'none'}.`,
+                );
+            },
+        ),
+
+        // Pixi: Remove Feature...
+        commands.registerCommand('pixi.removeFeature', async (targetItem?: unknown, presetFeature?: string) => {
+            const projectPath = await pickPixiProject(
+                manager,
+                'Select Pixi project to remove feature from',
+                targetItem,
+            );
+            if (!projectPath) {
+                return;
+            }
+
+            const projectName = path.basename(projectPath);
+            const allFeatures = (await getWorkspaceFeatures(projectPath)).filter((f) => f.name !== 'default');
+            if (allFeatures.length === 0) {
+                window.showInformationMessage(`No custom features found in ${projectName} to remove.`);
+                return;
+            }
+
+            let featureName =
+                (typeof presetFeature === 'string' && presetFeature.trim()) || extractFeatureName(targetItem);
+
+            if (!featureName) {
+                const pick = await window.showQuickPick(
+                    allFeatures.map((f) => ({
+                        label: `$(symbol-namespace) ${f.name}`,
+                        description: `${f.dependencies.length + f.pypiDependencies.length} dependencies`,
+                        featureName: f.name,
+                    })),
+                    {
+                        title: 'Pixi: Remove Feature',
+                        placeHolder: 'Select feature to remove from project manifest',
+                    },
+                );
+                if (!pick) {
+                    return;
+                }
+                featureName = pick.featureName;
+            }
+
+            if (featureName === 'default') {
+                window.showWarningMessage("The 'default' feature cannot be removed.");
+                return;
+            }
+
+            const allEnvs = await getWorkspaceEnvironments(projectPath);
+            const referencingEnvs = allEnvs.filter((e) => e.features?.includes(featureName!)).map((e) => e.name);
+            if (referencingEnvs.length > 0) {
+                const choice = await window.showWarningMessage(
+                    `Feature '${featureName}' is referenced by environment(s): ${referencingEnvs.join(', ')}. Removing it will remove it from the project manifest. Do you want to proceed?`,
+                    { modal: true },
+                    'Remove Feature',
+                );
+                if (choice !== 'Remove Feature') {
+                    return;
+                }
+            }
+
+            await runPixiWithProgress(
+                `Pixi: Removing feature '${featureName}' from ${projectName}...`,
+                ['workspace', 'feature', 'remove', featureName],
+                projectPath,
+                manager,
+                `Pixi: Feature '${featureName}' removed successfully from ${projectName}.`,
+            );
+        }),
+
+        // Pixi: Reveal Feature in Manifest...
+        commands.registerCommand(
+            'pixi.feature.revealInManifest',
+            async (targetItem?: unknown, presetFeature?: string) => {
+                const projectPath = await pickPixiProject(manager, 'Select Pixi project', targetItem);
+                if (!projectPath) {
+                    return;
+                }
+                let featureName =
+                    (typeof presetFeature === 'string' && presetFeature.trim()) || extractFeatureName(targetItem);
+                if (!featureName) {
+                    const allFeatures = await getWorkspaceFeatures(projectPath);
+                    const pick = await window.showQuickPick(
+                        allFeatures.map((f) => ({ label: f.name, featureName: f.name })),
+                        { title: 'Select Feature to Reveal' },
+                    );
+                    if (!pick) {
+                        return;
+                    }
+                    featureName = pick.featureName;
+                }
+
+                const manifestPath = findManifestPath(projectPath);
+                if (!manifestPath) {
+                    return;
+                }
+                await revealDefinitionInManifest({
+                    manifestPath,
+                    targetName: featureName,
+                    kind: 'feature',
+                });
+            },
+        ),
+
+        // Pixi: Change View Mode...
+        commands.registerCommand('pixi.projects.changeViewMode', async () => {
+            const config = workspace.getConfiguration('pixi.environments');
+            const current = config.get<string>('viewMode', 'environment');
+
+            interface ViewModeQuickPickItem extends QuickPickItem {
+                value: 'environment' | 'feature';
+            }
+
+            const items: ViewModeQuickPickItem[] = [
+                {
+                    label: '$(server-environment) Group by Environment',
+                    description: 'Group project view by environment and display installed packages (default)',
+                    detail: current === 'environment' ? '(Currently active)' : undefined,
+                    value: 'environment',
+                },
+                {
+                    label: '$(symbol-namespace) Group by Feature',
+                    description: 'Group project view by declared feature and display declared dependencies',
+                    detail: current === 'feature' ? '(Currently active)' : undefined,
+                    value: 'feature',
+                },
+            ];
+
+            const selected = await window.showQuickPick(items, {
+                title: 'Pixi Environments: Change View Mode',
+                placeHolder: 'Select how the Environments view should be organized',
+            });
+
+            if (selected) {
+                const inspect = config.inspect<string>('viewMode');
+                const target =
+                    inspect?.workspaceFolderValue !== undefined
+                        ? ConfigurationTarget.WorkspaceFolder
+                        : inspect?.workspaceValue !== undefined
+                          ? ConfigurationTarget.Workspace
+                          : ConfigurationTarget.Global;
+                await config.update('viewMode', selected.value, target);
+            }
         }),
     ];
 }

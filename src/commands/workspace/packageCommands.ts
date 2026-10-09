@@ -10,6 +10,7 @@ import { PixiPackage } from '../../core/types';
 import {
     extractCommandContext,
     extractEnvironmentName,
+    extractFeatureName,
     findPackageScope,
     PackageScopeResult,
     pickPixiProject,
@@ -202,10 +203,13 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
 
                 const envs = manager.getEnvironmentsForProject(projectPath);
 
+                const featureTargetName = extractFeatureName(targetItem);
                 const explicitScope: TargetScope | undefined =
                     typeof presetEnvOrScope === 'object' && presetEnvOrScope !== null && 'kind' in presetEnvOrScope
                         ? presetEnvOrScope
-                        : undefined;
+                        : featureTargetName
+                          ? { kind: 'feature', name: featureTargetName }
+                          : undefined;
 
                 const directScopeName =
                     explicitScope?.name ||
@@ -292,7 +296,11 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
             if (ctx.pkg && ctx.projectPath) {
                 const { pkg, projectPath } = ctx;
 
-                const scope = await findPackageScope(projectPath, pkg.name, ctx.envName);
+                const scope: PackageScopeResult | undefined = ctx.featureName
+                    ? ctx.featureName === 'default'
+                        ? { kind: 'global', isPypi: pkg.kind === 'pypi' }
+                        : { kind: 'feature', scopeName: ctx.featureName, isPypi: pkg.kind === 'pypi' }
+                    : await findPackageScope(projectPath, pkg.name, ctx.envName);
                 if (!scope) {
                     window
                         .showWarningMessage(

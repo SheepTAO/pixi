@@ -166,11 +166,11 @@ export function revealRangeInEditor(editor: TextEditor, line: number, startCol: 
 export interface RevealDefinitionOptions {
     manifestPath?: string;
     targetName: string;
-    kind: 'package' | 'task';
+    kind: 'package' | 'task' | 'feature';
 }
 
 /**
- * Locates and highlights a package dependency or task definition line in a project manifest file (pixi.toml or pyproject.toml).
+ * Locates and highlights a package dependency, task definition, or feature section line in a project manifest file (pixi.toml or pyproject.toml).
  */
 export async function revealDefinitionInManifest(options: RevealDefinitionOptions): Promise<boolean> {
     const { manifestPath, targetName, kind } = options;
@@ -199,6 +199,8 @@ export async function revealDefinitionInManifest(options: RevealDefinitionOption
         const keyRegex = new RegExp(`^\\s*["']?${namePattern}["']?\\s*=`, 'i');
         const taskSectionRegex =
             kind === 'task' ? new RegExp(`^\\s*\\[+.*tasks\\.(["']?)${escapedName}\\1\\]`, 'i') : undefined;
+        const featureSectionRegex =
+            kind === 'feature' ? new RegExp(`^\\s*\\[+.*features?\\.(["']?)${escapedName}\\1`, 'i') : undefined;
         const pyprojectDepRegex =
             kind === 'package' ? new RegExp(`["']${namePattern}(?:\\s*[\\[><=~!^;@]|["'])`, 'i') : undefined;
 
@@ -225,6 +227,29 @@ export async function revealDefinitionInManifest(options: RevealDefinitionOption
                         break;
                     } else if (fallbackLine < 0) {
                         fallbackLine = i;
+                    }
+                }
+            } else if (kind === 'feature') {
+                if (targetName === 'default') {
+                    const defaultSectionRegex =
+                        /^\s*\[+(?:tool\.pixi\.)?(?:dependencies|pypi-dependencies|workspace)\]/i;
+                    if (defaultSectionRegex.test(line)) {
+                        targetLine = i;
+                        break;
+                    }
+                } else {
+                    if (featureSectionRegex && featureSectionRegex.test(line)) {
+                        targetLine = i;
+                        break;
+                    }
+                    const isFeatureSection = /(^|\.)features?(\.|$)/i.test(currentSection);
+                    if (keyRegex.test(line)) {
+                        if (isFeatureSection) {
+                            targetLine = i;
+                            break;
+                        } else if (fallbackLine < 0) {
+                            fallbackLine = i;
+                        }
                     }
                 }
             } else {
@@ -275,11 +300,17 @@ export async function revealDefinitionInManifest(options: RevealDefinitionOption
 export function updateProjectTreeViewDescription(
     treeView: { description?: string } | undefined,
     projectManager: { getProjects: () => Array<{ name: string; manifestPath: string }> },
+    viewMode?: 'environment' | 'feature',
 ): void {
     if (!treeView) {
         return;
     }
     const projects = projectManager.getProjects();
+    const modeSuffix = viewMode === 'feature' ? ' • features' : '';
     treeView.description =
-        projects.length === 1 ? `${projects[0].name} (${path.basename(projects[0].manifestPath)})` : undefined;
+        projects.length === 1
+            ? `${projects[0].name} (${path.basename(projects[0].manifestPath)})${modeSuffix}`
+            : viewMode === 'feature'
+              ? 'features'
+              : undefined;
 }
