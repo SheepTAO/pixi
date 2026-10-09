@@ -1,5 +1,5 @@
 import * as path from 'path';
-import { commands, Disposable, QuickPickItem, Uri, window } from 'vscode';
+import { commands, Disposable, QuickPickItem, window } from 'vscode';
 
 import { runPixi } from '../../cli/pixiCli';
 import { runPixiWithProgress } from '../../cli/workspaceCli';
@@ -108,8 +108,8 @@ export async function promptCondaChannel(options?: PromptCondaChannelOptions): P
 export function registerChannelCommands(manager: PixiProjectManager): Disposable[] {
     return [
         // Pixi: Add Channel...
-        commands.registerCommand('pixi.addChannel', async (folderUri?: Uri) => {
-            const projectPath = await pickPixiProject(manager, 'Select Pixi project to add channel to', folderUri);
+        commands.registerCommand('pixi.addChannel', async (targetItem?: unknown) => {
+            const projectPath = await pickPixiProject(manager, 'Select Pixi project to add channel to', targetItem);
             if (!projectPath) {
                 return;
             }
@@ -161,8 +161,12 @@ export function registerChannelCommands(manager: PixiProjectManager): Disposable
         }),
 
         // Pixi: Remove Channel...
-        commands.registerCommand('pixi.removeChannel', async (folderUri?: Uri) => {
-            const projectPath = await pickPixiProject(manager, 'Select Pixi project to remove channel from', folderUri);
+        commands.registerCommand('pixi.removeChannel', async (targetItem?: unknown) => {
+            const projectPath = await pickPixiProject(
+                manager,
+                'Select Pixi project to remove channel from',
+                targetItem,
+            );
             if (!projectPath) {
                 return;
             }

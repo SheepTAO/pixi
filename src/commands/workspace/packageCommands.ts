@@ -181,8 +181,8 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
 
     // Pixi: Search Packages...
     disposables.push(
-        commands.registerCommand('pixi.searchPackages', async (folderUri?: unknown) => {
-            const targetProjectPath = normalizeFolderPath(folderUri);
+        commands.registerCommand('pixi.searchPackages', async (targetItem?: unknown) => {
+            const targetProjectPath = normalizeFolderPath(targetItem);
             await showPackageSearchPicker(manager, undefined, targetProjectPath);
         }),
     );

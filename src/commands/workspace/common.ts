@@ -391,24 +391,21 @@ export function extractCommandContext(target?: unknown): ExtractedCommandContext
     }
     if (typeof target === 'object') {
         const item = target as {
-            pkg?: PixiPackage;
+            pkg?: PixiPackage | { name: string; kind?: string };
             env?: PixiEnvironmentInfo;
-            projectPath?: string;
             manifestPath?: string;
-            project?: { projectPath?: string; manifestPath?: string };
+            project?: { manifestPath?: string };
             pixiEnvName?: string;
-            envName?: string;
             name?: string;
             featureName?: string;
             feature?: { name?: string };
-            uri?: Uri;
         };
 
         const projectPath = normalizeLocationPath(target);
-        const manifestPath = item.manifestPath || item.project?.manifestPath || item.env?.manifestPath;
-        const envName = item.pixiEnvName || item.env?.pixiEnvName || item.envName;
-        const pkg = item.pkg;
-        const pkgName = item.pkg?.name || item.name;
+        const manifestPath = item.manifestPath || item.project?.manifestPath;
+        const envName = item.pixiEnvName || item.env?.pixiEnvName;
+        const pkg = item.pkg as PixiPackage | undefined;
+        const pkgName = item.name || item.pkg?.name;
         const featureName = item.featureName || item.feature?.name;
 
         return {
@@ -451,8 +448,8 @@ export async function resolveTargetEnvironment(
     return undefined;
 }
 
-export async function resolveTargetFolder(folderUri?: unknown, placeHolder?: string): Promise<string | undefined> {
-    const direct = normalizeFolderPath(folderUri);
+export async function resolveTargetFolder(targetItem?: unknown, placeHolder?: string): Promise<string | undefined> {
+    const direct = normalizeFolderPath(targetItem);
     if (direct) {
         return direct;
     }

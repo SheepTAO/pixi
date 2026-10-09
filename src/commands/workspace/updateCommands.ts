@@ -380,16 +380,16 @@ async function handleUpgradeDependencies(
 
 export async function executeUnifiedUpdate(
     manager: PixiProjectManager,
-    folderUri?: unknown,
+    targetItem?: unknown,
     envName?: string,
 ): Promise<void> {
-    const projectPath = await pickPixiProject(manager, 'Select Pixi project to update dependencies', folderUri);
+    const projectPath = await pickPixiProject(manager, 'Select Pixi project to update dependencies', targetItem);
     if (!projectPath) {
         return;
     }
 
     const projectName = path.basename(projectPath);
-    const directEnv = (typeof envName === 'string' && envName.trim()) || extractEnvironmentName(folderUri);
+    const directEnv = (typeof envName === 'string' && envName.trim()) || extractEnvironmentName(targetItem);
 
     interface UpdateActionItem extends QuickPickItem {
         action: 'check' | 'update' | 'upgrade';
@@ -471,8 +471,8 @@ export async function executeUnifiedUpdate(
 
 export function registerUpdateCommands(manager: PixiProjectManager): Disposable[] {
     return [
-        commands.registerCommand('pixi.update', async (folderUri?: unknown, envName?: string) => {
-            await executeUnifiedUpdate(manager, folderUri, envName);
+        commands.registerCommand('pixi.update', async (targetItem?: unknown, envName?: string) => {
+            await executeUnifiedUpdate(manager, targetItem, envName);
         }),
     ];
 }

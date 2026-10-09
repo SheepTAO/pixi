@@ -52,8 +52,8 @@ async function pickInstallableEnvironment(
 export function registerEnvironmentCommands(manager: PixiProjectManager): Disposable[] {
     return [
         // Pixi: Initialize Project...
-        commands.registerCommand('pixi.init', async (folderUri?: Uri) => {
-            const targetFolder = await resolveTargetFolder(folderUri, 'Select folder to initialize Pixi project in');
+        commands.registerCommand('pixi.init', async (targetItem?: unknown) => {
+            const targetFolder = await resolveTargetFolder(targetItem, 'Select folder to initialize Pixi project in');
             if (!targetFolder) {
                 window.showWarningMessage('Please open a folder to initialize a Pixi project.');
                 return;
@@ -87,8 +87,8 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
         }),
 
         // Pixi: Create Feature...
-        commands.registerCommand('pixi.createFeature', async (folderUri?: unknown) => {
-            const projectPath = await pickPixiProject(manager, 'Select Pixi project to create feature in', folderUri);
+        commands.registerCommand('pixi.createFeature', async (targetItem?: unknown) => {
+            const projectPath = await pickPixiProject(manager, 'Select Pixi project to create feature in', targetItem);
             if (!projectPath) {
                 return;
             }
@@ -126,11 +126,11 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
         }),
 
         // Pixi: Create Environment...
-        commands.registerCommand('pixi.createEnvironment', async (folderUri?: unknown) => {
+        commands.registerCommand('pixi.createEnvironment', async (targetItem?: unknown) => {
             const projectPath = await pickPixiProject(
                 manager,
                 'Select Pixi project to create environment in',
-                folderUri,
+                targetItem,
             );
             if (!projectPath) {
                 return;
@@ -303,11 +303,11 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
         }),
 
         // Pixi: Delete Environment...
-        commands.registerCommand('pixi.deleteEnvironment', async (folderUri?: Uri) => {
+        commands.registerCommand('pixi.deleteEnvironment', async (targetItem?: unknown) => {
             const projectPath = await pickPixiProject(
                 manager,
                 'Select Pixi project to delete environment from',
-                folderUri,
+                targetItem,
             );
             if (!projectPath) {
                 return;
@@ -329,7 +329,7 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
             });
 
             const targetEnvName =
-                extractEnvironmentName(folderUri) ??
+                extractEnvironmentName(targetItem) ??
                 (
                     await window.showQuickPick(envItems, {
                         title: 'Pixi: Delete Environment',
@@ -518,8 +518,8 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
         }),
 
         // Pixi: Lock Dependencies
-        commands.registerCommand('pixi.lock', async (folderUri?: Uri) => {
-            const projectPath = await pickPixiProject(manager, 'Select Pixi project to lock dependencies', folderUri);
+        commands.registerCommand('pixi.lock', async (targetItem?: unknown) => {
+            const projectPath = await pickPixiProject(manager, 'Select Pixi project to lock dependencies', targetItem);
             if (!projectPath) {
                 return;
             }
@@ -561,11 +561,11 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
         }),
 
         // Pixi: Install (Sync Environments)
-        commands.registerCommand('pixi.install', async (folderUri?: unknown, envName?: string) => {
+        commands.registerCommand('pixi.install', async (targetItem?: unknown, envName?: string) => {
             const projectPath = await pickPixiProject(
                 manager,
                 'Select Pixi project to install and sync environments',
-                folderUri,
+                targetItem,
             );
             if (!projectPath) {
                 return;
@@ -621,18 +621,18 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
         }),
 
         // Pixi: Reinstall ...
-        commands.registerCommand('pixi.reinstall', async (folderUri?: unknown, envName?: string) => {
+        commands.registerCommand('pixi.reinstall', async (targetItem?: unknown, envName?: string) => {
             const projectPath = await pickPixiProject(
                 manager,
                 'Select Pixi project to reinstall environments',
-                folderUri,
+                targetItem,
             );
             if (!projectPath) {
                 return;
             }
 
             const projectName = path.basename(projectPath);
-            const explicitEnv = (typeof envName === 'string' && envName.trim()) || extractEnvironmentName(folderUri);
+            const explicitEnv = (typeof envName === 'string' && envName.trim()) || extractEnvironmentName(targetItem);
 
             if (explicitEnv) {
                 await runPixiWithProgress(

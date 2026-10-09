@@ -26,17 +26,17 @@ export interface TaskCommandArg {
     args?: string[];
 }
 
-function extractTask(arg?: unknown): PixiTask | undefined {
-    if (!arg || typeof arg !== 'object') {
+function extractTask(targetItem?: unknown): PixiTask | undefined {
+    if (!targetItem || typeof targetItem !== 'object') {
         return undefined;
     }
-    const item = arg as TaskCommandArg;
+    const item = targetItem as TaskCommandArg;
     if (item.task) {
         return item.args ? { ...item.task, args: item.args } : item.task;
     }
     const projectPath = item.projectPath || item.project?.projectPath;
     if (item.name && projectPath) {
-        const rawTask = arg as PixiTask;
+        const rawTask = targetItem as PixiTask;
         return {
             ...rawTask,
             name: item.name,
@@ -51,12 +51,12 @@ function extractTask(arg?: unknown): PixiTask | undefined {
 export function registerTaskCommands(manager: PixiProjectManager, taskProvider: PixiTaskProvider): Disposable[] {
     return [
         // Pixi: Run Task
-        commands.registerCommand('pixi.runTask', async (arg?: unknown, extraArgs?: string[]) => {
-            const targetTask = extractTask(arg);
+        commands.registerCommand('pixi.runTask', async (targetItem?: unknown, extraArgs?: string[]) => {
+            const targetTask = extractTask(targetItem);
             if (targetTask) {
                 return taskProvider.executePixiTask(targetTask, undefined, extraArgs);
             }
-            const projectPath = await pickPixiProject(manager, 'Select Pixi project to run task in', arg);
+            const projectPath = await pickPixiProject(manager, 'Select Pixi project to run task in', targetItem);
             if (!projectPath) {
                 return;
             }
@@ -71,12 +71,12 @@ export function registerTaskCommands(manager: PixiProjectManager, taskProvider: 
         }),
 
         // Pixi: Run Task in Environment
-        commands.registerCommand('pixi.runTaskInEnvironment', async (arg?: unknown) => {
-            const targetTask = extractTask(arg);
+        commands.registerCommand('pixi.runTaskInEnvironment', async (targetItem?: unknown) => {
+            const targetTask = extractTask(targetItem);
             if (targetTask) {
                 return taskProvider.promptAndRunTaskInEnvironment(targetTask);
             }
-            const projectPath = await pickPixiProject(manager, 'Select Pixi project to run task in', arg);
+            const projectPath = await pickPixiProject(manager, 'Select Pixi project to run task in', targetItem);
             if (!projectPath) {
                 return;
             }
@@ -136,11 +136,11 @@ export function registerTaskCommands(manager: PixiProjectManager, taskProvider: 
         }),
 
         // Pixi: Reveal Task in Manifest
-        commands.registerCommand('pixi.tasks.revealInManifest', async (arg?: unknown) => {
-            let task = extractTask(arg);
+        commands.registerCommand('pixi.tasks.revealInManifest', async (targetItem?: unknown) => {
+            let task = extractTask(targetItem);
 
             if (!task) {
-                const projectPath = await pickPixiProject(manager, 'Select Pixi project', arg);
+                const projectPath = await pickPixiProject(manager, 'Select Pixi project', targetItem);
                 if (!projectPath) {
                     return;
                 }
@@ -162,8 +162,8 @@ export function registerTaskCommands(manager: PixiProjectManager, taskProvider: 
         }),
 
         // Pixi: Add Task...
-        commands.registerCommand('pixi.tasks.addTask', async (arg?: unknown) => {
-            const projectPath = await pickPixiProject(manager, 'Select Pixi project to add task to', arg);
+        commands.registerCommand('pixi.tasks.addTask', async (targetItem?: unknown) => {
+            const projectPath = await pickPixiProject(manager, 'Select Pixi project to add task to', targetItem);
             if (!projectPath) {
                 return;
             }
@@ -174,8 +174,8 @@ export function registerTaskCommands(manager: PixiProjectManager, taskProvider: 
             // Detect if invoked from a task group (e.g. prefix group or environment group)
             let defaultTaskName: string | undefined;
             let initialEnv: string | undefined;
-            if (arg && typeof arg === 'object') {
-                const item = arg as {
+            if (targetItem && typeof targetItem === 'object') {
+                const item = targetItem as {
                     groupType?: 'prefix' | 'environment';
                     groupName?: string;
                 };
@@ -364,11 +364,15 @@ export function registerTaskCommands(manager: PixiProjectManager, taskProvider: 
         }),
 
         // Pixi: Remove Task
-        commands.registerCommand('pixi.tasks.removeTask', async (arg?: unknown) => {
-            let targetTask = extractTask(arg);
+        commands.registerCommand('pixi.tasks.removeTask', async (targetItem?: unknown) => {
+            let targetTask = extractTask(targetItem);
 
             if (!targetTask) {
-                const projectPath = await pickPixiProject(manager, 'Select Pixi project to remove task from', arg);
+                const projectPath = await pickPixiProject(
+                    manager,
+                    'Select Pixi project to remove task from',
+                    targetItem,
+                );
                 if (!projectPath) {
                     return;
                 }
