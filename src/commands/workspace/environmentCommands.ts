@@ -1035,8 +1035,8 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
             },
         ),
 
-        // Pixi: Change View Mode...
-        commands.registerCommand('pixi.projects.changeViewMode', async () => {
+        // Pixi: Change Grouping...
+        commands.registerCommand('pixi.environments.changeGrouping', async () => {
             const config = workspace.getConfiguration('pixi.environments');
             const current = config.get<string>('viewMode', 'environment');
 
@@ -1047,20 +1047,20 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
             const items: ViewModeQuickPickItem[] = [
                 {
                     label: '$(server-environment) Group by Environment',
-                    description: 'Group project view by environment and display installed packages (default)',
+                    description: 'Group view by environment with feature-nested packages (default)',
                     detail: current === 'environment' ? '(Currently active)' : undefined,
                     value: 'environment',
                 },
                 {
                     label: '$(symbol-namespace) Group by Feature',
-                    description: 'Group project view by declared feature and display declared dependencies',
+                    description: 'Group view by declared feature with declared dependencies',
                     detail: current === 'feature' ? '(Currently active)' : undefined,
                     value: 'feature',
                 },
             ];
 
             const selected = await window.showQuickPick(items, {
-                title: 'Pixi Environments: Change View Mode',
+                title: 'Pixi Environments: Change Grouping',
                 placeHolder: 'Select how the Environments view should be organized',
             });
 
@@ -1074,6 +1074,9 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                           : ConfigurationTarget.Global;
                 await config.update('viewMode', selected.value, target);
             }
+        }),
+        commands.registerCommand('pixi.projects.changeViewMode', async () => {
+            await commands.executeCommand('pixi.environments.changeGrouping');
         }),
     ];
 }

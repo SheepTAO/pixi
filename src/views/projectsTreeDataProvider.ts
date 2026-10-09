@@ -73,6 +73,9 @@ export class PixiPackageTreeItem extends TreeItem {
     get pixiEnvName(): string {
         return this.env.pixiEnvName;
     }
+    get featureName(): string | undefined {
+        return this._featureName;
+    }
     get name(): string {
         return this.pkg.name;
     }
@@ -81,6 +84,7 @@ export class PixiPackageTreeItem extends TreeItem {
         public readonly pkg: PixiPackage,
         public readonly env: PixiEnvironmentInfo,
         public readonly project?: PixiProject,
+        private readonly _featureName?: string,
     ) {
         super(pkg.name, TreeItemCollapsibleState.None);
         const versionStr = pkg.version ? ` v${pkg.version}` : '';
@@ -100,6 +104,9 @@ export class PixiPackageTreeItem extends TreeItem {
             `${pkg.name}${versionStr}`,
             `Kind: ${pkg.kind ? pkg.kind.toUpperCase() : 'Conda'}${pkg.is_explicit ? ' (explicit dependency)' : ' (transitive dependency)'}`,
         ];
+        if (this._featureName) {
+            lines.push(`Feature: ${this._featureName}`);
+        }
         if (pkg.is_editable || pkg.is_local) {
             lines.push(`Type: Local ${pkg.is_editable ? 'Editable ' : ''}Subpackage`);
         }
@@ -370,11 +377,50 @@ export class PixiDeclaredPackageTreeItem extends TreeItem {
     }
 }
 
+function normalizePkgName(name: string): string {
+    return name.toLowerCase().replace(/[-_.]+/g, '-');
+}
+
+export class PixiEnvFeatureGroupTreeItem extends TreeItem {
+    get projectPath(): string {
+        return this.project.projectPath;
+    }
+    get manifestPath(): string {
+        return this.project.manifestPath;
+    }
+    get envName(): string {
+        return this.env.pixiEnvName;
+    }
+    get featureName(): string {
+        return this.groupName;
+    }
+    get feature(): { name: string } {
+        return { name: this.groupName };
+    }
+
+    constructor(
+        public readonly groupName: string,
+        public readonly packages: PixiPackage[],
+        public readonly env: PixiEnvironmentInfo,
+        public readonly project: PixiProject,
+        public readonly isDefault: boolean = false,
+    ) {
+        super(groupName, packages.length > 0 ? TreeItemCollapsibleState.Expanded : TreeItemCollapsibleState.None);
+        this.description = `(${packages.length})`;
+        this.iconPath = new ThemeIcon('symbol-namespace');
+        this.tooltip = isDefault
+            ? `Global Feature '${groupName}': ${packages.length} package(s) in environment '${env.pixiEnvName}'`
+            : `Feature '${groupName}': ${packages.length} package(s) in environment '${env.pixiEnvName}'`;
+        this.contextValue = isDefault ? 'pixiEnvFeatureDefault' : 'pixiEnvFeatureGroup';
+    }
+}
+
 export type ProjectsViewMode = 'environment' | 'feature';
 
 export type PixiProjectsTreeItem =
     | PixiProjectTreeItem
     | PixiEnvironmentTreeItem
+    | PixiEnvFeatureGroupTreeItem
     | PixiPackageTreeItem
     | PixiEmptyTreeItem
     | PixiTransitiveGroupTreeItem
@@ -407,12 +453,14 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
                         .get<ProjectsViewMode>('viewMode', 'environment');
                     if (newMode !== this.currentViewMode) {
                         this.currentViewMode = newMode;
+                        commands.executeCommand('setContext', 'pixi.environments.viewMode', this.currentViewMode);
                         commands.executeCommand('setContext', 'pixi.projects.viewMode', this.currentViewMode);
                         this.refresh();
                     }
                 }
             }),
         );
+        commands.executeCommand('setContext', 'pixi.environments.viewMode', this.currentViewMode);
         commands.executeCommand('setContext', 'pixi.projects.viewMode', this.currentViewMode);
     }
 
@@ -422,6 +470,7 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
 
     public bindView(treeView: TreeView<PixiProjectsTreeItem>): void {
         this.treeView = treeView;
+        commands.executeCommand('setContext', 'pixi.environments.viewMode', this.currentViewMode);
         commands.executeCommand('setContext', 'pixi.projects.viewMode', this.currentViewMode);
         updateProjectTreeViewDescription(this.treeView, this.projectManager, this.currentViewMode);
     }
@@ -505,6 +554,15 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
             return items;
         }
 
+        if (element instanceof PixiEnvFeatureGroupTreeItem) {
+            if (element.packages.length === 0) {
+                return [new PixiEmptyTreeItem('No packages found in this feature', element.project, element.env)];
+            }
+            return element.packages.map(
+                (pkg) => new PixiPackageTreeItem(pkg, element.env, element.project, element.groupName),
+            );
+        }
+
         if (element instanceof PixiEnvironmentTreeItem) {
             if (element.env.pixiStatus !== 'installed') {
                 return [];
@@ -521,28 +579,82 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
             const config = workspace.getConfiguration('pixi', Uri.file(element.project.projectPath));
             const displayMode = config.get<'grouped' | 'explicitOnly' | 'all'>('packages.displayMode', 'grouped');
 
+            const allFeatures = await getWorkspaceFeatures(element.project.projectPath);
+            const hasCustomFeatures = allFeatures.some((f) => f.name !== 'default');
             const sorted = sortPixiPackages(packages);
-            if (displayMode === 'all') {
-                return sorted.map((pkg) => new PixiPackageTreeItem(pkg, element.env, element.project));
-            }
 
-            const explicit = sorted.filter((p) => p.is_explicit);
-            if (displayMode === 'explicitOnly') {
-                if (explicit.length === 0) {
-                    return [new PixiEmptyTreeItem('No explicit packages found', element.project, element.env)];
+            if (!hasCustomFeatures) {
+                if (displayMode === 'all') {
+                    return sorted.map((pkg) => new PixiPackageTreeItem(pkg, element.env, element.project));
                 }
-                return explicit.map((pkg) => new PixiPackageTreeItem(pkg, element.env, element.project));
+
+                const explicit = sorted.filter((p) => p.is_explicit);
+                if (displayMode === 'explicitOnly') {
+                    if (explicit.length === 0) {
+                        return [new PixiEmptyTreeItem('No explicit packages found', element.project, element.env)];
+                    }
+                    return explicit.map((pkg) => new PixiPackageTreeItem(pkg, element.env, element.project));
+                }
+
+                // 'grouped' mode (default)
+                const transitive = sorted.filter((p) => !p.is_explicit);
+                const result: PixiProjectsTreeItem[] = explicit.map(
+                    (pkg) => new PixiPackageTreeItem(pkg, element.env, element.project),
+                );
+                if (transitive.length > 0) {
+                    result.push(new PixiTransitiveGroupTreeItem(transitive, element.env, element.project));
+                }
+                return result;
             }
 
-            // 'grouped' mode (default)
-            const transitive = sorted.filter((p) => !p.is_explicit);
-            const result: PixiProjectsTreeItem[] = explicit.map(
-                (pkg) => new PixiPackageTreeItem(pkg, element.env, element.project),
-            );
-            if (transitive.length > 0) {
-                result.push(new PixiTransitiveGroupTreeItem(transitive, element.env, element.project));
+            // Project has custom features: group explicit dependencies by their declared feature
+            const envFeatureNames = new Set(element.envFeatures ?? []);
+            const defaultFeature = allFeatures.find((f) => f.name === 'default');
+            if (
+                defaultFeature &&
+                (defaultFeature.dependencies.length > 0 || defaultFeature.pypiDependencies.length > 0)
+            ) {
+                envFeatureNames.add('default');
             }
-            return result;
+
+            const targetFeatures = allFeatures.filter((f) => envFeatureNames.has(f.name));
+            const matchedPackages = new Set<PixiPackage>();
+            const featureItems: PixiProjectsTreeItem[] = [];
+
+            for (const f of targetFeatures) {
+                const declaredNames = new Set<string>([
+                    ...f.dependencies.map((d) => normalizePkgName(d)),
+                    ...f.pypiDependencies.map((d) => normalizePkgName(d)),
+                ]);
+
+                const featurePkgs = sorted.filter((pkg) => declaredNames.has(normalizePkgName(pkg.name)));
+                for (const p of featurePkgs) {
+                    matchedPackages.add(p);
+                }
+
+                if (f.dependencies.length > 0 || f.pypiDependencies.length > 0) {
+                    featureItems.push(
+                        new PixiEnvFeatureGroupTreeItem(
+                            f.name,
+                            featurePkgs,
+                            element.env,
+                            element.project,
+                            f.name === 'default',
+                        ),
+                    );
+                }
+            }
+
+            const transitive = sorted.filter((pkg) => !matchedPackages.has(pkg));
+            if (displayMode !== 'explicitOnly' && transitive.length > 0) {
+                featureItems.push(new PixiTransitiveGroupTreeItem(transitive, element.env, element.project));
+            }
+
+            if (featureItems.length === 0) {
+                return [new PixiEmptyTreeItem('No packages found', element.project, element.env)];
+            }
+
+            return featureItems;
         }
 
         if (element instanceof PixiTransitiveGroupTreeItem) {

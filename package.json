@@ -174,10 +174,16 @@
                 "icon": "$(go-to-file)"
             },
             {
-                "command": "pixi.projects.changeViewMode",
-                "title": "Change View Mode ...",
+                "command": "pixi.environments.changeGrouping",
+                "title": "Change Grouping ...",
                 "category": "Pixi",
-                "icon": "$(layers)"
+                "icon": "$(organization)"
+            },
+            {
+                "command": "pixi.projects.changeViewMode",
+                "title": "Change Grouping ...",
+                "category": "Pixi",
+                "icon": "$(organization)"
             },
             {
                 "command": "pixi.deleteEnvironment",
@@ -515,6 +521,14 @@
                 {
                     "command": "pixi.tasks.changeGrouping",
                     "when": "false"
+                },
+                {
+                    "command": "pixi.environments.changeGrouping",
+                    "when": "false"
+                },
+                {
+                    "command": "pixi.projects.changeViewMode",
+                    "when": "false"
                 }
             ],
             "editor/title": [
@@ -541,7 +555,7 @@
             ],
             "view/title": [
                 {
-                    "command": "pixi.projects.changeViewMode",
+                    "command": "pixi.environments.changeGrouping",
                     "when": "view == pixi.views.projects && pixi.hasPixiProject",
                     "group": "navigation@0"
                 },
@@ -784,12 +798,12 @@
                 },
                 {
                     "command": "pixi.addPackage",
-                    "when": "view == pixi.views.projects && (viewItem == pixiFeatureItem || viewItem == pixiFeatureDefault)",
+                    "when": "view == pixi.views.projects && (viewItem == pixiFeatureItem || viewItem == pixiFeatureDefault || viewItem == pixiEnvFeatureGroup || viewItem == pixiEnvFeatureDefault)",
                     "group": "inline@1"
                 },
                 {
                     "command": "pixi.feature.revealInManifest",
-                    "when": "view == pixi.views.projects && (viewItem == pixiFeatureItem || viewItem == pixiFeatureDefault)",
+                    "when": "view == pixi.views.projects && (viewItem == pixiFeatureItem || viewItem == pixiFeatureDefault || viewItem == pixiEnvFeatureGroup || viewItem == pixiEnvFeatureDefault)",
                     "group": "1_navigate@1"
                 },
                 {

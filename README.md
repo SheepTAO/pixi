@@ -95,7 +95,7 @@ Launch any command via the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) by t
 | **Pixi: Feature ...**                        | `pixi.feature`                      | Centralized management hub for feature creation, dependency installation, & removal.          |
 | **Pixi: Configure Environment Features ...** | `pixi.configureEnvironmentFeatures` | Configure and update feature composition for an environment (`pixi workspace environment`).   |
 | **Pixi: Remove Feature ...**                 | `pixi.removeFeature`                | Remove a declared feature from the project manifest (`pixi workspace feature remove`).        |
-| **Pixi: Change View Mode ...**               | `pixi.projects.changeViewMode`      | Change Environments tree view organization between Environment View and Feature View.         |
+| **Pixi: Change Grouping ...**                | `pixi.environments.changeGrouping`  | Change Environments tree view organization between Environment View and Feature View.         |
 | **Pixi: Search Packages ...**                | `pixi.searchPackages`               | Search Conda & PyPI packages to inspect platforms, licenses, metadata, and docs.              |
 | **Pixi: Install (Sync Environments)**        | `pixi.install`                      | Install dependencies and synchronize all project environments.                                |
 | **Pixi: Reinstall ...**                      | `pixi.reinstall`                    | Interactive menu to rebuild all environments or a specific environment.                       |
