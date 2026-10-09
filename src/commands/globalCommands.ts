@@ -22,7 +22,7 @@ import {
     uninstallGlobalTool,
     updateGlobalTool,
 } from '../cli/globalCli';
-import { promptCondaChannel } from '../cli/pixiCli';
+import { promptCondaChannel } from './workspace/channelCommands';
 
 export {
     clearGlobalManifestCache,

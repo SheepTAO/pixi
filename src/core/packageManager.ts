@@ -136,3 +136,10 @@ export function sortPixiPackages(packages: PixiPackage[]): PixiPackage[] {
         return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
     });
 }
+
+/**
+ * Normalizes package names for resilient cross-ecosystem lookup (PEP 503).
+ */
+export function normalizePkgName(name: string): string {
+    return name.toLowerCase().replace(/[-_.]+/g, '-');
+}

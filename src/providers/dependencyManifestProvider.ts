@@ -28,6 +28,7 @@ import {
 } from 'vscode';
 
 import { escapeRegex } from '../common/execUtils';
+import { normalizePkgName } from '../core/packageManager';
 import { PixiProjectManager } from '../core/projectManager';
 import { PixiPackage } from '../core/types';
 
@@ -168,13 +169,6 @@ function findCommentIndex(line: string): number {
         }
     }
     return -1;
-}
-
-/**
- * Normalizes package names for resilient cross-ecosystem lookup (PEP 503).
- */
-function normalizePkgName(name: string): string {
-    return name.toLowerCase().replace(/[-_.]+/g, '-');
 }
 
 const KV_DEP_SECTION_REGEX = /(?:^|\.)(?:pypi-|build-|host-)?dependencies$/i;

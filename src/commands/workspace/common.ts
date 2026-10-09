@@ -5,8 +5,11 @@ import { QuickPickItem, Uri, window, workspace } from 'vscode';
 import { runPixi } from '../../cli/pixiCli';
 import { normalizeFolderPath, normalizeLocationPath } from '../../common/execUtils';
 import { getEnvironmentStatusBadge } from '../../core/environmentRules';
+import { normalizePkgName } from '../../core/packageManager';
 import { PixiProjectManager } from '../../core/projectManager';
 import { PixiEnvironmentInfo, PixiPackage } from '../../core/types';
+
+export { normalizePkgName };
 
 export interface ProjectQuickPickItem extends QuickPickItem {
     projectPath: string;
@@ -133,7 +136,7 @@ export async function findPackageScope(
     packageName: string,
     preferredEnv?: string,
 ): Promise<PackageScopeResult | undefined> {
-    const norm = packageName.toLowerCase().replace(/[-_.]+/g, '-');
+    const norm = normalizePkgName(packageName);
     const [features, envs] = await Promise.all([
         getWorkspaceFeatures(projectPath),
         getWorkspaceEnvironments(projectPath),
@@ -372,8 +375,6 @@ export interface ExtractedCommandContext {
     pkgName?: string;
     featureName?: string;
 }
-
-export type EnvironmentContextCandidate = ExtractedCommandContext;
 
 export function extractCommandContext(target?: unknown): ExtractedCommandContext {
     if (!target) {

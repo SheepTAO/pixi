@@ -868,8 +868,10 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                     envName = pick.envName;
                 }
 
-                const allFeatures = await getWorkspaceFeatures(projectPath);
-                const allEnvs = await getWorkspaceEnvironments(projectPath);
+                const [allFeatures, allEnvs] = await Promise.all([
+                    getWorkspaceFeatures(projectPath),
+                    getWorkspaceEnvironments(projectPath),
+                ]);
                 const envEntry = allEnvs.find((e) => e.name === envName);
                 const currentBoundFeatures = envEntry?.features || ['default'];
 

@@ -189,13 +189,6 @@ export function getHostCondaPlatform(): string {
     return 'linux-64';
 }
 
-export {
-    CONDA_CHANNEL_PRESETS,
-    CondaChannelPreset,
-    promptCondaChannel,
-    PromptCondaChannelOptions,
-} from '../commands/workspace/channelCommands';
-
 const MAX_SEARCH_CACHE_SIZE = 100;
 const searchCache = new Map<string, PixiPackageSearchResult[]>();
 

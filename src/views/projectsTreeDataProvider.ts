@@ -16,7 +16,7 @@ import {
 
 import { getWorkspaceEnvironments, getWorkspaceFeatures, WorkspaceListEntry } from '../commands/workspace/common';
 import { updateProjectTreeViewDescription } from '../common/execUtils';
-import { sortPixiPackages } from '../core/packageManager';
+import { normalizePkgName, sortPixiPackages } from '../core/packageManager';
 import { PixiProjectManager } from '../core/projectManager';
 import { PixiEnvironmentInfo, PixiPackage, PixiProject } from '../core/types';
 
@@ -375,10 +375,6 @@ export class PixiDeclaredPackageTreeItem extends TreeItem {
         this.contextValue = 'pixiDeclaredPackage';
         this.tooltip = `${pkgName}\nSource: ${kind.toUpperCase()}\nDeclared in feature: ${feature.name}\nProject: ${project.name}`;
     }
-}
-
-function normalizePkgName(name: string): string {
-    return name.toLowerCase().replace(/[-_.]+/g, '-');
 }
 
 export class PixiEnvFeatureGroupTreeItem extends TreeItem {
