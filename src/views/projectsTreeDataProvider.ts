@@ -458,10 +458,8 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
     }
 
     private async getEnvironmentItemsForProject(project: PixiProject): Promise<PixiProjectsTreeItem[]> {
-        const [envs, wsEnvs] = await Promise.all([
-            Promise.resolve(this.projectManager.getEnvironmentsForProject(project.projectPath)),
-            getWorkspaceEnvironments(project.projectPath),
-        ]);
+        const envs = this.projectManager.getEnvironmentsForProject(project.projectPath);
+        const wsEnvs = await getWorkspaceEnvironments(project.projectPath);
         const envFeaturesMap = new Map<string, string[]>();
         for (const we of wsEnvs) {
             if (we.features) {

@@ -184,7 +184,7 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
         try {
             const candidate =
                 (target as { env?: PixiEnvironmentInfo })?.env ?? (target as PixiEnvironmentInfo | undefined);
-            let env = candidate && typeof candidate.pixiEnvName === 'string' ? candidate : undefined;
+            let env = candidate?.pixiEnvName ? candidate : undefined;
 
             const folder = normalizeFolderPath(target);
             const targetProjectPath = folder
