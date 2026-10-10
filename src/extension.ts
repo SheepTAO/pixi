@@ -65,7 +65,6 @@ export async function activate(context: ExtensionContext): Promise<PixiExtension
     const tasksTreeView = window.createTreeView('pixi.views.tasks', {
         treeDataProvider: tasksTreeDataProvider,
     });
-    tasksTreeDataProvider.bindView(tasksTreeView);
 
     context.subscriptions.push(tasksTreeDataProvider, tasksTreeView);
 

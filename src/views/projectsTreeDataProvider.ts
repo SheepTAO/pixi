@@ -1,6 +1,5 @@
 import * as path from 'path';
 import {
-    commands,
     Disposable,
     Event,
     EventEmitter,
@@ -448,15 +447,11 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
                         .get<ProjectsViewMode>('viewMode', 'environment');
                     if (newMode !== this.currentViewMode) {
                         this.currentViewMode = newMode;
-                        commands.executeCommand('setContext', 'pixi.environments.viewMode', this.currentViewMode);
-                        commands.executeCommand('setContext', 'pixi.projects.viewMode', this.currentViewMode);
                         this.refresh();
                     }
                 }
             }),
         );
-        commands.executeCommand('setContext', 'pixi.environments.viewMode', this.currentViewMode);
-        commands.executeCommand('setContext', 'pixi.projects.viewMode', this.currentViewMode);
     }
 
     public getViewMode(): ProjectsViewMode {
@@ -465,8 +460,6 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
 
     public bindView(treeView: TreeView<PixiProjectsTreeItem>): void {
         this.treeView = treeView;
-        commands.executeCommand('setContext', 'pixi.environments.viewMode', this.currentViewMode);
-        commands.executeCommand('setContext', 'pixi.projects.viewMode', this.currentViewMode);
         this.updateViewDescription();
     }
 

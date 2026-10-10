@@ -8,7 +8,6 @@ import {
     TreeDataProvider,
     TreeItem,
     TreeItemCollapsibleState,
-    TreeView,
     Uri,
     workspace,
 } from 'vscode';
@@ -196,7 +195,6 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
     private readonly _onDidChangeTreeData = new EventEmitter<PixiTasksTreeItem | undefined | null | void>();
     readonly onDidChangeTreeData: Event<PixiTasksTreeItem | undefined | null | void> = this._onDidChangeTreeData.event;
     private readonly disposables: Disposable[] = [];
-    private treeView?: TreeView<PixiTasksTreeItem>;
 
     constructor(
         private readonly projectManager: PixiProjectManager,
@@ -214,10 +212,6 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
                 }
             }),
         );
-    }
-
-    public bindView(treeView: TreeView<PixiTasksTreeItem>): void {
-        this.treeView = treeView;
     }
 
     public refresh(): void {
