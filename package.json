@@ -1041,22 +1041,6 @@
                     "description": "Path to the Pixi executable (supports relative paths and ${workspaceFolder}). Leave empty to use auto-discovery.",
                     "scope": "machine-overridable"
                 },
-                "pixi.searchIgnorePatterns": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "default": [
-                        "**/node_modules/**",
-                        "**/.git/**",
-                        "**/dist/**",
-                        "**/build/**",
-                        "**/.venv/**",
-                        "**/.pixi/*/**"
-                    ],
-                    "description": "Glob patterns to exclude when searching for Pixi projects in the workspace.",
-                    "scope": "resource"
-                },
                 "pixi.environmentRules": {
                     "type": "array",
                     "items": {
@@ -1279,7 +1263,6 @@
     },
     "dependencies": {
         "@vscode/python-environments": "^1.0.0",
-        "fast-glob": "^3.3.3",
         "picomatch": "^4.0.7",
         "semver": "^7.7.4",
         "which": "^6.0.1"

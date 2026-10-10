@@ -15,7 +15,6 @@ import {
 } from 'vscode';
 
 import { getWorkspaceEnvironments, getWorkspaceFeatures, WorkspaceListEntry } from '../commands/workspace/common';
-import { updateProjectTreeViewDescription } from '../common/execUtils';
 import { normalizePkgName, sortPixiPackages } from '../core/packageManager';
 import { PixiProjectManager } from '../core/projectManager';
 import { PixiEnvironmentInfo, PixiPackage, PixiProject } from '../core/types';
@@ -468,13 +467,19 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
         this.treeView = treeView;
         commands.executeCommand('setContext', 'pixi.environments.viewMode', this.currentViewMode);
         commands.executeCommand('setContext', 'pixi.projects.viewMode', this.currentViewMode);
-        updateProjectTreeViewDescription(this.treeView, this.projectManager, this.currentViewMode);
+        this.updateViewDescription();
     }
 
     public refresh(): void {
         this.projectManager.clearPackagesCache();
-        updateProjectTreeViewDescription(this.treeView, this.projectManager, this.currentViewMode);
+        this.updateViewDescription();
         this._onDidChangeTreeData.fire();
+    }
+
+    private updateViewDescription(): void {
+        if (this.treeView) {
+            this.treeView.description = this.currentViewMode === 'feature' ? 'features' : undefined;
+        }
     }
 
     public dispose(): void {

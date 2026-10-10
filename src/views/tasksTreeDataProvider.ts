@@ -13,7 +13,7 @@ import {
     workspace,
 } from 'vscode';
 
-import { escapeRegex, updateProjectTreeViewDescription } from '../common/execUtils';
+import { escapeRegex } from '../common/execUtils';
 import { PixiProjectManager } from '../core/projectManager';
 import { PixiProject } from '../core/types';
 import { PixiTask, PixiTaskProvider } from '../providers/taskProvider';
@@ -206,7 +206,6 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
             this.projectManager.onDidProjectsChanged(() => this.refresh()),
             this.projectManager.onDidChangeEnvironments(() => this.refresh()),
             this.taskProvider.onDidChangeTasks(() => {
-                updateProjectTreeViewDescription(this.treeView, this.projectManager);
                 this._onDidChangeTreeData.fire();
             }),
             workspace.onDidChangeConfiguration((e) => {
@@ -219,7 +218,6 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
 
     public bindView(treeView: TreeView<PixiTasksTreeItem>): void {
         this.treeView = treeView;
-        updateProjectTreeViewDescription(this.treeView, this.projectManager);
     }
 
     public refresh(): void {

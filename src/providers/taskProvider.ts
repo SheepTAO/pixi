@@ -85,7 +85,7 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
         public readonly log?: LogOutputChannel,
     ) {
         // Invalidate cache when manifest files change
-        const watcher = workspace.createFileSystemWatcher('**/{pixi.toml,pyproject.toml}');
+        const watcher = workspace.createFileSystemWatcher('{pixi.toml,pyproject.toml}');
         watcher.onDidChange(() => this.refresh(), this, this.disposables);
         watcher.onDidCreate(() => this.refresh(), this, this.disposables);
         watcher.onDidDelete(() => this.refresh(), this, this.disposables);

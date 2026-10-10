@@ -74,13 +74,16 @@ export class PixiProjectManager implements Disposable {
             }, 500);
         };
 
-        const watcher = workspace.createFileSystemWatcher('**/{pixi.toml,pyproject.toml,pixi.lock}');
+        const watcher = workspace.createFileSystemWatcher('{pixi.toml,pyproject.toml,pixi.lock}');
 
         this.disposables.push(
             watcher,
             watcher.onDidChange(scheduleRefresh),
             watcher.onDidCreate(scheduleRefresh),
             watcher.onDidDelete(scheduleRefresh),
+            workspace.onDidChangeWorkspaceFolders(async () => {
+                await this.refreshAll();
+            }),
         );
     }
 

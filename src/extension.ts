@@ -123,13 +123,6 @@ export async function activate(context: ExtensionContext): Promise<PixiExtension
             if (e.affectsConfiguration('pixi.cache.autoMeasureSize')) {
                 infoTreeDataProvider.refresh();
             }
-            if (
-                e.affectsConfiguration('pixi.workspaceSearchPaths') ||
-                e.affectsConfiguration('pixi.globalSearchPaths') ||
-                e.affectsConfiguration('pixi.searchIgnorePatterns')
-            ) {
-                await projectManager.refresh(undefined);
-            }
         }),
     );
 

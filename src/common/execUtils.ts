@@ -293,24 +293,3 @@ export async function revealDefinitionInManifest(options: RevealDefinitionOption
         return false;
     }
 }
-
-/**
- * Updates a TreeView description to show the single project name and manifest if only one project exists.
- */
-export function updateProjectTreeViewDescription(
-    treeView: { description?: string } | undefined,
-    projectManager: { getProjects: () => Array<{ name: string; manifestPath: string }> },
-    viewMode?: 'environment' | 'feature',
-): void {
-    if (!treeView) {
-        return;
-    }
-    const projects = projectManager.getProjects();
-    const modeSuffix = viewMode === 'feature' ? ' • features' : '';
-    treeView.description =
-        projects.length === 1
-            ? `${projects[0].name} (${path.basename(projects[0].manifestPath)})${modeSuffix}`
-            : viewMode === 'feature'
-              ? 'features'
-              : undefined;
-}
