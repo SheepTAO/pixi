@@ -78,6 +78,12 @@
                 "icon": "$(trash)"
             },
             {
+                "command": "pixi.channel",
+                "title": "Channel ...",
+                "category": "Pixi",
+                "icon": "$(globe)"
+            },
+            {
                 "command": "pixi.addChannel",
                 "title": "Add Channel ...",
                 "category": "Pixi",
@@ -391,15 +397,15 @@
                     "when": "pixi.hasPixiProject"
                 },
                 {
-                    "command": "pixi.createEnvironment",
+                    "command": "pixi.environment",
                     "when": "pixi.hasPixiProject"
                 },
                 {
-                    "command": "pixi.createFeature",
+                    "command": "pixi.feature",
                     "when": "pixi.hasPixiProject"
                 },
                 {
-                    "command": "pixi.deleteEnvironment",
+                    "command": "pixi.channel",
                     "when": "pixi.hasPixiProject"
                 },
                 {
@@ -408,14 +414,6 @@
                 },
                 {
                     "command": "pixi.removePackage",
-                    "when": "pixi.hasPixiProject"
-                },
-                {
-                    "command": "pixi.addChannel",
-                    "when": "pixi.hasPixiProject"
-                },
-                {
-                    "command": "pixi.removeChannel",
                     "when": "pixi.hasPixiProject"
                 },
                 {
@@ -529,6 +527,54 @@
                 {
                     "command": "pixi.projects.changeViewMode",
                     "when": "false"
+                },
+                {
+                    "command": "pixi.createEnvironment",
+                    "when": "false"
+                },
+                {
+                    "command": "pixi.createFeature",
+                    "when": "false"
+                },
+                {
+                    "command": "pixi.deleteEnvironment",
+                    "when": "false"
+                },
+                {
+                    "command": "pixi.configureEnvironmentFeatures",
+                    "when": "false"
+                },
+                {
+                    "command": "pixi.removeFeature",
+                    "when": "false"
+                },
+                {
+                    "command": "pixi.feature.revealInManifest",
+                    "when": "false"
+                },
+                {
+                    "command": "pixi.addChannel",
+                    "when": "false"
+                },
+                {
+                    "command": "pixi.removeChannel",
+                    "when": "false"
+                },
+                {
+                    "command": "pixi.views.projects.focus",
+                    "when": "false"
+                },
+                {
+                    "command": "pixi.views.tasks.focus",
+                    "when": "false"
+                },
+                {
+                    "command": "pixi.views.global.focus",
+                    "when": "false"
+                },
+                {
+                    "command": "pixi.views.info.focus",
+                    "when": "false"
                 }
             ],
             "editor/title": [
@@ -555,9 +601,24 @@
             ],
             "view/title": [
                 {
-                    "command": "pixi.environments.changeGrouping",
+                    "command": "pixi.createEnvironment",
                     "when": "view == pixi.views.projects && pixi.hasPixiProject",
                     "group": "navigation@0"
+                },
+                {
+                    "command": "pixi.install",
+                    "when": "view == pixi.views.projects && pixi.hasPixiProject",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "pixi.environments.changeGrouping",
+                    "when": "view == pixi.views.projects && pixi.hasPixiProject",
+                    "group": "navigation@2"
+                },
+                {
+                    "command": "pixi.refreshProjects",
+                    "when": "view == pixi.views.projects",
+                    "group": "navigation@3"
                 },
                 {
                     "command": "pixi.environment",
@@ -570,34 +631,24 @@
                     "group": "1_manage@1"
                 },
                 {
-                    "command": "pixi.createEnvironment",
+                    "command": "pixi.channel",
                     "when": "view == pixi.views.projects && pixi.hasPixiProject",
-                    "group": "navigation@1"
-                },
-                {
-                    "command": "pixi.refreshProjects",
-                    "when": "view == pixi.views.projects",
-                    "group": "navigation@2"
-                },
-                {
-                    "command": "pixi.install",
-                    "when": "view == pixi.views.projects && pixi.hasPixiProject",
-                    "group": "navigation@3"
+                    "group": "1_manage@2"
                 },
                 {
                     "command": "pixi.lock",
                     "when": "view == pixi.views.projects && pixi.hasPixiProject",
-                    "group": "1_manage@2"
+                    "group": "1_manage@3"
                 },
                 {
                     "command": "pixi.update",
                     "when": "view == pixi.views.projects && pixi.hasPixiProject",
-                    "group": "1_manage@2"
+                    "group": "1_manage@4"
                 },
                 {
                     "command": "pixi.reinstall",
                     "when": "view == pixi.views.projects && pixi.hasPixiProject",
-                    "group": "1_manage@3"
+                    "group": "1_manage@5"
                 },
                 {
                     "command": "pixi.clean",
@@ -607,7 +658,7 @@
                 {
                     "command": "pixi.init",
                     "when": "view == pixi.views.projects && !pixi.hasPixiProject",
-                    "group": "1_manage@2"
+                    "group": "1_manage@6"
                 },
                 {
                     "command": "pixi.global.install",

@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { QuickPickItem, Uri, window, workspace } from 'vscode';
+import { QuickPickItem, QuickPickItemKind, Uri, window, workspace } from 'vscode';
 
 import { runPixi } from '../../cli/pixiCli';
 import { normalizeFolderPath, normalizeLocationPath } from '../../common/execUtils';
@@ -257,31 +257,60 @@ export async function pickTargetScope(
 
     const items: ScopeQuickPickItem[] = [
         {
+            label: 'Global Dependencies',
+            kind: QuickPickItemKind.Separator,
+        },
+        {
             label: '$(globe) [default] (Global Dependencies)',
             description: 'Shared across all environments',
             scope: { kind: 'global' },
         },
-        ...namedFeatures.map((f) => ({
-            label: `$(symbol-namespace) Feature: ${f.name}`,
-            description: `Reusable feature (${f.dependencies.length + f.pypiDependencies.length} dependencies)`,
-            scope: { kind: 'feature' as const, name: f.name },
-        })),
-        ...namedEnvs.map((e) => {
-            const { icon, text } = getEnvironmentStatusBadge(e.pixiStatus);
-            return {
-                label: `${icon} Environment: ${e.pixiEnvName}`,
-                description: text
-                    ? `Inline dependency for ${e.pixiEnvName} (${text})`
-                    : `Inline dependency for ${e.pixiEnvName}`,
-                scope: { kind: 'environment' as const, name: e.pixiEnvName },
-            };
-        }),
+    ];
+
+    if (namedFeatures.length > 0) {
+        items.push({
+            label: 'Features (Reusable)',
+            kind: QuickPickItemKind.Separator,
+        });
+        items.push(
+            ...namedFeatures.map((f) => ({
+                label: `$(symbol-namespace) Feature: ${f.name}`,
+                description: `Reusable feature (${f.dependencies.length + f.pypiDependencies.length} dependencies)`,
+                scope: { kind: 'feature' as const, name: f.name },
+            })),
+        );
+    }
+
+    if (namedEnvs.length > 0) {
+        items.push({
+            label: 'Environments (Inline Dependencies)',
+            kind: QuickPickItemKind.Separator,
+        });
+        items.push(
+            ...namedEnvs.map((e) => {
+                const { icon, text } = getEnvironmentStatusBadge(e.pixiStatus);
+                return {
+                    label: `${icon} Environment: ${e.pixiEnvName}`,
+                    description: text
+                        ? `Inline dependency for ${e.pixiEnvName} (${text})`
+                        : `Inline dependency for ${e.pixiEnvName}`,
+                    scope: { kind: 'environment' as const, name: e.pixiEnvName },
+                };
+            }),
+        );
+    }
+
+    items.push(
+        {
+            label: 'Actions',
+            kind: QuickPickItemKind.Separator,
+        },
         {
             label: '$(plus) Create New Feature ...',
             description: 'Create a new feature and add this package to it',
             isCreateFeature: true,
         },
-    ];
+    );
 
     const selected = await window.showQuickPick(items, {
         title: 'Pixi: Target Scope',

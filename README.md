@@ -93,6 +93,7 @@ Launch any command via the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) by t
 | :------------------------------------------- | :---------------------------------- | :-------------------------------------------------------------------------------------------- |
 | **Pixi: Environment ...**                    | `pixi.environment`                  | Centralized management hub for environment creation, installation, configuration, & terminal. |
 | **Pixi: Feature ...**                        | `pixi.feature`                      | Centralized management hub for feature creation, dependency installation, & removal.          |
+| **Pixi: Channel ...**                        | `pixi.channel`                      | Centralized management hub to add Conda presets/mirrors or remove channels.                   |
 | **Pixi: Configure Environment Features ...** | `pixi.configureEnvironmentFeatures` | Configure and update feature composition for an environment (`pixi workspace environment`).   |
 | **Pixi: Remove Feature ...**                 | `pixi.removeFeature`                | Remove a declared feature from the project manifest (`pixi workspace feature remove`).        |
 | **Pixi: Change Grouping ...**                | `pixi.environments.changeGrouping`  | Change Environments tree view organization between Environment View and Feature View.         |

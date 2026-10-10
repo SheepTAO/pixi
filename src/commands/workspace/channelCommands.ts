@@ -214,5 +214,29 @@ export function registerChannelCommands(manager: PixiProjectManager): Disposable
                 `Pixi: Channel '${selected.channel}' removed successfully from '${projectName}'.`,
             );
         }),
+
+        // Pixi: Channel Management (Hub)
+        commands.registerCommand('pixi.channel', async (targetItem?: unknown) => {
+            const actions = [
+                {
+                    label: '$(plus) Add Channel...',
+                    description: 'Add a Conda channel preset, mirror URL, or custom channel to the project',
+                    command: 'pixi.addChannel',
+                },
+                {
+                    label: '$(trash) Remove Channel...',
+                    description: 'Remove a configured channel from the project manifest',
+                    command: 'pixi.removeChannel',
+                },
+            ];
+
+            const pick = await window.showQuickPick(actions, {
+                title: 'Pixi: Channel Management',
+                placeHolder: 'Select channel operation',
+            });
+            if (pick) {
+                await commands.executeCommand(pick.command, targetItem);
+            }
+        }),
     ];
 }

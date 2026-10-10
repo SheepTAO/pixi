@@ -1,5 +1,5 @@
 import * as path from 'path';
-import { commands, Disposable, env as vscodeEnv, QuickPickItem, window } from 'vscode';
+import { commands, Disposable, env as vscodeEnv, QuickPickItem, QuickPickItemKind, window } from 'vscode';
 
 import { PixiPackageSearchResult } from '../../cli/pixiCli';
 import { runPixiWithProgress } from '../../cli/workspaceCli';
@@ -12,6 +12,8 @@ import {
     extractEnvironmentName,
     extractFeatureName,
     findPackageScope,
+    getWorkspaceEnvironments,
+    getWorkspaceFeatures,
     PackageScopeResult,
     pickPixiProject,
     pickTargetScope,
@@ -83,6 +85,154 @@ export async function pickPackageFromEnvironment(
         return undefined;
     }
     return { pkg: pick.pkg, pkgName: pick.pkgName, envLabel, targetEnv: resolvedEnv };
+}
+
+export function extractPackageNameFromSpec(spec: string): string {
+    const cleaned = spec.trim();
+    const name = cleaned.split(/[<>=~!\s\[]/)[0].trim();
+    return name || cleaned;
+}
+
+export interface DeclaredPackageItem {
+    pkgName: string;
+    rawSpec: string;
+    kind: 'conda' | 'pypi';
+    scope: PackageScopeResult;
+    scopeLabel: string;
+}
+
+export interface PickDeclaredPackageOptions {
+    title?: string;
+    placeHolder?: string;
+    filterFeature?: string;
+    filterEnv?: string;
+    emptyWarning?: string;
+}
+
+export async function pickDeclaredPackage(
+    projectPath: string,
+    options?: PickDeclaredPackageOptions,
+): Promise<DeclaredPackageItem | undefined> {
+    const [features, envs] = await Promise.all([
+        getWorkspaceFeatures(projectPath),
+        getWorkspaceEnvironments(projectPath),
+    ]);
+
+    const targetFeatures = options?.filterFeature
+        ? features.filter((f) => f.name === options.filterFeature)
+        : options?.filterEnv
+          ? features.filter((f) => {
+                const envEntry = envs.find((e) => e.name === options.filterEnv);
+                return f.name === 'default' || Boolean(envEntry?.features?.includes(f.name));
+            })
+          : features;
+
+    interface DeclaredQuickPickItem extends QuickPickItem {
+        declaredPkg?: DeclaredPackageItem;
+    }
+
+    const items: DeclaredQuickPickItem[] = [];
+
+    // Sort features so 'default' comes first, followed by others alphabetically
+    const sortedFeatures = [...targetFeatures].sort((a, b) => {
+        if (a.name === 'default') {
+            return -1;
+        }
+        if (b.name === 'default') {
+            return 1;
+        }
+        return a.name.localeCompare(b.name);
+    });
+
+    const toQuickPickItems = (
+        specs: string[],
+        kind: 'conda' | 'pypi',
+        scope: PackageScopeResult,
+        scopeLabel: string,
+    ): DeclaredQuickPickItem[] => {
+        const isPypi = kind === 'pypi';
+        const icon = isPypi ? '$(symbol-keyword)' : '$(package)';
+        const badge = isPypi ? '[PyPI]' : '[Conda]';
+
+        return specs.map((rawSpec) => {
+            const pkgName = extractPackageNameFromSpec(rawSpec);
+            const versionConstraint = rawSpec.slice(pkgName.length).trim();
+            return {
+                label: `${icon} ${pkgName}`,
+                description: versionConstraint ? `${badge} ${versionConstraint}` : badge,
+                detail: `Scope: ${scopeLabel}`,
+                declaredPkg: {
+                    pkgName,
+                    rawSpec,
+                    kind,
+                    scope: { ...scope, isPypi },
+                    scopeLabel,
+                },
+            };
+        });
+    };
+
+    for (const f of sortedFeatures) {
+        const hasDeps = f.dependencies.length > 0 || f.pypiDependencies.length > 0;
+        if (!hasDeps) {
+            continue;
+        }
+
+        const isDefault = f.name === 'default';
+        const sectionTitle = isDefault ? 'Global Dependencies ([default])' : `Feature: ${f.name}`;
+
+        items.push({
+            label: sectionTitle,
+            kind: QuickPickItemKind.Separator,
+        });
+
+        const scope: PackageScopeResult = isDefault
+            ? { kind: 'global', isPypi: false }
+            : { kind: 'feature', scopeName: f.name, isPypi: false };
+        const scopeLabel = isDefault ? 'global dependencies' : `feature '${f.name}'`;
+
+        items.push(...toQuickPickItems(f.dependencies, 'conda', scope, scopeLabel));
+        items.push(...toQuickPickItems(f.pypiDependencies, 'pypi', scope, scopeLabel));
+    }
+
+    // Process inline environments if not filtering by feature
+    if (!options?.filterFeature) {
+        const targetEnvs = options?.filterEnv ? envs.filter((e) => e.name === options.filterEnv) : envs;
+
+        for (const e of targetEnvs) {
+            const hasInline = e.dependencies.length > 0 || e.pypiDependencies.length > 0;
+            if (!hasInline) {
+                continue;
+            }
+
+            const scopeLabel = `environment '${e.name}'`;
+            const envScope: PackageScopeResult = { kind: 'environment', scopeName: e.name, isPypi: false };
+
+            items.push({
+                label: `Environment: ${e.name} (Inline Dependencies)`,
+                kind: QuickPickItemKind.Separator,
+            });
+
+            items.push(...toQuickPickItems(e.dependencies, 'conda', envScope, scopeLabel));
+            items.push(...toQuickPickItems(e.pypiDependencies, 'pypi', envScope, scopeLabel));
+        }
+    }
+
+    if (items.length === 0) {
+        window.showInformationMessage(
+            options?.emptyWarning || 'No declared packages found in this Pixi project manifest.',
+        );
+        return undefined;
+    }
+
+    const pick = await window.showQuickPick(items, {
+        title: options?.title || 'Pixi: Select Declared Package',
+        placeHolder: options?.placeHolder || 'Choose a package declared in the manifest',
+        matchOnDescription: true,
+        matchOnDetail: true,
+    });
+
+    return pick?.declaredPkg;
 }
 
 export function parseAddedSpecsFromOutput(output: string, fallback: string): string {
@@ -342,47 +492,34 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
                 return;
             }
 
-            const directEnvName = extractEnvironmentName(targetItem);
-            const targetEnvName = directEnvName === 'default' ? undefined : directEnvName;
+            const filterFeature = ctx.featureName;
+            const filterEnv = ctx.envName && ctx.envName !== 'default' ? ctx.envName : undefined;
 
-            const picked = await pickPackageFromEnvironment(manager, projectPath, targetEnvName, {
+            const picked = await pickDeclaredPackage(projectPath, {
                 title: 'Pixi: Remove Package',
-                placeHolder: 'Select a package to remove',
-                emptyWarning: 'No packages found to remove in this environment.',
-                preferExplicit: true,
-                formatItem: (p) => {
-                    const channelBadge = p.kind === 'pypi' ? '[PyPI]' : '[Conda]';
-                    const explicitBadge = p.is_explicit ? '' : ' (transitive)';
-                    return {
-                        label: p.name,
-                        description: `${channelBadge} ${p.version}${explicitBadge}`,
-                    };
-                },
+                placeHolder: 'Select a declared package to remove from manifest',
+                filterFeature,
+                filterEnv,
+                emptyWarning: 'No declared packages found in this Pixi project manifest.',
             });
             if (!picked) {
                 return;
             }
 
-            const scope = await findPackageScope(projectPath, picked.pkg.name, picked.targetEnv);
-            if (!scope) {
-                window
-                    .showWarningMessage(
-                        `'${picked.pkg.name}' is a transitive dependency (installed automatically by another package) and cannot be removed directly from the manifest.`,
-                        'Why is this installed?',
-                    )
-                    .then((action) => {
-                        if (action === 'Why is this installed?') {
-                            commands.executeCommand('pixi.whyPackage', {
-                                pkg: picked.pkg,
-                                projectPath,
-                                envName: picked.targetEnv,
-                            });
-                        }
-                    });
+            const confirmed = await window.showWarningMessage(
+                `Are you sure you want to remove package '${picked.pkgName}' from ${picked.scopeLabel}?`,
+                'Remove',
+            );
+            if (confirmed !== 'Remove') {
                 return;
             }
 
-            return executeRemovePackage(manager, projectPath, picked.pkg, scope);
+            return executeRemovePackage(
+                manager,
+                projectPath,
+                { name: picked.pkgName, kind: picked.kind },
+                picked.scope,
+            );
         }),
     );
 
@@ -452,11 +589,10 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
             }
 
             if (!pkgName) {
-                const picked = await pickPackageFromEnvironment(manager, projectPath, undefined, {
+                const picked = await pickDeclaredPackage(projectPath, {
                     title: 'Select Package to Reveal in Manifest',
-                    placeHolder: 'Select a package to jump to its definition',
-                    emptyWarning: 'No packages found to reveal in manifest.',
-                    preferExplicit: true,
+                    placeHolder: 'Select a declared package to jump to its definition',
+                    emptyWarning: 'No declared packages found to reveal in manifest.',
                 });
                 if (!picked) {
                     return;
@@ -487,9 +623,10 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
                 if (!projectPath) {
                     return;
                 }
-                const picked = await pickPackageFromEnvironment(manager, projectPath, undefined, {
+                const picked = await pickDeclaredPackage(projectPath, {
                     title: 'Select Package to Copy Name',
-                    placeHolder: 'Select a package to copy its name to clipboard',
+                    placeHolder: 'Select a declared package to copy its name to clipboard',
+                    emptyWarning: 'No declared packages found in manifest.',
                 });
                 if (!picked) {
                     return;

@@ -741,6 +741,11 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                     command: 'pixi.createEnvironment',
                 },
                 {
+                    label: '$(sparkle) Create New Feature...',
+                    description: 'Create a new feature set in the project manifest',
+                    command: 'pixi.createFeature',
+                },
+                {
                     label: '$(symbol-namespace) Configure Environment Features...',
                     description: 'Manage and update feature bindings for an existing environment',
                     command: 'pixi.configureEnvironmentFeatures',
