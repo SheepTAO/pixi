@@ -186,12 +186,6 @@
                 "icon": "$(organization)"
             },
             {
-                "command": "pixi.projects.changeViewMode",
-                "title": "Change Grouping ...",
-                "category": "Pixi",
-                "icon": "$(organization)"
-            },
-            {
                 "command": "pixi.deleteEnvironment",
                 "title": "Delete Environment ...",
                 "category": "Pixi",
@@ -522,10 +516,6 @@
                 },
                 {
                     "command": "pixi.environments.changeGrouping",
-                    "when": "false"
-                },
-                {
-                    "command": "pixi.projects.changeViewMode",
                     "when": "false"
                 },
                 {

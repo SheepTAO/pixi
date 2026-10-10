@@ -1082,8 +1082,5 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                 await config.update('viewMode', selected.value, target);
             }
         }),
-        commands.registerCommand('pixi.projects.changeViewMode', async () => {
-            await commands.executeCommand('pixi.environments.changeGrouping');
-        }),
     ];
 }

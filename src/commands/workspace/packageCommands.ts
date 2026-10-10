@@ -36,7 +36,6 @@ export interface PickPackageOptions {
     title: string;
     placeHolder: string;
     emptyWarning?: string;
-    preferExplicit?: boolean;
     formatItem?: (pkg: PixiPackage) => QuickPickItem;
 }
 
@@ -56,18 +55,11 @@ export async function pickPackageFromEnvironment(
     }
     const envLabel = resolvedEnv || (envs.length > 0 ? envs[0].pixiEnvName : 'default');
     const packages = await manager.getPackagesForEnvironment(envLabel, projectPath);
-    let candidates = packages;
-    if (options.preferExplicit) {
-        const explicit = packages.filter((p) => p.is_explicit);
-        if (explicit.length > 0) {
-            candidates = explicit;
-        }
-    }
-    if (candidates.length === 0) {
+    if (packages.length === 0) {
         window.showInformationMessage(options.emptyWarning || `No packages found in environment '${envLabel}'.`);
         return undefined;
     }
-    const sorted = sortPixiPackages(candidates);
+    const sorted = sortPixiPackages(packages);
     const items = options.formatItem
         ? sorted.map((p) => ({ ...options.formatItem!(p), pkgName: p.name, pkg: p }))
         : sorted.map((p) => ({
