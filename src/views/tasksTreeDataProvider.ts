@@ -369,26 +369,20 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
 
     private async getTaskGroupChildren(groupItem: PixiTaskGroupTreeItem): Promise<PixiTasksTreeItem[]> {
         const project = groupItem.project;
-        if (groupItem.groupType === 'environment') {
-            return groupItem.tasks
-                .slice()
-                .sort((a, b) => a.name.localeCompare(b.name))
-                .map((t) => new PixiTaskTreeItem(t, project));
-        }
-
-        const config = workspace.getConfiguration('pixi.tasks', Uri.file(project.projectPath));
-        const maxDepth = Math.max(1, Math.min(3, config.get<number>('maxDepth', 1)));
-        const prefixSeparators = config.get<string[]>('prefixSeparators', ['-', '_']);
-        const minGroupSize = Math.max(1, config.get<number>('minGroupSize', 2));
-
-        if (groupItem.depth < maxDepth) {
-            return this.groupTasksByPrefix(
-                groupItem.tasks,
-                project,
-                prefixSeparators,
-                minGroupSize,
-                groupItem.depth + 1,
-            );
+        if (groupItem.groupType === 'prefix') {
+            const config = workspace.getConfiguration('pixi.tasks', Uri.file(project.projectPath));
+            const maxDepth = Math.max(1, Math.min(3, config.get<number>('maxDepth', 1)));
+            if (groupItem.depth < maxDepth) {
+                const prefixSeparators = config.get<string[]>('prefixSeparators', ['-', '_']);
+                const minGroupSize = Math.max(1, config.get<number>('minGroupSize', 2));
+                return this.groupTasksByPrefix(
+                    groupItem.tasks,
+                    project,
+                    prefixSeparators,
+                    minGroupSize,
+                    groupItem.depth + 1,
+                );
+            }
         }
 
         return groupItem.tasks

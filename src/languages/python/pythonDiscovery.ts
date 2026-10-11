@@ -3,7 +3,7 @@ import * as path from 'path';
 import { MarkdownString, ThemeIcon, Uri, window } from 'vscode';
 
 import { runPixiWithProgress } from '../../cli/workspaceCli';
-import { promptToInstallEnvironment as promptCoreInstall, sortPixiEnvironments } from '../../core/environmentRules';
+import { promptToInstallEnvironment as promptCoreInstall } from '../../core/environmentRules';
 import { PixiProjectManager } from '../../core/projectManager';
 import { scanPythonToolchain } from '../../core/toolchains';
 import { PixiEnvironmentInfo } from '../../core/types';
@@ -80,8 +80,6 @@ function checkHasIpykernel(envPath: string): boolean {
     }
     return false;
 }
-
-export const sortEnvironments = sortPixiEnvironments;
 
 export function formatDisplayName(template: string, projectName: string, envName: string, version?: string): string {
     const defaultName = projectName ? `${projectName}:${envName}` : envName || 'default';

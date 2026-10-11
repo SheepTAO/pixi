@@ -12,26 +12,15 @@ import {
 } from 'vscode';
 
 import {
-    clearGlobalManifestCache,
     getGlobalManifestPath,
     installGlobalTools,
     listGlobalEnvironments,
-    onDidChangeGlobalEnvironments,
-    PixiGlobalEnvironment,
     refreshGlobalEnvironments,
     syncGlobalEnvironments,
     uninstallGlobalTool,
     updateGlobalTool,
 } from '../cli/globalCli';
 import { promptCondaChannel } from './workspace/channelCommands';
-
-export {
-    clearGlobalManifestCache,
-    getGlobalManifestPath,
-    listGlobalEnvironments,
-    onDidChangeGlobalEnvironments,
-    PixiGlobalEnvironment,
-};
 
 interface GlobalActionQuickPickItem extends QuickPickItem {
     action: 'install' | 'list' | 'sync' | 'update' | 'uninstall' | 'edit';

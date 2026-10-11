@@ -21,7 +21,7 @@ import { getPixi } from '../../cli/pixiCli';
 import { createDeferred, Deferred } from '../../common/deferred';
 import { traceVerbose } from '../../common/logging';
 import { getWorkspacePersistentState } from '../../common/persistentState';
-import { getDefaultEnvironment, matchEnvironmentForUri } from '../../core/environmentRules';
+import { getDefaultEnvironment, matchEnvironmentForUri, sortPixiEnvironments } from '../../core/environmentRules';
 import { PixiProjectManager } from '../../core/projectManager';
 import { PIXI_MANAGER_ID } from './constants';
 import {
@@ -29,7 +29,6 @@ import {
     isEnvironmentInvalid,
     promptToInstallEnvironment,
     promptToInstallIpykernel,
-    sortEnvironments,
 } from './pythonDiscovery';
 import { PixiPythonEnvironment } from './types';
 
@@ -210,7 +209,7 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
                     coreEnvs.map((core) => createPythonEnvironment(core, pixiBin, template)),
                 );
 
-                const sorted = sortEnvironments(pyEnvs);
+                const sorted = sortPixiEnvironments(pyEnvs);
                 this.projectToEnvs.set(projectPath, sorted);
 
                 const oldEnvs = oldProjectToEnvs.get(projectPath) || [];
@@ -309,14 +308,14 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
 
         if (scope === 'all' || !scope) {
             const all = Array.from(this.projectToEnvs.values()).flat();
-            return sortEnvironments(all);
+            return sortPixiEnvironments(all);
         }
 
         if (scope instanceof Uri) {
             const project = this.api.getPythonProject(scope);
             const projectPath = project?.uri.fsPath || this.projectManager.findProjectForUri(scope);
             const envs = projectPath ? this.projectToEnvs.get(projectPath) || [] : [];
-            return sortEnvironments(envs);
+            return [...envs];
         }
 
         return [];
@@ -350,8 +349,8 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
     }
 
     async set(scope: SetEnvironmentScope, environment?: PythonEnvironment): Promise<void> {
-        if (environment) {
-            const pyEnv = environment as PixiPythonEnvironment;
+        const pyEnv = environment as PixiPythonEnvironment | undefined;
+        if (pyEnv) {
             if (pyEnv.pixiStatus === 'uninstalled') {
                 const targetFolder = scope instanceof Uri ? scope : Array.isArray(scope) ? scope[0] : undefined;
                 void promptToInstallEnvironment(pyEnv, targetFolder);
@@ -361,9 +360,9 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
             if (isEnvironmentInvalid(pyEnv)) {
                 const reason =
                     pyEnv.statusReason ||
-                    environment.error ||
+                    pyEnv.error ||
                     'The environment is incompatible with the current platform or missing Python.';
-                void window.showErrorMessage(`Cannot activate environment '${environment.displayName}': ${reason}`);
+                void window.showErrorMessage(`Cannot activate environment '${pyEnv.displayName}': ${reason}`);
                 return;
             }
 
@@ -385,12 +384,10 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
         const storage = getWorkspacePersistentState();
 
         if (scope === undefined) {
-            await storage.set('globalEnvId', environment?.envId.id);
-            this.triggerDidChangeEnvironment(undefined, this.globalEnv, environment);
-            this.globalEnv = environment as PixiPythonEnvironment | undefined;
-            if (this.pixiApi && environment) {
-                await this.pixiApi.setActiveEnvironment(undefined, (environment as PixiPythonEnvironment).pixiEnvName);
-            }
+            await storage.set('globalEnvId', pyEnv?.envId.id);
+            this.triggerDidChangeEnvironment(undefined, this.globalEnv, pyEnv);
+            this.globalEnv = pyEnv;
+            await this.pixiApi?.setActiveEnvironment(undefined, pyEnv?.pixiEnvName);
             return;
         }
 
@@ -405,19 +402,16 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
             const projectPath = project.uri.fsPath;
             const oldEnv = this.activeEnv.get(projectPath);
 
-            if (environment) {
-                const pyEnv = environment as PixiPythonEnvironment;
+            if (pyEnv) {
                 this.activeEnv.set(projectPath, pyEnv);
-                await storage.set(`projectEnvId:${projectPath}`, environment.envId.id);
-                if (this.pixiApi) {
-                    await this.pixiApi.setActiveEnvironment(project.uri, pyEnv.pixiEnvName);
-                }
+                await storage.set(`projectEnvId:${projectPath}`, pyEnv.envId.id);
             } else {
                 this.activeEnv.delete(projectPath);
                 await storage.set(`projectEnvId:${projectPath}`, undefined);
             }
+            await this.pixiApi?.setActiveEnvironment(project.uri, pyEnv?.pixiEnvName);
 
-            this.triggerDidChangeEnvironment(project.uri, oldEnv, environment);
+            this.triggerDidChangeEnvironment(project.uri, oldEnv, pyEnv);
         }
     }
 

@@ -132,18 +132,23 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
         }
     }
 
+    private async getSystemInfo(): Promise<PixiSystemInfo> {
+        if (!this.cachedSystemInfo) {
+            const rawJson = await runPixi(['info', '--json']);
+            this.cachedSystemInfo = safeJsonParse<PixiSystemInfo>(rawJson);
+        }
+        return this.cachedSystemInfo;
+    }
+
     public async measureCacheSize(): Promise<void> {
         this.cacheMeasurementAttempted = false;
-        if (!this.cachedSystemInfo) {
-            try {
-                const rawJson = await runPixi(['info', '--json']);
-                this.cachedSystemInfo = safeJsonParse<PixiSystemInfo>(rawJson);
-            } catch {
-                // ignore
+        try {
+            const info = await this.getSystemInfo();
+            if (info.cache_dir) {
+                await this.calculateCacheSize(info.cache_dir);
             }
-        }
-        if (this.cachedSystemInfo?.cache_dir) {
-            await this.calculateCacheSize(this.cachedSystemInfo.cache_dir);
+        } catch {
+            // ignore
         }
     }
 
@@ -183,11 +188,7 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
         }
 
         try {
-            if (!this.cachedSystemInfo) {
-                const rawJson = await runPixi(['info', '--json']);
-                this.cachedSystemInfo = safeJsonParse<PixiSystemInfo>(rawJson);
-            }
-            return this.buildInfoTree(this.cachedSystemInfo);
+            return this.buildInfoTree(await this.getSystemInfo());
         } catch (err: unknown) {
             traceError('Failed to fetch Pixi info:', err);
             const errorItem = new PixiInfoItem('Pixi CLI Unavailable', TreeItemCollapsibleState.None);

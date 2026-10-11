@@ -29,9 +29,6 @@ import {
 } from './packageSearchPicker';
 import { disposeTreeOutputChannel, showDependencyTreeCommand, whyPackageCommand } from './packageTreeViewer';
 
-export * from './packageSearchPicker';
-export * from './packageTreeViewer';
-
 export interface PickPackageOptions {
     title: string;
     placeHolder: string;
