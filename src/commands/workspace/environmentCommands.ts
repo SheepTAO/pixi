@@ -713,12 +713,7 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                 return;
             }
 
-            try {
-                const doc = await workspace.openTextDocument(Uri.file(manifestPath));
-                await window.showTextDocument(doc);
-            } catch (err) {
-                window.showErrorMessage(`Failed to open manifest: ${err instanceof Error ? err.message : String(err)}`);
-            }
+            await openDocumentIfExists(manifestPath);
         }),
 
         // Pixi: Refresh Projects
@@ -1027,12 +1022,8 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                     featureName = pick.featureName;
                 }
 
-                const manifestPath = findManifestPath(projectPath);
-                if (!manifestPath) {
-                    return;
-                }
                 await revealDefinitionInManifest({
-                    manifestPath,
+                    manifestPath: manager.getManifestPath(projectPath),
                     targetName: featureName,
                     kind: 'feature',
                 });

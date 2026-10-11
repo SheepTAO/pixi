@@ -235,42 +235,25 @@ export function registerTaskCommands(manager: PixiProjectManager, taskProvider: 
                     scope: { kind: 'standalone' | 'default-env' | 'feature'; name?: string };
                 }
 
-                const scopeItems: TaskScopeQuickPickItem[] = [];
+                const hasInitialEnv = Boolean(initialEnv && initialEnv !== 'default');
+                const standaloneItem: TaskScopeQuickPickItem = {
+                    label: `$(globe) Standalone Task${hasInitialEnv ? '' : ' (Recommended)'}`,
+                    description: 'Global task in [tasks], runnable in any environment',
+                    scope: { kind: 'standalone' },
+                };
+                const makeEnvItem = (envName: string, recommended = false): TaskScopeQuickPickItem => ({
+                    label: `$(server-environment) Default Environment: ${envName}${recommended ? ' (Recommended)' : ''}`,
+                    description: `Task runs in '${envName}' by default (--default-environment)`,
+                    scope: { kind: 'default-env', name: envName },
+                });
 
-                if (initialEnv && initialEnv !== 'default') {
-                    scopeItems.push({
-                        label: `$(server-environment) Default Environment: ${initialEnv} (Recommended)`,
-                        description: `Task runs in '${initialEnv}' by default (--default-environment)`,
-                        scope: { kind: 'default-env' as const, name: initialEnv },
-                    });
-                    scopeItems.push({
-                        label: '$(globe) Standalone Task',
-                        description: 'Global task in [tasks], runnable in any environment',
-                        scope: { kind: 'standalone' },
-                    });
-                    for (const e of namedEnvs) {
-                        if (e.pixiEnvName !== initialEnv) {
-                            scopeItems.push({
-                                label: `$(server-environment) Default Environment: ${e.pixiEnvName}`,
-                                description: `Task runs in '${e.pixiEnvName}' by default (--default-environment)`,
-                                scope: { kind: 'default-env' as const, name: e.pixiEnvName },
-                            });
-                        }
-                    }
-                } else {
-                    scopeItems.push({
-                        label: '$(globe) Standalone Task (Recommended)',
-                        description: 'Global task in [tasks], runnable in any environment',
-                        scope: { kind: 'standalone' },
-                    });
-                    for (const e of namedEnvs) {
-                        scopeItems.push({
-                            label: `$(server-environment) Default Environment: ${e.pixiEnvName}`,
-                            description: `Task runs in '${e.pixiEnvName}' by default (--default-environment)`,
-                            scope: { kind: 'default-env' as const, name: e.pixiEnvName },
-                        });
-                    }
-                }
+                const scopeItems: TaskScopeQuickPickItem[] = hasInitialEnv
+                    ? [
+                          makeEnvItem(initialEnv!, true),
+                          standaloneItem,
+                          ...namedEnvs.filter((e) => e.pixiEnvName !== initialEnv).map((e) => makeEnvItem(e.pixiEnvName)),
+                      ]
+                    : [standaloneItem, ...namedEnvs.map((e) => makeEnvItem(e.pixiEnvName))];
 
                 for (const f of features) {
                     scopeItems.push({

@@ -129,9 +129,9 @@ export class PixiExtensionApiImpl implements PixiExtensionApi, Disposable {
 
     public async getActiveEnvironment(scope?: Uri): Promise<PixiEnvironmentInfo | undefined> {
         if (scope) {
-            const projectPath = this.projectManager.findProjectForUri(scope);
-            if (projectPath) {
-                return this.getEnvironmentForUri(scope);
+            const env = this.getEnvironmentForUri(scope);
+            if (env) {
+                return env;
             }
         }
 

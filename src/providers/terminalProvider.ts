@@ -80,9 +80,6 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
         const envs = sortPixiEnvironments(rawEnvs);
 
         if (envs.length === 1) {
-            if (await this.handleUninstalledOrError(envs[0])) {
-                return undefined;
-            }
             return envs[0];
         }
 
@@ -109,9 +106,6 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
                 }
             }
             if (matchedEnv) {
-                if (await this.handleUninstalledOrError(matchedEnv)) {
-                    return undefined;
-                }
                 return matchedEnv;
             }
         }
@@ -135,15 +129,7 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
             token,
         );
 
-        if (!selected) {
-            return undefined;
-        }
-
-        if (await this.handleUninstalledOrError(selected.env)) {
-            return undefined;
-        }
-
-        return selected.env;
+        return selected?.env;
     }
 
     private async createTerminalOptions(env: PixiEnvironmentInfo): Promise<TerminalOptions> {
@@ -168,7 +154,7 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
         traceVerbose('Terminal profile requested for Pixi');
         try {
             const env = await this.pickEnvironment(token);
-            if (!env) {
+            if (!env || (await this.handleUninstalledOrError(env))) {
                 return undefined;
             }
 
@@ -191,15 +177,11 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
                 ? this.projectManager.findProjectForUri(Uri.file(folder)) || folder
                 : undefined;
 
-            if (env) {
-                if (await this.handleUninstalledOrError(env)) {
-                    return;
-                }
-            } else {
+            if (!env) {
                 env = await this.pickEnvironment(undefined, targetProjectPath);
-                if (!env) {
-                    return;
-                }
+            }
+            if (!env || (await this.handleUninstalledOrError(env))) {
+                return;
             }
 
             const options = await this.createTerminalOptions(env);
