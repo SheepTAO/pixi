@@ -191,15 +191,15 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
                 ? this.projectManager.findProjectForUri(Uri.file(folder)) || folder
                 : undefined;
 
-            if (!env) {
+            if (env) {
+                if (await this.handleUninstalledOrError(env)) {
+                    return;
+                }
+            } else {
                 env = await this.pickEnvironment(undefined, targetProjectPath);
-            }
-            if (!env) {
-                return;
-            }
-
-            if (await this.handleUninstalledOrError(env)) {
-                return;
+                if (!env) {
+                    return;
+                }
             }
 
             const options = await this.createTerminalOptions(env);

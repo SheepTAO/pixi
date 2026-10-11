@@ -159,12 +159,12 @@ export async function findPackageScope(
         entry: WorkspaceListEntry,
         kind: 'global' | 'feature' | 'environment',
     ): PackageScopeResult | undefined => {
-        if (entry.dependencies.some((d) => d.toLowerCase().replace(/[-_.]+/g, '-') === norm)) {
+        if (entry.dependencies.some((d) => normalizePkgName(d) === norm)) {
             return kind === 'global' || entry.name === 'default'
                 ? { kind: 'global', isPypi: false }
                 : { kind, scopeName: entry.name, isPypi: false };
         }
-        if (entry.pypiDependencies.some((d) => d.toLowerCase().replace(/[-_.]+/g, '-') === norm)) {
+        if (entry.pypiDependencies.some((d) => normalizePkgName(d) === norm)) {
             return kind === 'global' || entry.name === 'default'
                 ? { kind: 'global', isPypi: true }
                 : { kind, scopeName: entry.name, isPypi: true };

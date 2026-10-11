@@ -1,6 +1,7 @@
 import * as path from 'path';
 import {
     CancellationError,
+    CancellationToken,
     commands,
     Disposable,
     ProgressLocation,
@@ -38,7 +39,7 @@ interface GlobalActionQuickPickItem extends QuickPickItem {
 
 async function runWithProgressNotification(
     title: string,
-    action: () => Promise<unknown>,
+    action: (token: CancellationToken) => Promise<unknown>,
     successMsg: string,
 ): Promise<boolean> {
     try {
@@ -48,8 +49,8 @@ async function runWithProgressNotification(
                 title,
                 cancellable: true,
             },
-            async (_progress) => {
-                await action();
+            async (_progress, token) => {
+                await action(token);
                 window.showInformationMessage(successMsg);
             },
         );
@@ -71,7 +72,7 @@ export async function executeGlobalUpdate(toolName?: string): Promise<boolean> {
         ? `Pixi Global: Successfully updated '${toolName}'.`
         : 'Pixi Global: Successfully updated all global tools.';
 
-    return runWithProgressNotification(title, () => updateGlobalTool(toolName), successMsg);
+    return runWithProgressNotification(title, (token) => updateGlobalTool(toolName, token), successMsg);
 }
 
 export async function executeGlobalUninstall(toolName: string): Promise<boolean> {
@@ -85,7 +86,7 @@ export async function executeGlobalUninstall(toolName: string): Promise<boolean>
 
     return runWithProgressNotification(
         `Pixi Global: Uninstalling tool '${toolName}'...`,
-        () => uninstallGlobalTool(toolName),
+        (token) => uninstallGlobalTool(toolName, token),
         `Pixi Global: Successfully uninstalled tool '${toolName}'.`,
     );
 }
@@ -93,7 +94,7 @@ export async function executeGlobalUninstall(toolName: string): Promise<boolean>
 export async function executeGlobalSync(): Promise<boolean> {
     return runWithProgressNotification(
         'Pixi Global: Syncing global environments...',
-        () => syncGlobalEnvironments(),
+        (token) => syncGlobalEnvironments(token),
         'Pixi Global: Successfully synced global environments.',
     );
 }
@@ -130,7 +131,7 @@ export async function handleGlobalInstall(initialTool?: string): Promise<void> {
     const channelLabel = targetChannel ? `channel: ${targetChannel}` : 'channel: conda-forge';
     await runWithProgressNotification(
         `Pixi Global: Installing '${tools.join(', ')}' (${channelLabel})...`,
-        () => installGlobalTools(tools, targetChannel),
+        (token) => installGlobalTools(tools, targetChannel, token),
         `Pixi Global: Successfully installed '${tools.join(', ')}' (${channelLabel}).`,
     );
 }

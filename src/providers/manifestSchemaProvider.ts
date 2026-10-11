@@ -113,87 +113,30 @@ export class PixiManifestSchemaProvider implements CompletionItemProvider, Hover
         properties?: Record<string, SchemaProperty>;
         $defs?: Record<string, { properties?: Record<string, SchemaProperty>; description?: string }>;
     }): ManifestSchemaMetadata {
-        const topLevelSections = new Map<string, string>();
-        const workspaceProperties = new Map<string, string>();
-        const taskProperties = new Map<string, string>();
-        const systemRequirementProperties = new Map<string, string>();
-        const pypiOptionProperties = new Map<string, string>();
         const allPropertiesDoc = new Map<string, string>();
 
-        const topProps = schemaJson.properties || {};
-        for (const [key, prop] of Object.entries(topProps)) {
-            const desc = prop.description || '';
-            topLevelSections.set(key, desc);
-            allPropertiesDoc.set(key, desc);
-        }
+        const collectProps = (props?: Record<string, SchemaProperty>): Map<string, string> => {
+            const map = new Map<string, string>();
+            for (const [key, prop] of Object.entries(props || {})) {
+                const desc = prop.description || '';
+                map.set(key, desc);
+                if (!allPropertiesDoc.has(key)) {
+                    allPropertiesDoc.set(key, desc);
+                }
+            }
+            return map;
+        };
 
         const defs = schemaJson.$defs || {};
 
-        const wsProps = defs.Workspace?.properties || {};
-        for (const [key, prop] of Object.entries(wsProps)) {
-            const desc = prop.description || '';
-            workspaceProperties.set(key, desc);
-            if (!allPropertiesDoc.has(key)) {
-                allPropertiesDoc.set(key, desc);
-            }
-        }
-
-        const taskProps = defs.TaskInlineTable?.properties || {};
-        for (const [key, prop] of Object.entries(taskProps)) {
-            const desc = prop.description || '';
-            taskProperties.set(key, desc);
-            if (!allPropertiesDoc.has(key)) {
-                allPropertiesDoc.set(key, desc);
-            }
-        }
-
-        const sysProps = defs.SystemRequirements?.properties || {};
-        for (const [key, prop] of Object.entries(sysProps)) {
-            const desc = prop.description || '';
-            systemRequirementProperties.set(key, desc);
-            if (!allPropertiesDoc.has(key)) {
-                allPropertiesDoc.set(key, desc);
-            }
-        }
-
-        // Support official schema PyPIOptions naming
-        const pypiProps = defs.PyPIOptions?.properties || defs.PypiOptions?.properties || {};
-        for (const [key, prop] of Object.entries(pypiProps)) {
-            const desc = prop.description || '';
-            pypiOptionProperties.set(key, desc);
-            if (!allPropertiesDoc.has(key)) {
-                allPropertiesDoc.set(key, desc);
-            }
-        }
-
-        const activationProperties = new Map<string, string>();
-        const actProps = defs.Activation?.properties || {};
-        for (const [key, prop] of Object.entries(actProps)) {
-            const desc = prop.description || '';
-            activationProperties.set(key, desc);
-            if (!allPropertiesDoc.has(key)) {
-                allPropertiesDoc.set(key, desc);
-            }
-        }
-
-        const environmentProperties = new Map<string, string>();
-        const envProps = defs.Environment?.properties || {};
-        for (const [key, prop] of Object.entries(envProps)) {
-            const desc = prop.description || '';
-            environmentProperties.set(key, desc);
-            if (!allPropertiesDoc.has(key)) {
-                allPropertiesDoc.set(key, desc);
-            }
-        }
-
         return {
-            topLevelSections,
-            workspaceProperties,
-            taskProperties,
-            systemRequirementProperties,
-            pypiOptionProperties,
-            activationProperties,
-            environmentProperties,
+            topLevelSections: collectProps(schemaJson.properties),
+            workspaceProperties: collectProps(defs.Workspace?.properties),
+            taskProperties: collectProps(defs.TaskInlineTable?.properties),
+            systemRequirementProperties: collectProps(defs.SystemRequirements?.properties),
+            pypiOptionProperties: collectProps(defs.PyPIOptions?.properties || defs.PypiOptions?.properties),
+            activationProperties: collectProps(defs.Activation?.properties),
+            environmentProperties: collectProps(defs.Environment?.properties),
             allPropertiesDoc,
         };
     }

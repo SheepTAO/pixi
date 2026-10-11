@@ -27,7 +27,6 @@ export async function runPixiWithProgress(
                     combinedOutput += (combinedOutput ? '\n' : '') + out;
                 }
                 await manager.refresh(Uri.file(cwd));
-                manager.clearPackagesCache(cwd);
                 const finalSuccessMsg = typeof successMsg === 'function' ? successMsg(combinedOutput) : successMsg;
                 window.showInformationMessage(finalSuccessMsg);
             },

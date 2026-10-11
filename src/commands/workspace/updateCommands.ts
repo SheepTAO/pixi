@@ -3,7 +3,7 @@ import { commands, Disposable, ProgressLocation, QuickPickItem, window } from 'v
 
 import { runPixi } from '../../cli/pixiCli';
 import { runPixiWithProgress } from '../../cli/workspaceCli';
-import { safeJsonParse } from '../../common/execUtils';
+import { escapeRegex, safeJsonParse } from '../../common/execUtils';
 import { PixiProjectManager } from '../../core/projectManager';
 import { extractEnvironmentName, pickPixiProject } from './common';
 
@@ -54,13 +54,8 @@ export function parseCondaInfo(url?: string, pkgName?: string): { version?: stri
             .pop()
             ?.replace(/(\.conda|\.tar\.bz2|\.whl|\.tar\.gz)$/, '') || '';
     let rest = filename;
-    if (pkgName) {
-        const altPkg = pkgName.includes('_') ? pkgName.replace(/_/g, '-') : pkgName.replace(/-/g, '_');
-        if (rest.toLowerCase().startsWith(`${pkgName.toLowerCase()}-`)) {
-            rest = rest.slice(pkgName.length + 1);
-        } else if (rest.toLowerCase().startsWith(`${altPkg.toLowerCase()}-`)) {
-            rest = rest.slice(altPkg.length + 1);
-        }
+    if (pkgName && new RegExp(`^${escapeRegex(pkgName).replace(/[-_]/g, '[-_]')}-`, 'i').test(rest)) {
+        rest = rest.slice(pkgName.length + 1);
     }
     const lastDash = rest.lastIndexOf('-');
     if (lastDash > 0) {

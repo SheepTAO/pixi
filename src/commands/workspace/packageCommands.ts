@@ -101,6 +101,16 @@ export interface PickDeclaredPackageOptions {
     emptyWarning?: string;
 }
 
+function formatScopeLabel(scope: PackageScopeResult): string {
+    if (scope.kind === 'feature') {
+        return `feature '${scope.scopeName}'`;
+    }
+    if (scope.kind === 'environment') {
+        return `environment '${scope.scopeName}'`;
+    }
+    return 'global dependencies';
+}
+
 export async function pickDeclaredPackage(
     projectPath: string,
     options?: PickDeclaredPackageOptions,
@@ -140,11 +150,11 @@ export async function pickDeclaredPackage(
         specs: string[],
         kind: 'conda' | 'pypi',
         scope: PackageScopeResult,
-        scopeLabel: string,
     ): DeclaredQuickPickItem[] => {
         const isPypi = kind === 'pypi';
         const icon = isPypi ? '$(symbol-keyword)' : '$(package)';
         const badge = isPypi ? '[PyPI]' : '[Conda]';
+        const scopeLabel = formatScopeLabel(scope);
 
         return specs.map((rawSpec) => {
             const pkgName = extractPackageNameFromSpec(rawSpec);
@@ -181,10 +191,9 @@ export async function pickDeclaredPackage(
         const scope: PackageScopeResult = isDefault
             ? { kind: 'global', isPypi: false }
             : { kind: 'feature', scopeName: f.name, isPypi: false };
-        const scopeLabel = isDefault ? 'global dependencies' : `feature '${f.name}'`;
 
-        items.push(...toQuickPickItems(f.dependencies, 'conda', scope, scopeLabel));
-        items.push(...toQuickPickItems(f.pypiDependencies, 'pypi', scope, scopeLabel));
+        items.push(...toQuickPickItems(f.dependencies, 'conda', scope));
+        items.push(...toQuickPickItems(f.pypiDependencies, 'pypi', scope));
     }
 
     // Process inline environments if not filtering by feature
@@ -197,7 +206,6 @@ export async function pickDeclaredPackage(
                 continue;
             }
 
-            const scopeLabel = `environment '${e.name}'`;
             const envScope: PackageScopeResult = { kind: 'environment', scopeName: e.name, isPypi: false };
 
             items.push({
@@ -205,8 +213,8 @@ export async function pickDeclaredPackage(
                 kind: QuickPickItemKind.Separator,
             });
 
-            items.push(...toQuickPickItems(e.dependencies, 'conda', envScope, scopeLabel));
-            items.push(...toQuickPickItems(e.pypiDependencies, 'pypi', envScope, scopeLabel));
+            items.push(...toQuickPickItems(e.dependencies, 'conda', envScope));
+            items.push(...toQuickPickItems(e.pypiDependencies, 'pypi', envScope));
         }
     }
 
@@ -257,16 +265,8 @@ export async function executeRemovePackage(
     manager: PixiProjectManager,
     projectPath: string,
     pkg: Pick<PixiPackage, 'name' | 'kind'>,
-    scopeOverride?: PackageScopeResult,
+    scope: PackageScopeResult,
 ): Promise<void> {
-    const scope = scopeOverride ?? (await findPackageScope(projectPath, pkg.name));
-    if (!scope) {
-        window.showInformationMessage(
-            `Pixi: '${pkg.name}' is a transitive dependency (installed automatically) and cannot be removed directly from the manifest.`,
-        );
-        return;
-    }
-
     const isPypi = scope.isPypi || pkg.kind === 'pypi';
     const args = ['remove'];
     if (isPypi) {
@@ -280,12 +280,7 @@ export async function executeRemovePackage(
     args.push(pkg.name);
 
     const projectName = path.basename(projectPath);
-    const scopeLabel =
-        scope.kind === 'feature'
-            ? `feature '${scope.scopeName}'`
-            : scope.kind === 'environment'
-              ? `environment '${scope.scopeName}'`
-              : 'global dependencies';
+    const scopeLabel = formatScopeLabel(scope);
     const sourceLabel = isPypi ? 'PyPI' : 'Conda';
     await runPixiWithProgress(
         `Pixi: Removing '${pkg.name}' (${sourceLabel}) from ${scopeLabel} in '${projectName}'...`,
@@ -457,12 +452,7 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
                     return;
                 }
 
-                const scopeDesc =
-                    scope.kind === 'feature'
-                        ? `feature '${scope.scopeName}'`
-                        : scope.kind === 'environment'
-                          ? `environment '${scope.scopeName}'`
-                          : 'global dependencies';
+                const scopeDesc = formatScopeLabel(scope);
 
                 const confirmed = await window.showWarningMessage(
                     `Are you sure you want to remove package '${pkg.name}' from ${scopeDesc}?`,
