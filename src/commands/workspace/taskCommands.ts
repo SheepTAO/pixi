@@ -251,7 +251,9 @@ export function registerTaskCommands(manager: PixiProjectManager, taskProvider: 
                     ? [
                           makeEnvItem(initialEnv!, true),
                           standaloneItem,
-                          ...namedEnvs.filter((e) => e.pixiEnvName !== initialEnv).map((e) => makeEnvItem(e.pixiEnvName)),
+                          ...namedEnvs
+                              .filter((e) => e.pixiEnvName !== initialEnv)
+                              .map((e) => makeEnvItem(e.pixiEnvName)),
                       ]
                     : [standaloneItem, ...namedEnvs.map((e) => makeEnvItem(e.pixiEnvName))];
 
