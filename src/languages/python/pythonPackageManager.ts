@@ -11,7 +11,7 @@ import {
 import { Disposable, Event, EventEmitter, LogOutputChannel, ProgressLocation, ThemeIcon, window } from 'vscode';
 
 import { runPixi } from '../../cli/pixiCli';
-import { findPackageScope } from '../../commands/workspace/common';
+import { findPackageScope, getScopeArgs } from '../../commands/workspace/common';
 import { traceError, traceInfo, traceVerbose } from '../../common/logging';
 import { listPixiPackages } from '../../core/packageManager';
 import { PixiProjectManager } from '../../core/projectManager';
@@ -162,10 +162,9 @@ export class PixiPythonPackageManager implements PackageManager, Disposable {
                         if (isPypi) {
                             args.push('--pypi');
                         }
-                        if (scope?.kind === 'feature' && scope.scopeName) {
-                            args.push('-f', scope.scopeName);
-                        } else if (scope?.kind === 'environment' && scope.scopeName) {
-                            args.push('-e', scope.scopeName);
+                        const scopeArgs = getScopeArgs(scope);
+                        if (scopeArgs.length > 0) {
+                            args.push(...scopeArgs);
                         } else if (!scope && details.envName !== 'default') {
                             args.push('-e', details.envName);
                         }

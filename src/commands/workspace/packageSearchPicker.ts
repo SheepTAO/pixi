@@ -11,7 +11,6 @@ import {
 
 import { PixiPackageSearchResult, searchPixiPackages } from '../../cli/pixiCli';
 import { getProjectConfiguredChannels } from '../../core/projectDiscovery';
-import { PixiProjectManager } from '../../core/projectManager';
 import { handleGlobalInstall } from '../globalCommands';
 
 export type SourceMode = 'conda' | 'pypi' | 'pypi-custom' | 'path' | 'git';
@@ -115,7 +114,7 @@ export function attachDebouncedPackageSearch<T extends QuickPickItem>(
     const projectChannels =
         options.channels ?? (options.projectPath ? getProjectConfiguredChannels(options.projectPath) : []);
 
-    const performSearch = (query: string) => {
+    const cleanup = () => {
         if (debounceTimer) {
             clearTimeout(debounceTimer);
         }
@@ -123,6 +122,10 @@ export function attachDebouncedPackageSearch<T extends QuickPickItem>(
             searchCts.cancel();
             searchCts.dispose();
         }
+    };
+
+    const performSearch = (query: string) => {
+        cleanup();
 
         const trimmed = query.trim();
         const prefixItems = options.buildPrefixItems ? options.buildPrefixItems(trimmed) : [];
@@ -199,26 +202,12 @@ export function attachDebouncedPackageSearch<T extends QuickPickItem>(
         }, 300);
     };
 
-    const cleanup = () => {
-        if (debounceTimer) {
-            clearTimeout(debounceTimer);
-        }
-        if (searchCts) {
-            searchCts.cancel();
-            searchCts.dispose();
-        }
-    };
-
     quickPick.onDidChangeValue(performSearch);
 
     return { triggerSearch: performSearch, dispose: cleanup };
 }
 
-export async function showPackageSearchPicker(
-    _manager?: PixiProjectManager,
-    initialQuery?: string,
-    targetProjectPath?: string,
-): Promise<void> {
+export async function showPackageSearchPicker(targetProjectPath?: string, initialQuery?: string): Promise<void> {
     const quickPick = window.createQuickPick<SearchResultQuickPickItem>();
     quickPick.title = 'Pixi: Search Packages (Conda & PyPI)';
     quickPick.placeholder = 'Type package name to search Conda & PyPI... (e.g. numpy, uv, torch, ruff)';

@@ -4,7 +4,6 @@ import { commands, Disposable, QuickPickItem, Uri, window, workspace } from 'vsc
 
 import { runPixiWithProgress } from '../../cli/workspaceCli';
 import { revealDefinitionInManifest } from '../../common/execUtils';
-import { getEnvironmentStatusBadge } from '../../core/environmentRules';
 import { findManifestPath } from '../../core/projectDiscovery';
 import { PixiProjectManager } from '../../core/projectManager';
 import {
@@ -17,7 +16,9 @@ import {
     openDocumentIfExists,
     pickManifestFormat,
     pickPixiProject,
+    promptNewFeatureName,
     resolveTargetFolder,
+    toEnvQuickPickItem,
     updateConfigurationValue,
 } from './common';
 
@@ -36,17 +37,7 @@ async function pickInstallableEnvironment(
         return undefined;
     }
 
-    const pick = await window.showQuickPick(
-        candidateEnvs.map((e) => {
-            const { icon, text } = getEnvironmentStatusBadge(e.pixiStatus);
-            return {
-                label: `${icon} ${e.pixiEnvName}`,
-                description: text,
-                envName: e.pixiEnvName,
-            };
-        }),
-        { title, placeHolder },
-    );
+    const pick = await window.showQuickPick(candidateEnvs.map(toEnvQuickPickItem), { title, placeHolder });
     return pick?.envName;
 }
 
@@ -94,29 +85,11 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
             }
 
             const existingFeatures = await getWorkspaceFeatures(projectPath);
-            const featureName = await window.showInputBox({
-                title: 'Pixi: Create Feature',
-                prompt: 'Enter a name for the new feature',
-                placeHolder: 'e.g. test, dev, cuda, docs',
-                validateInput: (value) => {
-                    const trimmed = value?.trim();
-                    if (!trimmed) {
-                        return 'Feature name cannot be empty.';
-                    }
-                    if (!/^[a-zA-Z0-9_\-]+$/.test(trimmed)) {
-                        return 'Feature name must only contain alphanumeric characters, underscores, and hyphens.';
-                    }
-                    if (trimmed === 'default' || existingFeatures.some((f) => f.name === trimmed)) {
-                        return `Feature '${trimmed}' already exists in this project.`;
-                    }
-                    return null;
-                },
-            });
-            if (!featureName) {
+            const trimmedName = await promptNewFeatureName(existingFeatures);
+            if (!trimmedName) {
                 return;
             }
 
-            const trimmedName = featureName.trim();
             // In Pixi, a feature is created natively via CLI by adding a dependency or task to it.
             // Dispatch to pixi.addPackage with explicit feature scope to run `pixi add -f <feature> <spec>`.
             await commands.executeCommand('pixi.addPackage', Uri.file(projectPath), {
@@ -319,19 +292,10 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                 return;
             }
 
-            const envItems = envs.map((e) => {
-                const { icon, text } = getEnvironmentStatusBadge(e.pixiStatus);
-                return {
-                    label: `${icon} ${e.pixiEnvName}`,
-                    description: text,
-                    envName: e.pixiEnvName,
-                };
-            });
-
             const targetEnvName =
                 extractEnvironmentName(targetItem) ??
                 (
-                    await window.showQuickPick(envItems, {
+                    await window.showQuickPick(envs.map(toEnvQuickPickItem), {
                         title: 'Pixi: Delete Environment',
                         placeHolder: 'Select an environment to delete or clean',
                     })
@@ -454,20 +418,10 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                     window.showInformationMessage(`No installed environments found to clean in ${projectName}.`);
                     return;
                 }
-                const targetEnv = await window.showQuickPick(
-                    installedEnvs.map((e) => {
-                        const { icon, text } = getEnvironmentStatusBadge(e.pixiStatus);
-                        return {
-                            label: `${icon} ${e.pixiEnvName}`,
-                            description: text,
-                            envName: e.pixiEnvName,
-                        };
-                    }),
-                    {
-                        title: `Pixi: Clean Specific Environment (${projectName})`,
-                        placeHolder: 'Select an installed environment to clean from disk',
-                    },
-                );
+                const targetEnv = await window.showQuickPick(installedEnvs.map(toEnvQuickPickItem), {
+                    title: `Pixi: Clean Specific Environment (${projectName})`,
+                    placeHolder: 'Select an installed environment to clean from disk',
+                });
                 if (!targetEnv) {
                     return;
                 }
@@ -846,20 +800,10 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                         );
                         return;
                     }
-                    const pick = await window.showQuickPick(
-                        namedEnvs.map((e) => {
-                            const { icon, text } = getEnvironmentStatusBadge(e.pixiStatus);
-                            return {
-                                label: `${icon} ${e.pixiEnvName}`,
-                                description: text,
-                                envName: e.pixiEnvName,
-                            };
-                        }),
-                        {
-                            title: 'Pixi: Select Environment to Configure Features',
-                            placeHolder: 'Select environment',
-                        },
-                    );
+                    const pick = await window.showQuickPick(namedEnvs.map(toEnvQuickPickItem), {
+                        title: 'Pixi: Select Environment to Configure Features',
+                        placeHolder: 'Select environment',
+                    });
                     if (!pick) {
                         return;
                     }

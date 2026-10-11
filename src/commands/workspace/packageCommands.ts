@@ -12,6 +12,8 @@ import {
     extractEnvironmentName,
     extractFeatureName,
     findPackageScope,
+    formatScopeLabel,
+    getScopeArgs,
     getWorkspaceEnvironments,
     getWorkspaceFeatures,
     PackageScopeResult,
@@ -98,16 +100,6 @@ export interface PickDeclaredPackageOptions {
     emptyWarning?: string;
 }
 
-function formatScopeLabel(scope: PackageScopeResult): string {
-    if (scope.kind === 'feature') {
-        return `feature '${scope.scopeName}'`;
-    }
-    if (scope.kind === 'environment') {
-        return `environment '${scope.scopeName}'`;
-    }
-    return 'global dependencies';
-}
-
 export async function pickDeclaredPackage(
     projectPath: string,
     options?: PickDeclaredPackageOptions,
@@ -187,7 +179,7 @@ export async function pickDeclaredPackage(
 
         const scope: PackageScopeResult = isDefault
             ? { kind: 'global', isPypi: false }
-            : { kind: 'feature', scopeName: f.name, isPypi: false };
+            : { kind: 'feature', name: f.name, isPypi: false };
 
         items.push(...toQuickPickItems(f.dependencies, 'conda', scope));
         items.push(...toQuickPickItems(f.pypiDependencies, 'pypi', scope));
@@ -203,7 +195,7 @@ export async function pickDeclaredPackage(
                 continue;
             }
 
-            const envScope: PackageScopeResult = { kind: 'environment', scopeName: e.name, isPypi: false };
+            const envScope: PackageScopeResult = { kind: 'environment', name: e.name, isPypi: false };
 
             items.push({
                 label: `Environment: ${e.name} (Inline Dependencies)`,
@@ -269,12 +261,7 @@ export async function executeRemovePackage(
     if (isPypi) {
         args.push('--pypi');
     }
-    if (scope.kind === 'feature' && scope.scopeName) {
-        args.push('-f', scope.scopeName);
-    } else if (scope.kind === 'environment' && scope.scopeName) {
-        args.push('-e', scope.scopeName);
-    }
-    args.push(pkg.name);
+    args.push(...getScopeArgs(scope), pkg.name);
 
     const projectName = path.basename(projectPath);
     const scopeLabel = formatScopeLabel(scope);
@@ -317,7 +304,7 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
     disposables.push(
         commands.registerCommand('pixi.searchPackages', async (targetItem?: unknown) => {
             const targetProjectPath = normalizeFolderPath(targetItem);
-            await showPackageSearchPicker(manager, undefined, targetProjectPath);
+            await showPackageSearchPicker(targetProjectPath);
         }),
     );
 
@@ -374,15 +361,8 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
                     return;
                 }
 
-                const scopeArgs: string[] = [];
-                let scopeLabel = 'global dependencies';
-                if (targetScope.kind === 'feature' && targetScope.name) {
-                    scopeArgs.push('-f', targetScope.name);
-                    scopeLabel = `feature '${targetScope.name}'`;
-                } else if (targetScope.kind === 'environment' && targetScope.name) {
-                    scopeArgs.push('-e', targetScope.name);
-                    scopeLabel = `environment '${targetScope.name}'`;
-                }
+                const scopeArgs = getScopeArgs(targetScope);
+                const scopeLabel = formatScopeLabel(targetScope);
 
                 if (promptResult.kind === 'selected') {
                     const pkg = promptResult.pkg;
@@ -433,7 +413,7 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
                 const scope: PackageScopeResult | undefined = ctx.featureName
                     ? ctx.featureName === 'default'
                         ? { kind: 'global', isPypi: pkg.kind === 'pypi' }
-                        : { kind: 'feature', scopeName: ctx.featureName, isPypi: pkg.kind === 'pypi' }
+                        : { kind: 'feature', name: ctx.featureName, isPypi: pkg.kind === 'pypi' }
                     : await findPackageScope(projectPath, pkg.name, ctx.envName);
                 if (!scope) {
                     window

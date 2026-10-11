@@ -27,9 +27,13 @@ export async function activate(context: ExtensionContext): Promise<PixiExtension
     // Setup persistent state for workspace
     setPersistentState(context);
 
-    // 1. Initialize Pixi Core
+    // 1. Initialize Pixi Core & Public API
     const projectManager = new PixiProjectManager(log);
     context.subscriptions.push(projectManager);
+
+    const extensionVersion: string = context.extension.packageJSON.version;
+    const pixiApi = createPixiApi(projectManager, extensionVersion);
+    context.subscriptions.push(pixiApi);
 
     const taskProvider = new PixiTaskProvider(projectManager, log);
     context.subscriptions.push(taskProvider);
@@ -37,7 +41,7 @@ export async function activate(context: ExtensionContext): Promise<PixiExtension
     const taskManifestProvider = new PixiTaskManifestProvider(projectManager, taskProvider);
     context.subscriptions.push(taskManifestProvider);
 
-    const dependencyManifestProvider = new PixiDependencyManifestProvider(projectManager);
+    const dependencyManifestProvider = new PixiDependencyManifestProvider(projectManager, pixiApi);
     context.subscriptions.push(dependencyManifestProvider);
 
     const manifestSchemaProvider = new PixiManifestSchemaProvider(context);
@@ -80,11 +84,6 @@ export async function activate(context: ExtensionContext): Promise<PixiExtension
         window.registerTreeDataProvider('pixi.views.info', infoTreeDataProvider),
         registerInfoCommands(infoTreeDataProvider),
     );
-
-    // 3. Initialize Public Extension API
-    const extensionVersion: string = context.extension.packageJSON.version;
-    const pixiApi = createPixiApi(projectManager, extensionVersion);
-    context.subscriptions.push(pixiApi);
 
     traceInfo(`Pixi extension v${extensionVersion} activated.`);
 

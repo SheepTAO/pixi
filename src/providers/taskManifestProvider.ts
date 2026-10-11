@@ -317,18 +317,14 @@ export class PixiTaskManifestProvider implements CodeLensProvider, HoverProvider
                 if (taskHeaderMatch) {
                     inTaskPropertiesTable = true;
                     const taskName = taskHeaderMatch[2] ?? taskHeaderMatch[3];
-                    const featMatch = currentSection.match(/(?:^|\.)feature\.([^.]+)\.tasks\./i);
-                    const envMatch = currentSection.match(/(?:^|\.)environments\.([^.]+)\.tasks\./i);
-                    const env = featMatch ? featMatch[1] : envMatch ? envMatch[1] : undefined;
+                    const env = currentSection.match(/(?:^|\.)(?:feature|environments)\.([^.]+)\.tasks\./i)?.[1];
 
                     const startCol = Math.max(0, line.indexOf(taskName));
                     const endCol = startCol + taskName.length;
                     tasks.push({ name: taskName, line: i, startCol, endCol, env });
                 } else if (/(?:^|\.)tasks$/i.test(currentSection)) {
                     isTasksContainer = true;
-                    const featMatch = currentSection.match(/(?:^|\.)feature\.([^.]+)\.tasks$/i);
-                    const envMatch = currentSection.match(/(?:^|\.)environments\.([^.]+)\.tasks$/i);
-                    currentEnv = featMatch ? featMatch[1] : envMatch ? envMatch[1] : undefined;
+                    currentEnv = currentSection.match(/(?:^|\.)(?:feature|environments)\.([^.]+)\.tasks$/i)?.[1];
 
                     sections.push({ line: i, section: currentSection, env: currentEnv });
                 }

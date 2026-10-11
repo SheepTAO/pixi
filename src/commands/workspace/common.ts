@@ -17,14 +17,21 @@ import { normalizePkgName } from '../../core/packageManager';
 import { PixiProjectManager } from '../../core/projectManager';
 import { PixiEnvironmentInfo, PixiPackage } from '../../core/types';
 
-export { normalizePkgName };
-
 export interface ProjectQuickPickItem extends QuickPickItem {
     projectPath: string;
 }
 
 export interface EnvQuickPickItem extends QuickPickItem {
     envName?: string;
+}
+
+export function toEnvQuickPickItem(e: PixiEnvironmentInfo): { label: string; description: string; envName: string } {
+    const { icon, text } = getEnvironmentStatusBadge(e.pixiStatus);
+    return {
+        label: `${icon} ${e.pixiEnvName}`,
+        description: text,
+        envName: e.pixiEnvName,
+    };
 }
 
 export async function pickManifestFormat(target?: Uri | string): Promise<'pixi' | 'pyproject' | undefined> {
@@ -60,6 +67,30 @@ export function getManifestPathForFormat(folder: string, format: 'pixi' | 'pypro
 export interface TargetScope {
     kind: 'global' | 'feature' | 'environment';
     name?: string;
+}
+
+export interface PackageScopeResult extends TargetScope {
+    isPypi: boolean;
+}
+
+export function getScopeArgs(scope?: TargetScope): string[] {
+    if (scope?.kind === 'feature' && scope.name) {
+        return ['-f', scope.name];
+    }
+    if (scope?.kind === 'environment' && scope.name) {
+        return ['-e', scope.name];
+    }
+    return [];
+}
+
+export function formatScopeLabel(scope: TargetScope): string {
+    if (scope.kind === 'feature' && scope.name) {
+        return `feature '${scope.name}'`;
+    }
+    if (scope.kind === 'environment' && scope.name) {
+        return `environment '${scope.name}'`;
+    }
+    return 'global dependencies';
 }
 
 export interface WorkspaceListEntry {
@@ -133,12 +164,6 @@ export async function getWorkspaceEnvironments(projectPath: string): Promise<Wor
     }
 }
 
-export interface PackageScopeResult {
-    kind: 'global' | 'feature' | 'environment';
-    scopeName?: string;
-    isPypi: boolean;
-}
-
 export async function findPackageScope(
     projectPath: string,
     packageName: string,
@@ -162,12 +187,12 @@ export async function findPackageScope(
         if (entry.dependencies.some((d) => normalizePkgName(d) === norm)) {
             return kind === 'global' || entry.name === 'default'
                 ? { kind: 'global', isPypi: false }
-                : { kind, scopeName: entry.name, isPypi: false };
+                : { kind, name: entry.name, isPypi: false };
         }
         if (entry.pypiDependencies.some((d) => normalizePkgName(d) === norm)) {
             return kind === 'global' || entry.name === 'default'
                 ? { kind: 'global', isPypi: true }
-                : { kind, scopeName: entry.name, isPypi: true };
+                : { kind, name: entry.name, isPypi: true };
         }
         return undefined;
     };
@@ -330,77 +355,33 @@ export async function pickTargetScope(
     }
 
     if (selected.isCreateFeature) {
-        const newName = await window.showInputBox({
-            title: 'Pixi: Create Feature',
-            prompt: 'Enter a name for the new feature',
-            placeHolder: 'e.g. test, dev, cuda, docs',
-            validateInput: (value) => {
-                const trimmed = value?.trim();
-                if (!trimmed) {
-                    return 'Feature name cannot be empty.';
-                }
-                if (!/^[a-zA-Z0-9_\-]+$/.test(trimmed)) {
-                    return 'Feature name must only contain alphanumeric characters, underscores, and hyphens.';
-                }
-                if (trimmed === 'default' || features.some((f) => f.name === trimmed)) {
-                    return `Feature '${trimmed}' already exists.`;
-                }
-                return null;
-            },
-        });
-        if (!newName?.trim()) {
-            return null;
-        }
-        return { kind: 'feature', name: newName.trim() };
+        const newName = await promptNewFeatureName(features);
+        return newName ? { kind: 'feature', name: newName } : null;
     }
 
     return selected.scope ?? null;
 }
 
-export async function pickTargetEnvironment(
-    envs: PixiEnvironmentInfo[],
-    action: 'add' | 'remove' | 'inspect',
-    placeholder?: string,
-): Promise<string | undefined | null> {
-    if (envs.length <= 1) {
-        return action === 'add' ? undefined : envs[0]?.pixiEnvName === 'default' ? undefined : envs[0]?.pixiEnvName;
-    }
-
-    const isAdd = action === 'add';
-    const isInspect = action === 'inspect';
-    const namedEnvs = envs.filter((e) => e.pixiEnvName !== 'default');
-    const items: EnvQuickPickItem[] = [
-        {
-            label: '$(globe) Default',
-            description: isAdd
-                ? 'Default environment / feature (available to all environments)'
-                : 'Default environment',
-            envName: undefined,
+export async function promptNewFeatureName(existingFeatures: WorkspaceListEntry[]): Promise<string | undefined> {
+    const featureName = await window.showInputBox({
+        title: 'Pixi: Create Feature',
+        prompt: 'Enter a name for the new feature',
+        placeHolder: 'e.g. test, dev, cuda, docs',
+        validateInput: (value) => {
+            const trimmed = value?.trim();
+            if (!trimmed) {
+                return 'Feature name cannot be empty.';
+            }
+            if (!/^[a-zA-Z0-9_\-]+$/.test(trimmed)) {
+                return 'Feature name must only contain alphanumeric characters, underscores, and hyphens.';
+            }
+            if (trimmed === 'default' || existingFeatures.some((f) => f.name === trimmed)) {
+                return `Feature '${trimmed}' already exists in this project.`;
+            }
+            return null;
         },
-        ...namedEnvs.map((e) => {
-            const { icon, text } = getEnvironmentStatusBadge(e.pixiStatus);
-            return {
-                label: `${icon} ${e.pixiEnvName}`,
-                description: text ? `${e.projectName} ${text}` : e.projectName,
-                envName: e.pixiEnvName,
-            };
-        }),
-    ];
-
-    const title = isInspect ? 'Pixi: Select Environment' : `Pixi: Target Environment${isAdd ? ' (Optional)' : ''}`;
-    const defaultPlaceholder = isInspect
-        ? 'Select environment to inspect'
-        : `Select target environment or feature to ${action} package`;
-
-    const selected = await window.showQuickPick(items, {
-        title,
-        placeHolder: placeholder || defaultPlaceholder,
     });
-
-    if (!selected) {
-        return null;
-    }
-    return selected.envName;
+    return featureName?.trim() || undefined;
 }
 
 export interface ExtractedCommandContext {
@@ -477,13 +458,26 @@ export async function resolveTargetEnvironment(
         return directEnvName;
     }
 
-    if (envs.length > 1) {
-        return pickTargetEnvironment(envs, 'inspect', placeholder);
+    if (envs.length <= 1) {
+        return envs[0]?.pixiEnvName === 'default' ? undefined : envs[0]?.pixiEnvName;
     }
-    if (envs.length === 1 && envs[0].pixiEnvName !== 'default') {
-        return envs[0].pixiEnvName;
-    }
-    return undefined;
+
+    const namedEnvs = envs.filter((e) => e.pixiEnvName !== 'default');
+    const items: EnvQuickPickItem[] = [
+        {
+            label: '$(globe) Default',
+            description: 'Default environment',
+            envName: undefined,
+        },
+        ...namedEnvs.map(toEnvQuickPickItem),
+    ];
+
+    const selected = await window.showQuickPick(items, {
+        title: 'Pixi: Select Environment',
+        placeHolder: placeholder || 'Select environment to inspect',
+    });
+
+    return selected ? selected.envName : null;
 }
 
 export async function resolveTargetFolder(targetItem?: unknown, placeHolder?: string): Promise<string | undefined> {

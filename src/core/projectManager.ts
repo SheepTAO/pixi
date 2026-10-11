@@ -15,6 +15,7 @@ import {
 import { runPixi } from '../cli/pixiCli';
 import { safeJsonParse } from '../common/execUtils';
 import { traceError, traceVerbose } from '../common/logging';
+import { getWorkspacePersistentState } from '../common/persistentState';
 import { getDefaultEnvironment, matchEnvironmentForUri, sortPixiEnvironments } from './environmentRules';
 import { listPixiPackages, PixiPackage } from './packageManager';
 import { findManifestPath, isPixiProject, resolvePixiProjectPaths } from './projectDiscovery';
@@ -195,6 +196,27 @@ export class PixiProjectManager implements Disposable {
         return undefined;
     }
 
+    public resolveProjectActiveOrDefault(
+        projectPath: string,
+        envs = this.getEnvironmentsForProject(projectPath),
+    ): PixiEnvironmentInfo | undefined {
+        if (envs.length === 0) {
+            return undefined;
+        }
+        try {
+            const activeName = getWorkspacePersistentState().get<string>(`projectEnvName:${projectPath}`);
+            if (activeName) {
+                const match = envs.find((e) => e.pixiEnvName === activeName);
+                if (match) {
+                    return match;
+                }
+            }
+        } catch {
+            // ignore if persistent state is not initialized yet
+        }
+        return getDefaultEnvironment(envs);
+    }
+
     public getEnvironmentForUri(uri: Uri): PixiEnvironmentInfo | undefined {
         const projectPath = this.findProjectForUri(uri);
         if (!projectPath) {
@@ -202,19 +224,11 @@ export class PixiProjectManager implements Disposable {
         }
 
         const envs = this.getEnvironmentsForProject(projectPath);
-        if (envs.length === 0) {
-            return undefined;
-        }
-        if (envs.length === 1) {
+        if (envs.length <= 1) {
             return envs[0];
         }
 
-        const matched = matchEnvironmentForUri(uri, projectPath, envs);
-        if (matched) {
-            return matched;
-        }
-
-        return getDefaultEnvironment(envs);
+        return matchEnvironmentForUri(uri, projectPath, envs) ?? this.resolveProjectActiveOrDefault(projectPath, envs);
     }
 
     public async refresh(scope?: Uri): Promise<void> {

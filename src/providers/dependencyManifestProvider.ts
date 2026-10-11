@@ -19,15 +19,14 @@ import {
     MarkdownString,
     Position,
     Range,
-    Selection,
     TextDocument,
-    TextEditorRevealType,
     Uri,
     window,
     workspace,
 } from 'vscode';
 
-import { escapeRegex } from '../common/execUtils';
+import { PixiExtensionApi } from '../api';
+import { escapeRegex, revealRangeInEditor } from '../common/execUtils';
 import { normalizePkgName } from '../core/packageManager';
 import { PixiProjectManager } from '../core/projectManager';
 import { PixiPackage } from '../core/types';
@@ -69,17 +68,7 @@ async function getLockfileLines(lockPath: string): Promise<string[] | undefined>
     }
 }
 
-/**
- * Finds the line index of a package in pixi.lock.
- * Prioritizes the detailed package record under top-level 'packages:',
- * then falls back to environment package list.
- */
-export async function findPackageLineInLockfile(lockPath: string, pkgName: string): Promise<number> {
-    const lines = await getLockfileLines(lockPath);
-    if (!lines) {
-        return -1;
-    }
-
+function findPackageLineInLines(lines: string[], pkgName: string): number {
     const namePattern = escapeRegex(pkgName).replace(/[-_]/g, '[-_]');
 
     const regCondaOrPypi = new RegExp(
@@ -108,20 +97,12 @@ export async function findPackageLineInLockfile(lockPath: string, pkgName: strin
     return -1;
 }
 
-/**
- * Fast in-memory resolution of locked package version directly from pixi.lock.
- */
-export async function getLockedPackageVersion(lockPath: string, pkgName: string): Promise<string | undefined> {
-    const lineIndex = await findPackageLineInLockfile(lockPath, pkgName);
-    if (lineIndex < 0) {
-        return undefined;
-    }
-    const lines = await getLockfileLines(lockPath);
-    if (!lines || lineIndex >= lines.length) {
+function getLockedVersionFromLines(lines: string[], pkgName: string): string | undefined {
+    const lineIndex = findPackageLineInLines(lines, pkgName);
+    if (lineIndex < 0 || lineIndex >= lines.length) {
         return undefined;
     }
     const targetLine = lines[lineIndex];
-
     const namePattern = escapeRegex(pkgName).replace(/[-_]/g, '[-_]');
 
     const urlMatch = targetLine.match(
@@ -146,6 +127,16 @@ export async function getLockedPackageVersion(lockPath: string, pkgName: string)
     }
 
     return undefined;
+}
+
+/**
+ * Finds the line index of a package in pixi.lock.
+ * Prioritizes the detailed package record under top-level 'packages:',
+ * then falls back to environment package list.
+ */
+async function findPackageLineInLockfile(lockPath: string, pkgName: string): Promise<number> {
+    const lines = await getLockfileLines(lockPath);
+    return lines ? findPackageLineInLines(lines, pkgName) : -1;
 }
 
 /**
@@ -184,7 +175,10 @@ export class PixiDependencyManifestProvider
     public readonly onDidChangeInlayHints: Event<void> = this._onDidChangeInlayHints.event;
     private readonly disposables: Disposable[] = [];
 
-    constructor(private readonly projectManager: PixiProjectManager) {
+    constructor(
+        private readonly projectManager: PixiProjectManager,
+        pixiApi?: PixiExtensionApi,
+    ) {
         const selectors: DocumentFilter[] = [
             { scheme: 'file', pattern: '**/pixi.toml' },
             { scheme: 'file', pattern: '**/pyproject.toml' },
@@ -205,6 +199,9 @@ export class PixiDependencyManifestProvider
                 }
             }),
         );
+        if (pixiApi) {
+            this.disposables.push(pixiApi.onDidChangeActiveEnvironment(() => this.refresh()));
+        }
 
         this.disposables.push(
             commands.registerCommand(
@@ -275,10 +272,7 @@ export class PixiDependencyManifestProvider
                     const nameStart = rawLine.indexOf(pkgName);
                     const nameEnd = nameStart + pkgName.length;
                     const nameRange = new Range(lineIndex, nameStart, lineIndex, nameEnd);
-                    const valEnd =
-                        commentIdx !== -1
-                            ? rawLine.substring(0, commentIdx).trimEnd().length
-                            : rawLine.trimEnd().length;
+                    const valEnd = codeLine.length;
                     const valueRange = new Range(lineIndex, nameEnd, lineIndex, valEnd);
                     const insertPosition = new Position(lineIndex, valEnd);
                     const requestedSpec = trimmed.replace(/^["']|["'],?$/g, '').trim();
@@ -308,10 +302,7 @@ export class PixiDependencyManifestProvider
                     const eqIndex = rawLine.indexOf('=');
                     const afterEq = rawLine.substring(eqIndex + 1);
                     const valStart = eqIndex + 1 + (afterEq.length - afterEq.trimStart().length);
-                    const valEnd =
-                        commentIdx !== -1
-                            ? rawLine.substring(0, commentIdx).trimEnd().length
-                            : rawLine.trimEnd().length;
+                    const valEnd = codeLine.length;
                     const valueRange = new Range(lineIndex, valStart, lineIndex, valEnd);
                     const insertPosition = new Position(lineIndex, valEnd);
                     const rawVal = rawLine.substring(valStart, valEnd).trim();
@@ -401,10 +392,11 @@ export class PixiDependencyManifestProvider
         if (missingDeps.length > 0 && !token.isCancellationRequested) {
             // Fast in-memory path: check pixi.lock directly without spawning child processes
             const lockPath = path.join(projectPath, 'pixi.lock');
+            const lockLines = await getLockfileLines(lockPath);
             const stillMissing: ParsedDependency[] = [];
 
             for (const dep of missingDeps) {
-                const lockedVer = await getLockedPackageVersion(lockPath, dep.name);
+                const lockedVer = lockLines ? getLockedVersionFromLines(lockLines, dep.name) : undefined;
                 if (lockedVer) {
                     hints.push(this.createInlayHint(dep, { version: lockedVer } as PixiPackage));
                 } else {
@@ -664,9 +656,7 @@ export class PixiDependencyManifestProvider
             if (packageName) {
                 const targetLine = await findPackageLineInLockfile(lockPath, packageName);
                 if (targetLine >= 0) {
-                    const pos = new Position(targetLine, 0);
-                    editor.selection = new Selection(pos, pos);
-                    editor.revealRange(new Range(pos, pos), TextEditorRevealType.InCenter);
+                    revealRangeInEditor(editor, targetLine, 0, 0);
                 }
             }
         } catch (error) {

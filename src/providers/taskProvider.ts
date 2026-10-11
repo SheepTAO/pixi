@@ -18,11 +18,11 @@ import {
 } from 'vscode';
 
 import { getPixi, runPixi } from '../cli/pixiCli';
+import { toEnvQuickPickItem } from '../commands/workspace/common';
 import { safeJsonParse } from '../common/execUtils';
 import { traceError, traceVerbose } from '../common/logging';
-import { getEnvironmentStatusBadge, promptToInstallEnvironment } from '../core/environmentRules';
+import { promptToInstallEnvironment } from '../core/environmentRules';
 import { PixiProjectManager } from '../core/projectManager';
-import { PixiEnvironmentInfo } from '../core/types';
 
 export interface PixiTaskDefinition extends TaskDefinition {
     type: 'pixi';
@@ -378,22 +378,9 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
         }
 
         const envs = this.projectManager.getEnvironmentsForProject(selectedTask.projectPath);
-        interface TaskEnvItem extends QuickPickItem {
-            envName: string;
-            pixiEnv?: PixiEnvironmentInfo;
-        }
-
-        const envItems: TaskEnvItem[] =
+        const envItems =
             envs.length > 0
-                ? envs.map((e) => {
-                      const { icon, text } = getEnvironmentStatusBadge(e.pixiStatus);
-                      return {
-                          label: `${icon} ${e.pixiEnvName}`,
-                          description: text,
-                          envName: e.pixiEnvName,
-                          pixiEnv: e,
-                      };
-                  })
+                ? envs.map(toEnvQuickPickItem)
                 : [
                       {
                           label: '$(globe) default',

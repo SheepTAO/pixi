@@ -19,13 +19,6 @@ import { PixiProjectManager } from '../core/projectManager';
 import { PixiEnvironmentInfo, PixiPackage, PixiProject } from '../core/types';
 
 export class PixiProjectTreeItem extends TreeItem {
-    get projectPath(): string {
-        return this.project.projectPath;
-    }
-    get manifestPath(): string {
-        return this.project.manifestPath;
-    }
-
     constructor(public readonly project: PixiProject) {
         super(project.name, TreeItemCollapsibleState.Expanded);
         this.description = path.basename(project.manifestPath);
@@ -36,16 +29,6 @@ export class PixiProjectTreeItem extends TreeItem {
 }
 
 export class PixiTransitiveGroupTreeItem extends TreeItem {
-    get projectPath(): string {
-        return this.project.projectPath;
-    }
-    get manifestPath(): string {
-        return this.project.manifestPath;
-    }
-    get pixiEnvName(): string {
-        return this.env.pixiEnvName;
-    }
-
     constructor(
         public readonly packages: PixiPackage[],
         public readonly env: PixiEnvironmentInfo,
@@ -62,27 +45,11 @@ export class PixiTransitiveGroupTreeItem extends TreeItem {
 }
 
 export class PixiPackageTreeItem extends TreeItem {
-    get projectPath(): string {
-        return this.project.projectPath;
-    }
-    get manifestPath(): string {
-        return this.project.manifestPath;
-    }
-    get pixiEnvName(): string {
-        return this.env.pixiEnvName;
-    }
-    get featureName(): string | undefined {
-        return this._featureName;
-    }
-    get name(): string {
-        return this.pkg.name;
-    }
-
     constructor(
         public readonly pkg: PixiPackage,
         public readonly env: PixiEnvironmentInfo,
         public readonly project: PixiProject,
-        private readonly _featureName?: string,
+        public readonly featureName?: string,
     ) {
         super(pkg.name, TreeItemCollapsibleState.None);
         const versionStr = pkg.version ? ` v${pkg.version}` : '';
@@ -102,8 +69,8 @@ export class PixiPackageTreeItem extends TreeItem {
             `${pkg.name}${versionStr}`,
             `Kind: ${pkg.kind ? pkg.kind.toUpperCase() : 'Conda'}${pkg.is_explicit ? ' (explicit dependency)' : ' (transitive dependency)'}`,
         ];
-        if (this._featureName) {
-            lines.push(`Feature: ${this._featureName}`);
+        if (this.featureName) {
+            lines.push(`Feature: ${this.featureName}`);
         }
         if (pkg.is_editable || pkg.is_local) {
             lines.push(`Type: Local ${pkg.is_editable ? 'Editable ' : ''}Subpackage`);
@@ -134,16 +101,6 @@ export class PixiPackageTreeItem extends TreeItem {
 }
 
 export class PixiEmptyTreeItem extends TreeItem {
-    get projectPath(): string | undefined {
-        return this.project?.projectPath || this.env?.projectPath;
-    }
-    get manifestPath(): string | undefined {
-        return this.project?.manifestPath;
-    }
-    get pixiEnvName(): string | undefined {
-        return this.env?.pixiEnvName;
-    }
-
     constructor(
         message: string,
         public readonly project?: PixiProject,
@@ -164,16 +121,6 @@ export class PixiEmptyTreeItem extends TreeItem {
 }
 
 export class PixiEnvironmentTreeItem extends TreeItem {
-    get projectPath(): string {
-        return this.project.projectPath;
-    }
-    get manifestPath(): string {
-        return this.project.manifestPath;
-    }
-    get pixiEnvName(): string {
-        return this.env.pixiEnvName;
-    }
-
     constructor(
         public readonly env: PixiEnvironmentInfo,
         public readonly project: PixiProject,
@@ -301,16 +248,6 @@ export class PixiEnvironmentTreeItem extends TreeItem {
 }
 
 export class PixiFeatureTreeItem extends TreeItem {
-    get projectPath(): string {
-        return this.project.projectPath;
-    }
-    get manifestPath(): string {
-        return this.project.manifestPath;
-    }
-    get featureName(): string {
-        return this.feature.name;
-    }
-
     constructor(
         public readonly feature: WorkspaceListEntry,
         public readonly project: PixiProject,
@@ -344,18 +281,6 @@ export class PixiFeatureTreeItem extends TreeItem {
 }
 
 export class PixiDeclaredPackageTreeItem extends TreeItem {
-    get projectPath(): string {
-        return this.project.projectPath;
-    }
-    get manifestPath(): string {
-        return this.project.manifestPath;
-    }
-    get name(): string {
-        return this.pkgName;
-    }
-    get featureName(): string {
-        return this.feature.name;
-    }
     get pkg(): { name: string; kind: 'conda' | 'pypi' } {
         return { name: this.pkgName, kind: this.kind };
     }
@@ -376,35 +301,19 @@ export class PixiDeclaredPackageTreeItem extends TreeItem {
 }
 
 export class PixiEnvFeatureGroupTreeItem extends TreeItem {
-    get projectPath(): string {
-        return this.project.projectPath;
-    }
-    get manifestPath(): string {
-        return this.project.manifestPath;
-    }
-    get envName(): string {
-        return this.env.pixiEnvName;
-    }
-    get featureName(): string {
-        return this.groupName;
-    }
-    get feature(): { name: string } {
-        return { name: this.groupName };
-    }
-
     constructor(
-        public readonly groupName: string,
+        public readonly featureName: string,
         public readonly packages: PixiPackage[],
         public readonly env: PixiEnvironmentInfo,
         public readonly project: PixiProject,
         public readonly isDefault: boolean = false,
     ) {
-        super(groupName, packages.length > 0 ? TreeItemCollapsibleState.Expanded : TreeItemCollapsibleState.None);
+        super(featureName, packages.length > 0 ? TreeItemCollapsibleState.Expanded : TreeItemCollapsibleState.None);
         this.description = `(${packages.length})`;
         this.iconPath = new ThemeIcon('symbol-namespace');
         this.tooltip = isDefault
-            ? `Global Feature '${groupName}': ${packages.length} package(s) in environment '${env.pixiEnvName}'`
-            : `Feature '${groupName}': ${packages.length} package(s) in environment '${env.pixiEnvName}'`;
+            ? `Global Feature '${featureName}': ${packages.length} package(s) in environment '${env.pixiEnvName}'`
+            : `Feature '${featureName}': ${packages.length} package(s) in environment '${env.pixiEnvName}'`;
         this.contextValue = isDefault ? 'pixiEnvFeatureDefault' : 'pixiEnvFeatureGroup';
     }
 }
@@ -512,6 +421,12 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
         return envs.map((e) => new PixiEnvironmentTreeItem(e, project, envFeaturesMap.get(e.pixiEnvName)));
     }
 
+    private getProjectChildren(project: PixiProject): Promise<PixiProjectsTreeItem[]> {
+        return this.currentViewMode === 'feature'
+            ? this.getFeatureItemsForProject(project)
+            : this.getEnvironmentItemsForProject(project);
+    }
+
     public async getChildren(element?: PixiProjectsTreeItem): Promise<PixiProjectsTreeItem[]> {
         const projects = this.projectManager.getProjects();
 
@@ -520,18 +435,13 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
                 return [];
             }
             if (projects.length === 1) {
-                const singleProject = projects[0];
-                return this.currentViewMode === 'feature'
-                    ? this.getFeatureItemsForProject(singleProject)
-                    : this.getEnvironmentItemsForProject(singleProject);
+                return this.getProjectChildren(projects[0]);
             }
             return projects.map((p) => new PixiProjectTreeItem(p));
         }
 
         if (element instanceof PixiProjectTreeItem) {
-            return this.currentViewMode === 'feature'
-                ? this.getFeatureItemsForProject(element.project)
-                : this.getEnvironmentItemsForProject(element.project);
+            return this.getProjectChildren(element.project);
         }
 
         if (element instanceof PixiFeatureTreeItem) {
@@ -553,7 +463,7 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
                 return [new PixiEmptyTreeItem('No packages found in this feature', element.project, element.env)];
             }
             return element.packages.map(
-                (pkg) => new PixiPackageTreeItem(pkg, element.env, element.project, element.groupName),
+                (pkg) => new PixiPackageTreeItem(pkg, element.env, element.project, element.featureName),
             );
         }
 

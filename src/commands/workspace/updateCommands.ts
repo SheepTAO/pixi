@@ -104,10 +104,12 @@ export function parseDryRunOutput(jsonStr: string): DryRunPackageChange[] {
                     continue;
                 }
                 const isPypi = p.type === 'pypi';
-                const beforeVer = isPypi ? p.before?.version : parseCondaInfo(p.before?.conda, p.name).version;
-                const afterVer = isPypi ? p.after?.version : parseCondaInfo(p.after?.conda, p.name).version;
-                const beforeBuild = !isPypi ? parseCondaInfo(p.before?.conda, p.name).build : undefined;
-                const afterBuild = !isPypi ? parseCondaInfo(p.after?.conda, p.name).build : undefined;
+                const beforeConda = isPypi ? undefined : parseCondaInfo(p.before?.conda, p.name);
+                const afterConda = isPypi ? undefined : parseCondaInfo(p.after?.conda, p.name);
+                const beforeVer = isPypi ? p.before?.version : beforeConda?.version;
+                const afterVer = isPypi ? p.after?.version : afterConda?.version;
+                const beforeBuild = beforeConda?.build;
+                const afterBuild = afterConda?.build;
 
                 const existing = pkgMap.get(p.name);
                 if (!existing) {

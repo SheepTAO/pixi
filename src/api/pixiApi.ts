@@ -1,13 +1,10 @@
 import { Disposable, Event, EventEmitter, Uri } from 'vscode';
 
 import { getWorkspacePersistentState } from '../common/persistentState';
-import { getDefaultEnvironment, matchEnvironmentForUri } from '../core/environmentRules';
 import { PixiProjectManager } from '../core/projectManager';
 import { ActiveEnvironmentChangeEvent, PixiEnvironmentInfo, PixiExtensionApi, PixiPackage, PixiProject } from './types';
 
 export class PixiExtensionApiImpl implements PixiExtensionApi, Disposable {
-    private readonly activeEnvNames = new Map<string, string>(); // projectPath -> envName
-    private globalActiveEnvName?: string;
     private readonly disposables: Disposable[] = [];
 
     private readonly _onDidChangeActiveEnvironment = new EventEmitter<ActiveEnvironmentChangeEvent>();
@@ -21,39 +18,34 @@ export class PixiExtensionApiImpl implements PixiExtensionApi, Disposable {
         this.disposables.push(
             this._onDidChangeActiveEnvironment,
             this.projectManager.onDidProjectsChanged(() => {
-                this.loadSavedActiveEnvironments();
+                this.pruneSavedActiveEnvironments();
             }),
             this.projectManager.onDidChangeEnvironments(() => {
-                this.loadSavedActiveEnvironments();
+                this.pruneSavedActiveEnvironments();
             }),
         );
 
-        this.loadSavedActiveEnvironments();
+        this.pruneSavedActiveEnvironments();
     }
 
-    private loadSavedActiveEnvironments(): void {
+    private pruneSavedActiveEnvironments(): void {
         try {
             const storage = getWorkspacePersistentState();
             for (const projectPath of this.projectManager.getProjectPaths()) {
-                const savedEnv = storage.get<string>(`projectEnvName:${projectPath}`);
+                const key = `projectEnvName:${projectPath}`;
+                const savedEnv = storage.get<string>(key);
                 if (savedEnv) {
                     const envs = this.projectManager.getEnvironmentsForProject(projectPath);
-                    if (envs.length === 0 || envs.some((e) => e.pixiEnvName === savedEnv)) {
-                        this.activeEnvNames.set(projectPath, savedEnv);
-                    } else {
-                        void storage.set(`projectEnvName:${projectPath}`, undefined);
-                        this.activeEnvNames.delete(projectPath);
+                    if (envs.length > 0 && !envs.some((e) => e.pixiEnvName === savedEnv)) {
+                        void storage.set(key, undefined);
                     }
                 }
             }
             const globalSaved = storage.get<string>('globalEnvName');
             if (globalSaved) {
                 const allEnvs = this.projectManager.getAllEnvironments();
-                if (allEnvs.length === 0 || allEnvs.some((e) => e.pixiEnvName === globalSaved)) {
-                    this.globalActiveEnvName = globalSaved;
-                } else {
+                if (allEnvs.length > 0 && !allEnvs.some((e) => e.pixiEnvName === globalSaved)) {
                     void storage.set('globalEnvName', undefined);
-                    this.globalActiveEnvName = undefined;
                 }
             }
         } catch {
@@ -86,41 +78,7 @@ export class PixiExtensionApiImpl implements PixiExtensionApi, Disposable {
     }
 
     public getEnvironmentForUri(uri: Uri): PixiEnvironmentInfo | undefined {
-        const projectPath = this.projectManager.findProjectForUri(uri);
-        if (!projectPath) {
-            return undefined;
-        }
-
-        const envs = this.projectManager.getEnvironmentsForProject(projectPath);
-        if (envs.length === 0) {
-            return undefined;
-        }
-        if (envs.length === 1) {
-            return envs[0];
-        }
-
-        // 1. Check file-level environment rules
-        const matched = matchEnvironmentForUri(uri, projectPath, envs);
-        if (matched) {
-            return matched;
-        }
-
-        // 2. Fallback to active or default environment for this project
-        return this.resolveProjectActiveOrDefault(projectPath, envs);
-    }
-
-    private resolveProjectActiveOrDefault(
-        projectPath: string,
-        envs: PixiEnvironmentInfo[],
-    ): PixiEnvironmentInfo | undefined {
-        const activeName = this.activeEnvNames.get(projectPath);
-        if (activeName) {
-            const match = envs.find((e) => e.pixiEnvName === activeName);
-            if (match) {
-                return match;
-            }
-        }
-        return getDefaultEnvironment(envs);
+        return this.projectManager.getEnvironmentForUri(uri);
     }
 
     public async refresh(scope?: Uri): Promise<void> {
@@ -136,92 +94,58 @@ export class PixiExtensionApiImpl implements PixiExtensionApi, Disposable {
         }
 
         // Global or first project default
-        if (this.globalActiveEnvName) {
-            const allEnvs = this.projectManager.getAllEnvironments();
-            const match = allEnvs.find((e) => e.pixiEnvName === this.globalActiveEnvName);
-            if (match) {
-                return match;
+        try {
+            const globalActiveEnvName = getWorkspacePersistentState().get<string>('globalEnvName');
+            if (globalActiveEnvName) {
+                const allEnvs = this.projectManager.getAllEnvironments();
+                const match = allEnvs.find((e) => e.pixiEnvName === globalActiveEnvName);
+                if (match) {
+                    return match;
+                }
             }
+        } catch {
+            // ignore
         }
 
         const projects = this.projectManager.getProjects();
         if (projects.length > 0) {
-            const projectPath = projects[0].projectPath;
-            const envs = this.projectManager.getEnvironmentsForProject(projectPath);
-            return this.resolveProjectActiveOrDefault(projectPath, envs);
+            return this.projectManager.resolveProjectActiveOrDefault(projects[0].projectPath);
         }
 
         return undefined;
     }
 
     public async setActiveEnvironment(scope: Uri | undefined, envName?: string): Promise<boolean> {
-        let projectPath: string | undefined;
-        if (scope) {
-            projectPath = this.projectManager.findProjectForUri(scope);
-        }
-
-        if (!projectPath) {
-            const projects = this.projectManager.getProjects();
-            if (projects.length > 0) {
-                projectPath = projects[0].projectPath;
-            }
-        }
+        const projectPath =
+            (scope ? this.projectManager.findProjectForUri(scope) : undefined) ??
+            this.projectManager.getProjects()[0]?.projectPath;
 
         const storage = getWorkspacePersistentState();
+        const storageKey = projectPath ? `projectEnvName:${projectPath}` : 'globalEnvName';
+        const current = storage.get<string>(storageKey);
 
-        if (projectPath) {
-            if (!envName) {
-                if (!this.activeEnvNames.has(projectPath)) {
-                    return true;
-                }
-                this.activeEnvNames.delete(projectPath);
-                await storage.set(`projectEnvName:${projectPath}`, undefined);
-                this._onDidChangeActiveEnvironment.fire({ scope, environment: undefined });
-                return true;
-            }
-
-            const envs = this.projectManager.getEnvironmentsForProject(projectPath);
-            const targetEnv = envs.find((e) => e.pixiEnvName === envName);
-            if (!targetEnv) {
-                return false;
-            }
-
-            const current = this.activeEnvNames.get(projectPath);
-            if (current === envName) {
-                return true;
-            }
-
-            this.activeEnvNames.set(projectPath, envName);
-            await storage.set(`projectEnvName:${projectPath}`, envName);
-
-            this._onDidChangeActiveEnvironment.fire({ scope, environment: targetEnv });
-            return true;
-        }
-
-        // Global fallback
         if (!envName) {
-            if (!this.globalActiveEnvName) {
+            if (!current) {
                 return true;
             }
-            this.globalActiveEnvName = undefined;
-            await storage.set('globalEnvName', undefined);
+            await storage.set(storageKey, undefined);
             this._onDidChangeActiveEnvironment.fire({ scope, environment: undefined });
             return true;
         }
 
-        const allEnvs = this.projectManager.getAllEnvironments();
-        const targetEnv = allEnvs.find((e) => e.pixiEnvName === envName);
+        const candidateEnvs = projectPath
+            ? this.projectManager.getEnvironmentsForProject(projectPath)
+            : this.projectManager.getAllEnvironments();
+        const targetEnv = candidateEnvs.find((e) => e.pixiEnvName === envName);
         if (!targetEnv) {
             return false;
         }
 
-        if (this.globalActiveEnvName === envName) {
+        if (current === envName) {
             return true;
         }
 
-        this.globalActiveEnvName = envName;
-        await storage.set('globalEnvName', envName);
-
+        await storage.set(storageKey, envName);
         this._onDidChangeActiveEnvironment.fire({ scope, environment: targetEnv });
         return true;
     }
