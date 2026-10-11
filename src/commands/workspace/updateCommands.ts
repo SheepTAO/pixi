@@ -220,11 +220,7 @@ async function handleCheckOutdated(
 
     const displayChanges = allExplicitSet.size > 0 ? explicitChanges : changes;
     if (displayChanges.length === 0) {
-        window.showInformationMessage(
-            changes.length > 0
-                ? `All manifest dependencies in ${projectName} (${envLabel}) are up to date!`
-                : `All dependencies in ${projectName} (${envLabel}) are up to date!`,
-        );
+        window.showInformationMessage(`All manifest dependencies in ${projectName} (${envLabel}) are up to date!`);
         return;
     }
 
@@ -309,7 +305,7 @@ async function handleCheckOutdated(
             ? `Update package '${selectedPkgNames[0]}' in ${projectName}${targetEnv ? ` (${targetEnv})` : ''}?`
             : `Update ${selectedPkgNames.length} selected packages in ${projectName}${targetEnv ? ` (${targetEnv})` : ''}?`;
 
-    const confirm = await window.showInformationMessage(confirmMsg, { modal: true }, 'Update Now');
+    const confirm = await window.showInformationMessage(confirmMsg, 'Update Now');
     if (confirm !== 'Update Now') {
         return;
     }
@@ -358,11 +354,9 @@ async function handleUpgradeDependencies(
     projectPath: string,
     projectName: string,
 ): Promise<void> {
-    const warning =
-        `Upgrade dependencies will loosen and bump version constraints in manifest (pixi.toml / pyproject.toml) to latest available versions.` +
-        `\n\nAre you sure you want to proceed for ${projectName}?`;
+    const warning = `Upgrade dependencies in ${projectName}? This will loosen and bump version constraints in the manifest to the latest available versions.`;
 
-    const confirmed = await window.showWarningMessage(warning, { modal: true }, 'Upgrade Manifest');
+    const confirmed = await window.showWarningMessage(warning, 'Upgrade Manifest');
     if (confirmed !== 'Upgrade Manifest') {
         return;
     }

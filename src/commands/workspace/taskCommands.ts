@@ -391,7 +391,6 @@ export function registerTaskCommands(manager: PixiProjectManager, taskProvider: 
 
             const confirmation = await window.showWarningMessage(
                 `Are you sure you want to remove task '${targetTask.name}' from ${projectName}?`,
-                { modal: true },
                 'Remove Task',
             );
             if (confirmation !== 'Remove Task') {
@@ -399,8 +398,10 @@ export function registerTaskCommands(manager: PixiProjectManager, taskProvider: 
             }
 
             const args = ['task', 'remove'];
-            if (targetTask.default_environment && targetTask.default_environment !== 'default') {
-                args.push('--environment', targetTask.default_environment);
+            if (targetTask.inline_environment) {
+                args.push('--environment', targetTask.inline_environment);
+            } else if (targetTask.feature) {
+                args.push('--feature', targetTask.feature);
             }
             args.push(targetTask.name);
 

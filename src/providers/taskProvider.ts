@@ -37,6 +37,8 @@ export interface PixiTask {
     cmd?: string;
     description?: string;
     default_environment?: string;
+    feature?: string;
+    inline_environment?: string;
     depends_on?: Array<{ task_name: string }>;
     inputs?: string[];
     outputs?: string[];
@@ -188,43 +190,55 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
         try {
             const raw = safeJsonParse<RawPixiTaskEnvironment[]>(jsonStr, []);
 
-            const normalizeTask = (t: RawPixiTask, fallbackEnv?: string): PixiTask => ({
-                name: t.name!,
-                cmd: typeof t.cmd === 'string' ? t.cmd : Array.isArray(t.cmd) ? t.cmd.join(' ') : undefined,
-                description: t.description || undefined,
-                default_environment: t.default_environment || fallbackEnv,
-                depends_on: Array.isArray(t.depends_on) && t.depends_on.length > 0 ? t.depends_on : undefined,
-                inputs: Array.isArray(t.inputs) && t.inputs.length > 0 ? t.inputs : undefined,
-                outputs: Array.isArray(t.outputs) && t.outputs.length > 0 ? t.outputs : undefined,
-                clean_env: typeof t.clean_env === 'boolean' ? t.clean_env : undefined,
-                projectPath,
-            });
-
-            const registerTask = (t: RawPixiTask, fallbackEnv?: string) => {
+            const registerTask = (
+                t: RawPixiTask,
+                scope: { fallbackEnv?: string; feature?: string; inlineEnv?: string },
+            ) => {
                 if (!t || !t.name) {
                     return;
                 }
                 const existing = taskMap.get(t.name);
                 if (!existing) {
-                    taskMap.set(t.name, normalizeTask(t, fallbackEnv));
-                } else if (!existing.default_environment && fallbackEnv) {
-                    existing.default_environment = fallbackEnv;
+                    taskMap.set(t.name, {
+                        name: t.name,
+                        cmd: typeof t.cmd === 'string' ? t.cmd : Array.isArray(t.cmd) ? t.cmd.join(' ') : undefined,
+                        description: t.description || undefined,
+                        default_environment: t.default_environment || scope.fallbackEnv,
+                        feature: scope.feature,
+                        inline_environment: scope.inlineEnv,
+                        depends_on: Array.isArray(t.depends_on) && t.depends_on.length > 0 ? t.depends_on : undefined,
+                        inputs: Array.isArray(t.inputs) && t.inputs.length > 0 ? t.inputs : undefined,
+                        outputs: Array.isArray(t.outputs) && t.outputs.length > 0 ? t.outputs : undefined,
+                        clean_env: typeof t.clean_env === 'boolean' ? t.clean_env : undefined,
+                        projectPath,
+                    });
+                } else {
+                    if (!existing.default_environment && scope.fallbackEnv) {
+                        existing.default_environment = scope.fallbackEnv;
+                    }
+                    if (!existing.feature && scope.feature) {
+                        existing.feature = scope.feature;
+                    }
+                    if (!existing.inline_environment && scope.inlineEnv) {
+                        existing.inline_environment = scope.inlineEnv;
+                    }
                 }
             };
 
             for (const envObj of raw) {
+                const envName = envObj.environment && envObj.environment !== 'default' ? envObj.environment : undefined;
+
                 // 1. Inline environment tasks ([environments.<env>.tasks])
-                const inlineEnv =
-                    envObj.environment && envObj.environment !== 'default' ? envObj.environment : undefined;
                 for (const t of envObj.tasks ?? []) {
-                    registerTask(t, inlineEnv);
+                    registerTask(t, { fallbackEnv: envName, inlineEnv: envName });
                 }
 
                 // 2. Feature tasks ([tasks] under default feature, or [feature.<name>.tasks])
                 for (const f of envObj.features ?? []) {
-                    const featureEnv = f.name && f.name !== 'default' ? f.name : undefined;
+                    const featureName = f.name && f.name !== 'default' ? f.name : undefined;
+                    const fallbackEnv = featureName ? envName || featureName : undefined;
                     for (const t of f.tasks ?? []) {
-                        registerTask(t, featureEnv);
+                        registerTask(t, { fallbackEnv, feature: featureName });
                     }
                 }
             }

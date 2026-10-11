@@ -474,7 +474,6 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
 
                 const confirmed = await window.showWarningMessage(
                     `Clean the installed '${targetEnv.envName}' environment on disk for ${projectName}?`,
-                    { modal: true },
                     'Clean Environment',
                 );
                 if (confirmed !== 'Clean Environment') {
@@ -501,7 +500,6 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
 
             const confirmed = await window.showWarningMessage(
                 `Are you sure you want to clean all installed Pixi environments in ${projectName}? (The .pixi directory will be removed)`,
-                { modal: true },
                 'Clean All',
             );
             if (confirmed !== 'Clean All') {
@@ -991,7 +989,6 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
             if (referencingEnvs.length > 0) {
                 const choice = await window.showWarningMessage(
                     `Feature '${featureName}' is referenced by environment(s): ${referencingEnvs.join(', ')}. Removing it will remove it from the project manifest. Do you want to proceed?`,
-                    { modal: true },
                     'Remove Feature',
                 );
                 if (choice !== 'Remove Feature') {

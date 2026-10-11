@@ -114,7 +114,9 @@ export async function runPixi(args: string[], options?: PixiRunOptions, token?: 
     });
     proc.on('close', () => {
         cancelDisposable?.dispose();
-        if (exitCode !== 0) {
+        const isSilentTaskRemoveFailure =
+            exitCode === 0 && args[0] === 'task' && args[1] === 'remove' && stderr.includes('does not exist');
+        if (exitCode !== 0 || isSilentTaskRemoveFailure) {
             traceError(`Failed to run "pixi ${args.join(' ')}":\n${stderr}`);
             deferred.reject(new Error(`Failed to run "pixi ${args.join(' ')}":\n ${stderr}`));
         } else {
