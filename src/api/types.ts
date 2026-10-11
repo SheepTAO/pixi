@@ -1,17 +1,6 @@
 import { Event, Uri } from 'vscode';
 
-import {
-    CppToolchainInfo,
-    EnvironmentToolchains,
-    PixiEnvironmentInfo,
-    PixiEnvironmentPlatform,
-    PixiEnvironmentStatus,
-    PixiPackage,
-    PixiProject,
-    PythonToolchainInfo,
-    RToolchainInfo,
-    RustToolchainInfo,
-} from '../core/types';
+import { PixiEnvironmentInfo, PixiPackage, PixiProject } from '../core/types';
 
 export {
     CppToolchainInfo,
@@ -24,7 +13,7 @@ export {
     PythonToolchainInfo,
     RToolchainInfo,
     RustToolchainInfo,
-};
+} from '../core/types';
 
 export interface ActiveEnvironmentChangeEvent {
     scope?: Uri;

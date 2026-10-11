@@ -8,17 +8,12 @@ import { registerPackageCommands } from './packageCommands';
 import { registerTaskCommands } from './taskCommands';
 import { registerUpdateCommands } from './updateCommands';
 
-export function registerWorkspaceCommands(manager: PixiProjectManager, taskProvider?: PixiTaskProvider): Disposable {
-    const disposables: Disposable[] = [
+export function registerWorkspaceCommands(manager: PixiProjectManager, taskProvider: PixiTaskProvider): Disposable {
+    return Disposable.from(
         ...registerEnvironmentCommands(manager),
         ...registerPackageCommands(manager),
         ...registerChannelCommands(manager),
         ...registerUpdateCommands(manager),
-    ];
-
-    if (taskProvider) {
-        disposables.push(...registerTaskCommands(manager, taskProvider));
-    }
-
-    return Disposable.from(...disposables);
+        ...registerTaskCommands(manager, taskProvider),
+    );
 }

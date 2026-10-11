@@ -3,7 +3,6 @@ import {
     Disposable,
     Event,
     EventEmitter,
-    LogOutputChannel,
     QuickPickItem,
     ShellExecution,
     Task,
@@ -82,18 +81,11 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
     private readonly _onDidChangeTasks = new EventEmitter<void>();
     readonly onDidChangeTasks: Event<void> = this._onDidChangeTasks.event;
 
-    constructor(
-        private readonly projectManager: PixiProjectManager,
-        public readonly log?: LogOutputChannel,
-    ) {
-        // Invalidate cache when manifest files change
-        const watcher = workspace.createFileSystemWatcher('{pixi.toml,pyproject.toml}');
-        watcher.onDidChange(() => this.refresh(), this, this.disposables);
-        watcher.onDidCreate(() => this.refresh(), this, this.disposables);
-        watcher.onDidDelete(() => this.refresh(), this, this.disposables);
-        this.disposables.push(watcher);
-
-        this.disposables.push(tasks.registerTaskProvider('pixi', this));
+    constructor(private readonly projectManager: PixiProjectManager) {
+        this.disposables.push(
+            this.projectManager.onDidChangeEnvironments(() => this.refresh()),
+            tasks.registerTaskProvider('pixi', this),
+        );
     }
 
     public refresh(projectPath?: string): void {

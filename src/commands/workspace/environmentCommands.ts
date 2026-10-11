@@ -41,6 +41,31 @@ async function pickInstallableEnvironment(
     return pick?.envName;
 }
 
+async function runSingleEnvironmentInstallCommand(
+    manager: PixiProjectManager,
+    action: 'install' | 'reinstall',
+    targetItem?: unknown,
+    presetEnv?: string,
+): Promise<void> {
+    const targetCommand = action === 'reinstall' ? 'pixi.reinstall' : 'pixi.install';
+    const envName = (typeof presetEnv === 'string' && presetEnv.trim()) || extractEnvironmentName(targetItem);
+    if (envName) {
+        await commands.executeCommand(targetCommand, targetItem, envName);
+        return;
+    }
+
+    const projectPath = await pickPixiProject(manager, `Select Pixi project to ${action} environment for`, targetItem);
+    if (!projectPath) {
+        return;
+    }
+
+    const title = action === 'reinstall' ? 'Pixi: Reinstall Environment' : 'Pixi: Install Environment';
+    const pickedEnv = await pickInstallableEnvironment(manager, projectPath, title, `Select environment to ${action}`);
+    if (pickedEnv) {
+        await commands.executeCommand(targetCommand, Uri.file(projectPath), pickedEnv);
+    }
+}
+
 export function registerEnvironmentCommands(manager: PixiProjectManager): Disposable[] {
     return [
         // Pixi: Initialize Project...
@@ -487,30 +512,9 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
         }),
 
         // Pixi: Install Environment (Single Environment)
-        commands.registerCommand('pixi.installEnvironment', async (targetItem?: unknown, presetEnv?: string) => {
-            const envName = (typeof presetEnv === 'string' && presetEnv.trim()) || extractEnvironmentName(targetItem);
-            if (envName) {
-                await commands.executeCommand('pixi.install', targetItem, envName);
-                return;
-            }
-            const projectPath = await pickPixiProject(
-                manager,
-                'Select Pixi project to install environment for',
-                targetItem,
-            );
-            if (!projectPath) {
-                return;
-            }
-            const pickedEnv = await pickInstallableEnvironment(
-                manager,
-                projectPath,
-                'Pixi: Install Environment',
-                'Select environment to install',
-            );
-            if (pickedEnv) {
-                await commands.executeCommand('pixi.install', Uri.file(projectPath), pickedEnv);
-            }
-        }),
+        commands.registerCommand('pixi.installEnvironment', (targetItem?: unknown, presetEnv?: string) =>
+            runSingleEnvironmentInstallCommand(manager, 'install', targetItem, presetEnv),
+        ),
 
         // Pixi: Install (Sync Environments)
         commands.registerCommand('pixi.install', async (targetItem?: unknown, envName?: string) => {
@@ -547,30 +551,9 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
         }),
 
         // Pixi: Reinstall Environment (Single Environment)
-        commands.registerCommand('pixi.reinstallEnvironment', async (targetItem?: unknown, presetEnv?: string) => {
-            const envName = (typeof presetEnv === 'string' && presetEnv.trim()) || extractEnvironmentName(targetItem);
-            if (envName) {
-                await commands.executeCommand('pixi.reinstall', targetItem, envName);
-                return;
-            }
-            const projectPath = await pickPixiProject(
-                manager,
-                'Select Pixi project to reinstall environment for',
-                targetItem,
-            );
-            if (!projectPath) {
-                return;
-            }
-            const pickedEnv = await pickInstallableEnvironment(
-                manager,
-                projectPath,
-                'Pixi: Reinstall Environment',
-                'Select environment to reinstall',
-            );
-            if (pickedEnv) {
-                await commands.executeCommand('pixi.reinstall', Uri.file(projectPath), pickedEnv);
-            }
-        }),
+        commands.registerCommand('pixi.reinstallEnvironment', (targetItem?: unknown, presetEnv?: string) =>
+            runSingleEnvironmentInstallCommand(manager, 'reinstall', targetItem, presetEnv),
+        ),
 
         // Pixi: Reinstall ...
         commands.registerCommand('pixi.reinstall', async (targetItem?: unknown, envName?: string) => {

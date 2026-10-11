@@ -532,36 +532,45 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
         }),
     );
 
+    async function resolveDeclaredPackageTarget(
+        targetItem: unknown,
+        projectPlaceHolder: string,
+        pickerOptions: { title: string; placeHolder: string; emptyWarning: string },
+    ): Promise<{ pkgName: string; manifestPath?: string } | undefined> {
+        const ctx = extractCommandContext(targetItem);
+        let { pkgName, projectPath } = ctx;
+
+        if (!pkgName) {
+            projectPath ||= await pickPixiProject(manager, projectPlaceHolder, targetItem);
+            if (!projectPath) {
+                return undefined;
+            }
+            const picked = await pickDeclaredPackage(projectPath, pickerOptions);
+            if (!picked) {
+                return undefined;
+            }
+            pkgName = picked.pkgName;
+        }
+
+        const manifestPath = ctx.manifestPath || (projectPath ? manager.getManifestPath(projectPath) : undefined);
+        return { pkgName, manifestPath };
+    }
+
     // Pixi: Reveal Package in Manifest (pixi.toml / pyproject.toml)
     disposables.push(
         commands.registerCommand('pixi.revealPackageInManifest', async (targetItem?: unknown) => {
-            const ctx = extractCommandContext(targetItem);
-            let pkgName = ctx.pkgName;
-            let projectPath = ctx.projectPath;
-            const manifestPath = ctx.manifestPath;
-
-            if (!projectPath) {
-                projectPath = await pickPixiProject(manager, 'Select Pixi project', targetItem);
-                if (!projectPath) {
-                    return;
-                }
-            }
-
-            if (!pkgName) {
-                const picked = await pickDeclaredPackage(projectPath, {
-                    title: 'Select Package to Reveal in Manifest',
-                    placeHolder: 'Select a declared package to jump to its definition',
-                    emptyWarning: 'No declared packages found to reveal in manifest.',
-                });
-                if (!picked) {
-                    return;
-                }
-                pkgName = picked.pkgName;
+            const target = await resolveDeclaredPackageTarget(targetItem, 'Select Pixi project', {
+                title: 'Select Package to Reveal in Manifest',
+                placeHolder: 'Select a declared package to jump to its definition',
+                emptyWarning: 'No declared packages found to reveal in manifest.',
+            });
+            if (!target) {
+                return;
             }
 
             await revealDefinitionInManifest({
-                manifestPath: manifestPath || manager.getManifestPath(projectPath),
-                targetName: pkgName,
+                manifestPath: target.manifestPath,
+                targetName: target.pkgName,
                 kind: 'package',
             });
         }),
@@ -570,31 +579,17 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
     // Pixi: Copy Package Name
     disposables.push(
         commands.registerCommand('pixi.copyPackageName', async (targetItem?: unknown) => {
-            const ctx = extractCommandContext(targetItem);
-            let pkgName = ctx.pkgName;
-
-            if (!pkgName) {
-                const projectPath = await pickPixiProject(
-                    manager,
-                    'Select Pixi project to copy package from',
-                    targetItem,
-                );
-                if (!projectPath) {
-                    return;
-                }
-                const picked = await pickDeclaredPackage(projectPath, {
-                    title: 'Select Package to Copy Name',
-                    placeHolder: 'Select a declared package to copy its name to clipboard',
-                    emptyWarning: 'No declared packages found in manifest.',
-                });
-                if (!picked) {
-                    return;
-                }
-                pkgName = picked.pkgName;
+            const target = await resolveDeclaredPackageTarget(targetItem, 'Select Pixi project to copy package from', {
+                title: 'Select Package to Copy Name',
+                placeHolder: 'Select a declared package to copy its name to clipboard',
+                emptyWarning: 'No declared packages found in manifest.',
+            });
+            if (!target) {
+                return;
             }
 
-            await vscodeEnv.clipboard.writeText(pkgName);
-            window.showInformationMessage(`Copied '${pkgName}' to clipboard.`);
+            await vscodeEnv.clipboard.writeText(target.pkgName);
+            window.showInformationMessage(`Copied '${target.pkgName}' to clipboard.`);
         }),
     );
 

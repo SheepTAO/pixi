@@ -116,14 +116,9 @@ export async function createPythonEnvironment(
     let statusDesc = 'pixi';
 
     if (status === 'installed') {
-        if (coreInfo.toolchains?.python) {
-            pythonExecutable = coreInfo.toolchains.python.executable;
-            pythonVersion = coreInfo.toolchains.python.version || '';
-        } else {
-            const py = await scanPythonToolchain(coreInfo.prefix);
-            pythonExecutable = py?.executable || '';
-            pythonVersion = py?.version || '';
-        }
+        const py = coreInfo.toolchains ? coreInfo.toolchains.python : await scanPythonToolchain(coreInfo.prefix);
+        pythonExecutable = py?.executable || '';
+        pythonVersion = py?.version || '';
         hasIpykernel = checkHasIpykernel(coreInfo.prefix);
 
         if (!pythonExecutable) {
@@ -192,14 +187,12 @@ export async function createPythonEnvironment(
             id: coreInfo.prefix,
             managerId: PIXI_MANAGER_ID,
         },
-        packages: [],
         pixiEnvName: coreInfo.pixiEnvName,
         pixiStatus: status,
         statusReason,
         projectPath: coreInfo.projectPath,
         projectName: coreInfo.projectName,
         manifestPath: coreInfo.manifestPath,
-        coreInfo,
         hasIpykernel,
     };
 }

@@ -137,10 +137,11 @@ export const MINIMUM_PIXI_VERSION = '0.53.0';
 export async function validatePixiCli(): Promise<boolean> {
     try {
         const stdout = await runPixi(['--version']);
+        const pixiBin = await getPixi();
         const versionMatch = stdout.trim().match(/pixi\s+([0-9]+\.[0-9]+\.[0-9]+[a-zA-Z0-9\-\.]*)/);
         const parsedVersion = semver.coerce(versionMatch ? versionMatch[1] : stdout.trim());
         if (!parsedVersion) {
-            window.showErrorMessage(`Found invalid Pixi binary at "${await getPixi()}".`);
+            window.showErrorMessage(`Found invalid Pixi binary at "${pixiBin}".`);
             return false;
         }
 
@@ -150,7 +151,7 @@ export async function validatePixiCli(): Promise<boolean> {
             );
             return false;
         }
-        traceInfo(`Pixi CLI: ${await getPixi()} (v${parsedVersion.version})`);
+        traceInfo(`Pixi CLI: ${pixiBin} (v${parsedVersion.version})`);
         return true;
     } catch (err) {
         traceError('Pixi validation failed:', err);
@@ -429,9 +430,7 @@ export async function searchPixiPackages(
     }
 
     const limited = combined.slice(0, 30);
-    if (searchCache.has(cacheKey)) {
-        searchCache.delete(cacheKey);
-    } else if (searchCache.size >= MAX_SEARCH_CACHE_SIZE) {
+    if (searchCache.size >= MAX_SEARCH_CACHE_SIZE) {
         const oldestKey = searchCache.keys().next().value;
         if (oldestKey !== undefined) {
             searchCache.delete(oldestKey);

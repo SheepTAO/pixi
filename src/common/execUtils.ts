@@ -36,7 +36,7 @@ export interface ExecutableCandidates {
  * Returns the absolute path to the first matching executable, or undefined if none are found.
  */
 export function findExecutable(baseDir: string, candidates: ExecutableCandidates): string | undefined {
-    const list = os.platform() === 'win32' ? candidates.win32 : candidates.posix;
+    const list = process.platform === 'win32' ? candidates.win32 : candidates.posix;
     for (const rel of list) {
         const fullPath = path.join(baseDir, rel);
         if (fs.existsSync(fullPath)) {
@@ -189,12 +189,9 @@ export async function revealDefinitionInManifest(options: RevealDefinitionOption
         const namePattern = kind === 'package' ? escapedName.replace(/[-_]/g, '[-_]') : escapedName;
 
         const keyRegex = new RegExp(`^\\s*["']?${namePattern}["']?\\s*=`, 'i');
-        const taskSectionRegex =
-            kind === 'task' ? new RegExp(`^\\s*\\[+.*tasks\\.(["']?)${escapedName}\\1\\]`, 'i') : undefined;
-        const featureSectionRegex =
-            kind === 'feature' ? new RegExp(`^\\s*\\[+.*features?\\.(["']?)${escapedName}\\1`, 'i') : undefined;
-        const pyprojectDepRegex =
-            kind === 'package' ? new RegExp(`["']${namePattern}(?:\\s*[\\[><=~!^;@]|["'])`, 'i') : undefined;
+        const taskSectionRegex = new RegExp(`^\\s*\\[+.*tasks\\.(["']?)${escapedName}\\1\\]`, 'i');
+        const featureSectionRegex = new RegExp(`^\\s*\\[+.*features?\\.(["']?)${escapedName}\\1`, 'i');
+        const pyprojectDepRegex = new RegExp(`["']${namePattern}(?:\\s*[\\[><=~!^;@]|["'])`, 'i');
 
         let targetLine = -1;
         let fallbackLine = -1;
@@ -208,7 +205,7 @@ export async function revealDefinitionInManifest(options: RevealDefinitionOption
             }
 
             if (kind === 'task') {
-                if (taskSectionRegex && taskSectionRegex.test(line)) {
+                if (taskSectionRegex.test(line)) {
                     targetLine = i;
                     break;
                 }
@@ -230,7 +227,7 @@ export async function revealDefinitionInManifest(options: RevealDefinitionOption
                         break;
                     }
                 } else {
-                    if (featureSectionRegex && featureSectionRegex.test(line)) {
+                    if (featureSectionRegex.test(line)) {
                         targetLine = i;
                         break;
                     }
@@ -249,8 +246,7 @@ export async function revealDefinitionInManifest(options: RevealDefinitionOption
                     /(^|\.)(?:dependencies|pypi-dependencies|build-dependencies|host-dependencies|optional-dependencies)(\.|$)/i.test(
                         currentSection,
                     );
-                const isMatch = keyRegex.test(line) || (pyprojectDepRegex ? pyprojectDepRegex.test(line) : false);
-                if (isMatch) {
+                if (keyRegex.test(line) || pyprojectDepRegex.test(line)) {
                     if (isDepSection) {
                         targetLine = i;
                         break;

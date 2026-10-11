@@ -1,5 +1,5 @@
 import { PythonEnvironmentApi } from '@vscode/python-environments';
-import { Disposable, extensions, LogOutputChannel } from 'vscode';
+import { Disposable, extensions } from 'vscode';
 
 import { PixiExtensionApi } from '../../api';
 import { traceError, traceInfo } from '../../common/logging';
@@ -9,25 +9,21 @@ import { PixiPythonPackageManager } from './pythonPackageManager';
 
 export async function activatePythonSupport(
     projectManager: PixiProjectManager,
-    pixiApi?: PixiExtensionApi,
-    log?: LogOutputChannel,
-): Promise<{ disposables: Disposable[]; envManager: PixiPythonEnvManager } | undefined> {
+    pixiApi: PixiExtensionApi,
+): Promise<Disposable[]> {
     const pythonEnvsExt = extensions.getExtension('ms-python.vscode-python-envs');
     if (!pythonEnvsExt) {
         traceInfo('ms-python.vscode-python-envs not found. Python environment integration will remain inactive.');
-        return undefined;
+        return [];
     }
 
     try {
-        let api: PythonEnvironmentApi;
-        if (pythonEnvsExt.isActive) {
-            api = pythonEnvsExt.exports as PythonEnvironmentApi;
-        } else {
-            api = (await pythonEnvsExt.activate()) as PythonEnvironmentApi;
-        }
+        const api = (
+            pythonEnvsExt.isActive ? pythonEnvsExt.exports : await pythonEnvsExt.activate()
+        ) as PythonEnvironmentApi;
 
-        const envManager = new PixiPythonEnvManager(api, projectManager, pixiApi, log);
-        const packageManager = new PixiPythonPackageManager(api, log, envManager, projectManager);
+        const envManager = new PixiPythonEnvManager(api, projectManager, pixiApi);
+        const packageManager = new PixiPythonPackageManager(api, envManager, projectManager);
 
         const disposables: Disposable[] = [
             envManager,
@@ -39,9 +35,9 @@ export async function activatePythonSupport(
         await envManager.initialize();
         traceInfo('Pixi Python environment integration activated successfully.');
 
-        return { disposables, envManager };
+        return disposables;
     } catch (error) {
         traceError('Failed to activate Pixi Python environment integration:', error);
-        return undefined;
+        return [];
     }
 }

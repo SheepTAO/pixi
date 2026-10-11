@@ -344,7 +344,6 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
         this.currentViewMode = config.get<ProjectsViewMode>('viewMode', 'environment');
 
         this.disposables.push(
-            this.projectManager.onDidProjectsChanged(() => this.refresh()),
             this.projectManager.onDidChangeEnvironments(() => this.refresh()),
             workspace.onDidChangeConfiguration((e) => {
                 if (e.affectsConfiguration('pixi.packages.displayMode')) {

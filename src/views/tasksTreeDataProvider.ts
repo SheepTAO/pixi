@@ -185,8 +185,6 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
         private readonly taskProvider: PixiTaskProvider,
     ) {
         this.disposables.push(
-            this.projectManager.onDidProjectsChanged(() => this.refresh()),
-            this.projectManager.onDidChangeEnvironments(() => this.refresh()),
             this.taskProvider.onDidChangeTasks(() => {
                 this._onDidChangeTreeData.fire();
             }),
@@ -196,10 +194,6 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
                 }
             }),
         );
-    }
-
-    public refresh(): void {
-        this.taskProvider.refresh();
     }
 
     public dispose(): void {

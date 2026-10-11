@@ -15,16 +15,8 @@ export function registerLogger(logChannel: LogOutputChannel): Disposable {
     };
 }
 
-export function traceLog(...args: Arguments): void {
-    channel?.appendLine(util.format(...args));
-}
-
 export function traceError(...args: Arguments): void {
     channel?.error(util.format(...args));
-}
-
-export function traceWarn(...args: Arguments): void {
-    channel?.warn(util.format(...args));
 }
 
 export function traceInfo(...args: Arguments): void {

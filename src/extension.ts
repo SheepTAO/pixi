@@ -28,17 +28,17 @@ export async function activate(context: ExtensionContext): Promise<PixiExtension
     setPersistentState(context);
 
     // 1. Initialize Pixi Core & Public API
-    const projectManager = new PixiProjectManager(log);
+    const projectManager = new PixiProjectManager();
     context.subscriptions.push(projectManager);
 
     const extensionVersion: string = context.extension.packageJSON.version;
     const pixiApi = createPixiApi(projectManager, extensionVersion);
     context.subscriptions.push(pixiApi);
 
-    const taskProvider = new PixiTaskProvider(projectManager, log);
+    const taskProvider = new PixiTaskProvider(projectManager);
     context.subscriptions.push(taskProvider);
 
-    const taskManifestProvider = new PixiTaskManifestProvider(projectManager, taskProvider);
+    const taskManifestProvider = new PixiTaskManifestProvider(taskProvider);
     context.subscriptions.push(taskManifestProvider);
 
     const dependencyManifestProvider = new PixiDependencyManifestProvider(projectManager, pixiApi);
@@ -47,7 +47,7 @@ export async function activate(context: ExtensionContext): Promise<PixiExtension
     const manifestSchemaProvider = new PixiManifestSchemaProvider(context);
     context.subscriptions.push(manifestSchemaProvider);
 
-    const terminalProvider = new PixiTerminalProvider(projectManager, log);
+    const terminalProvider = new PixiTerminalProvider(projectManager);
     context.subscriptions.push(terminalProvider, terminalProvider.registerCommands());
 
     const workspaceCommands = registerWorkspaceCommands(projectManager, taskProvider);
@@ -102,10 +102,7 @@ export async function activate(context: ExtensionContext): Promise<PixiExtension
     }
 
     // 5. Conditionally activate Python support (if ms-python.vscode-python-envs is available)
-    const pythonSupport = await activatePythonSupport(projectManager, pixiApi, log);
-    if (pythonSupport) {
-        context.subscriptions.push(...pythonSupport.disposables);
-    }
+    context.subscriptions.push(...(await activatePythonSupport(projectManager, pixiApi)));
 
     // 6. React to configuration changes
     context.subscriptions.push(

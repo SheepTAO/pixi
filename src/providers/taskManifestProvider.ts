@@ -17,7 +17,6 @@ import {
     workspace,
 } from 'vscode';
 
-import { PixiProjectManager } from '../core/projectManager';
 import { PixiTask, PixiTaskProvider } from './taskProvider';
 
 export type ManifestActionMode = 'hover' | 'compact' | 'full' | 'header' | 'off';
@@ -46,10 +45,7 @@ export class PixiTaskManifestProvider implements CodeLensProvider, HoverProvider
     public readonly onDidChangeCodeLenses: Event<void> = this._onDidChangeCodeLenses.event;
     private readonly disposables: Disposable[] = [];
 
-    constructor(
-        private readonly projectManager: PixiProjectManager,
-        private readonly taskProvider: PixiTaskProvider,
-    ) {
+    constructor(private readonly taskProvider: PixiTaskProvider) {
         const selectors: DocumentFilter[] = [
             { scheme: 'file', pattern: '**/pixi.toml' },
             { scheme: 'file', pattern: '**/pyproject.toml' },
@@ -57,16 +53,9 @@ export class PixiTaskManifestProvider implements CodeLensProvider, HoverProvider
         this.disposables.push(
             languages.registerCodeLensProvider(selectors, this),
             languages.registerHoverProvider(selectors, this),
-        );
-
-        this.disposables.push(
             this.taskProvider.onDidChangeTasks(() => this.refresh()),
-            this.projectManager.onDidProjectsChanged(() => this.refresh()),
             workspace.onDidChangeConfiguration((e) => {
-                if (
-                    e.affectsConfiguration('pixi.tasks.manifestActions') ||
-                    e.affectsConfiguration('pixi.tasks.codeLens')
-                ) {
+                if (e.affectsConfiguration('pixi.tasks.manifestActions')) {
                     this.refresh();
                 }
             }),
@@ -265,12 +254,6 @@ export class PixiTaskManifestProvider implements CodeLensProvider, HoverProvider
         if (mode && ['hover', 'compact', 'full', 'header', 'off'].includes(mode)) {
             return mode as ManifestActionMode;
         }
-
-        const legacyCodeLens = config.get<unknown>('codeLens');
-        if (typeof legacyCodeLens === 'boolean') {
-            return legacyCodeLens ? 'compact' : 'off';
-        }
-
         return 'hover';
     }
 

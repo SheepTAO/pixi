@@ -2,7 +2,6 @@ import {
     CancellationToken,
     commands,
     Disposable,
-    LogOutputChannel,
     QuickPickItem,
     TerminalOptions,
     TerminalProfile,
@@ -27,10 +26,7 @@ interface EnvQuickPickItem extends QuickPickItem {
 export class PixiTerminalProvider implements TerminalProfileProvider, Disposable {
     private readonly disposables: Disposable[] = [];
 
-    constructor(
-        private readonly projectManager: PixiProjectManager,
-        public readonly log?: LogOutputChannel,
-    ) {
+    constructor(private readonly projectManager: PixiProjectManager) {
         this.disposables.push(window.registerTerminalProfileProvider('pixi.terminal', this));
     }
 

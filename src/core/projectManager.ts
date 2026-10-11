@@ -5,7 +5,6 @@ import {
     ConfigurationTarget,
     Disposable,
     EventEmitter,
-    LogOutputChannel,
     ProgressLocation,
     Uri,
     window,
@@ -17,10 +16,10 @@ import { safeJsonParse } from '../common/execUtils';
 import { traceError, traceVerbose } from '../common/logging';
 import { getWorkspacePersistentState } from '../common/persistentState';
 import { getDefaultEnvironment, matchEnvironmentForUri, sortPixiEnvironments } from './environmentRules';
-import { listPixiPackages, PixiPackage } from './packageManager';
+import { listPixiPackages } from './packageManager';
 import { findManifestPath, isPixiProject, resolvePixiProjectPaths } from './projectDiscovery';
 import { scanEnvironmentToolchains } from './toolchains';
-import { PixiEnvironmentInfo, PixiEnvironmentStatus, PixiInfo, PixiProject } from './types';
+import { PixiEnvironmentInfo, PixiEnvironmentStatus, PixiInfo, PixiPackage, PixiProject } from './types';
 
 export class PixiProjectManager implements Disposable {
     private projectPaths: string[] = [];
@@ -36,7 +35,7 @@ export class PixiProjectManager implements Disposable {
     readonly onDidChangeEnvironments = this._onDidChangeEnvironments.event;
     private refreshTimer: NodeJS.Timeout | undefined;
 
-    constructor(public readonly log?: LogOutputChannel) {
+    constructor() {
         // Watch manifest and lock files for changes (debounced by 500ms with project targeting)
         let pendingChangedUris: Uri[] = [];
 
@@ -253,14 +252,11 @@ export class PixiProjectManager implements Disposable {
         const currentPaths = new Set(this.projectPaths);
         const pathsChanged = oldPaths.size !== currentPaths.size || [...oldPaths].some((p) => !currentPaths.has(p));
 
-        if (pathsChanged) {
-            this._onDidProjectsChanged.fire(this.projectPaths);
-        }
-
         // Clean up deleted projects
         for (const knownPath of this.projectToEnvs.keys()) {
             if (!currentPaths.has(knownPath)) {
                 this.projectToEnvs.delete(knownPath);
+                this.clearPackagesCache(knownPath);
             }
         }
 
@@ -276,6 +272,9 @@ export class PixiProjectManager implements Disposable {
             );
         }
 
+        if (pathsChanged) {
+            this._onDidProjectsChanged.fire(this.projectPaths);
+        }
         this._onDidChangeEnvironments.fire();
     }
 

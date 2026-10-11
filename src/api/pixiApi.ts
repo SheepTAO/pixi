@@ -17,15 +17,10 @@ export class PixiExtensionApiImpl implements PixiExtensionApi, Disposable {
     ) {
         this.disposables.push(
             this._onDidChangeActiveEnvironment,
-            this.projectManager.onDidProjectsChanged(() => {
-                this.pruneSavedActiveEnvironments();
-            }),
             this.projectManager.onDidChangeEnvironments(() => {
                 this.pruneSavedActiveEnvironments();
             }),
         );
-
-        this.pruneSavedActiveEnvironments();
     }
 
     private pruneSavedActiveEnvironments(): void {

@@ -6,8 +6,6 @@ import { safeJsonParse } from '../common/execUtils';
 import { traceError, traceVerbose } from '../common/logging';
 import { PixiPackage } from './types';
 
-export { PixiPackage };
-
 interface ManifestCandidate {
     filename: string;
     versionRegex: RegExp;

@@ -191,7 +191,6 @@ export class PixiDependencyManifestProvider
         );
 
         this.disposables.push(
-            this.projectManager.onDidProjectsChanged(() => this.refresh()),
             this.projectManager.onDidChangeEnvironments(() => this.refresh()),
             workspace.onDidChangeConfiguration((e) => {
                 if (e.affectsConfiguration('pixi.dependencies.inlayHints')) {
