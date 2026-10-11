@@ -338,6 +338,7 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
 
     private treeView?: TreeView<PixiProjectsTreeItem>;
     private currentViewMode: ProjectsViewMode = 'environment';
+    private readonly featuresCache = new Map<string, Promise<WorkspaceListEntry[]>>();
 
     constructor(private readonly projectManager: PixiProjectManager) {
         const config = workspace.getConfiguration('pixi.environments');
@@ -372,6 +373,7 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
     }
 
     public refresh(): void {
+        this.featuresCache.clear();
         this.updateViewDescription();
         this._onDidChangeTreeData.fire();
     }
@@ -383,6 +385,7 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
     }
 
     public dispose(): void {
+        this.featuresCache.clear();
         this._onDidChangeTreeData.dispose();
         for (const d of this.disposables) {
             d.dispose();
@@ -393,9 +396,18 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
         return element;
     }
 
+    private getProjectFeatures(projectPath: string): Promise<WorkspaceListEntry[]> {
+        let promise = this.featuresCache.get(projectPath);
+        if (!promise) {
+            promise = getWorkspaceFeatures(projectPath);
+            this.featuresCache.set(projectPath, promise);
+        }
+        return promise;
+    }
+
     private async getFeatureItemsForProject(project: PixiProject): Promise<PixiProjectsTreeItem[]> {
         const [features, envs] = await Promise.all([
-            getWorkspaceFeatures(project.projectPath),
+            this.getProjectFeatures(project.projectPath),
             getWorkspaceEnvironments(project.projectPath),
         ]);
         if (features.length === 0) {
@@ -481,7 +493,7 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
             const config = workspace.getConfiguration('pixi', Uri.file(element.project.projectPath));
             const displayMode = config.get<'grouped' | 'explicitOnly' | 'all'>('packages.displayMode', 'grouped');
 
-            const allFeatures = await getWorkspaceFeatures(element.project.projectPath);
+            const allFeatures = await this.getProjectFeatures(element.project.projectPath);
             const hasCustomFeatures = allFeatures.some((f) => f.name !== 'default');
             const sorted = sortPixiPackages(packages);
 

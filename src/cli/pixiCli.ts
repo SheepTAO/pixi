@@ -14,6 +14,7 @@ let _cachedPixi: string | undefined;
 
 export function clearPixiCache(): void {
     _cachedPixi = undefined;
+    searchCache.clear();
 }
 
 async function findPixi(): Promise<string | undefined> {

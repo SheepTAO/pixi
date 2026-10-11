@@ -1,15 +1,5 @@
 import * as path from 'path';
-import {
-    CancellationError,
-    CancellationToken,
-    commands,
-    Disposable,
-    ProgressLocation,
-    QuickPickItem,
-    Uri,
-    window,
-    workspace,
-} from 'vscode';
+import { commands, Disposable, QuickPickItem, Uri, window, workspace } from 'vscode';
 
 import {
     getGlobalManifestPath,
@@ -21,36 +11,10 @@ import {
     updateGlobalTool,
 } from '../cli/globalCli';
 import { promptCondaChannel } from './workspace/channelCommands';
+import { runWithProgressNotification } from './workspace/common';
 
 interface GlobalActionQuickPickItem extends QuickPickItem {
     action: 'install' | 'list' | 'sync' | 'update' | 'uninstall' | 'edit';
-}
-
-async function runWithProgressNotification(
-    title: string,
-    action: (token: CancellationToken) => Promise<unknown>,
-    successMsg: string,
-): Promise<boolean> {
-    try {
-        await window.withProgress(
-            {
-                location: ProgressLocation.Notification,
-                title,
-                cancellable: true,
-            },
-            async (_progress, token) => {
-                await action(token);
-                window.showInformationMessage(successMsg);
-            },
-        );
-        return true;
-    } catch (error) {
-        if (error instanceof CancellationError) {
-            return false;
-        }
-        window.showErrorMessage(error instanceof Error ? error.message : String(error));
-        return false;
-    }
 }
 
 export async function executeGlobalUpdate(toolName?: string): Promise<boolean> {

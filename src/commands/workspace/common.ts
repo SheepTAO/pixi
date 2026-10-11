@@ -1,7 +1,10 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import {
+    CancellationError,
+    CancellationToken,
     ConfigurationTarget,
+    ProgressLocation,
     QuickPickItem,
     QuickPickItemKind,
     Uri,
@@ -168,33 +171,30 @@ export async function findPackageScope(
     projectPath: string,
     packageName: string,
     preferredEnv?: string,
+    cachedWorkspaceData?: { features: WorkspaceListEntry[]; envs: WorkspaceListEntry[] },
 ): Promise<PackageScopeResult | undefined> {
     const norm = normalizePkgName(packageName);
-    const [features, envs] = await Promise.all([
-        getWorkspaceFeatures(projectPath),
-        getWorkspaceEnvironments(projectPath),
-    ]);
+    const [features, envs] = cachedWorkspaceData
+        ? [cachedWorkspaceData.features, cachedWorkspaceData.envs]
+        : await Promise.all([getWorkspaceFeatures(projectPath), getWorkspaceEnvironments(projectPath)]);
 
-    const featureMap = new Map<string, WorkspaceListEntry>();
-    for (const f of features) {
-        featureMap.set(f.name, f);
-    }
+    const featureMap = new Map(features.map((f) => [f.name, f]));
 
     const checkEntry = (
         entry: WorkspaceListEntry,
         kind: 'global' | 'feature' | 'environment',
     ): PackageScopeResult | undefined => {
-        if (entry.dependencies.some((d) => normalizePkgName(d) === norm)) {
-            return kind === 'global' || entry.name === 'default'
-                ? { kind: 'global', isPypi: false }
-                : { kind, name: entry.name, isPypi: false };
+        const isPypi = entry.dependencies.some((d) => normalizePkgName(d) === norm)
+            ? false
+            : entry.pypiDependencies.some((d) => normalizePkgName(d) === norm)
+              ? true
+              : undefined;
+        if (isPypi === undefined) {
+            return undefined;
         }
-        if (entry.pypiDependencies.some((d) => normalizePkgName(d) === norm)) {
-            return kind === 'global' || entry.name === 'default'
-                ? { kind: 'global', isPypi: true }
-                : { kind, name: entry.name, isPypi: true };
-        }
-        return undefined;
+        return kind === 'global' || entry.name === 'default'
+            ? { kind: 'global', isPypi }
+            : { kind, name: entry.name, isPypi };
     };
 
     // 1. If preferredEnv is provided and not default, check target environment context first
@@ -558,4 +558,33 @@ export async function updateConfigurationValue<T>(
               ? ConfigurationTarget.Workspace
               : ConfigurationTarget.Global;
     await config.update(key, value, target);
+}
+
+export async function runWithProgressNotification(
+    title: string,
+    action: (token: CancellationToken) => Promise<unknown>,
+    successMsg: string,
+    errorPrefix?: string,
+): Promise<boolean> {
+    try {
+        await window.withProgress(
+            {
+                location: ProgressLocation.Notification,
+                title,
+                cancellable: true,
+            },
+            async (_progress, token) => {
+                await action(token);
+                window.showInformationMessage(successMsg);
+            },
+        );
+        return true;
+    } catch (error) {
+        if (error instanceof CancellationError) {
+            return false;
+        }
+        const msg = error instanceof Error ? error.message : String(error);
+        window.showErrorMessage(errorPrefix ? `${errorPrefix}: ${msg}` : msg);
+        return false;
+    }
 }

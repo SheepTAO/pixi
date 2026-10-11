@@ -11,8 +11,14 @@ import {
 import { Disposable, Event, EventEmitter, ProgressLocation, ThemeIcon, window } from 'vscode';
 
 import { runPixi } from '../../cli/pixiCli';
-import { findPackageScope, getScopeArgs } from '../../commands/workspace/common';
+import {
+    findPackageScope,
+    getScopeArgs,
+    getWorkspaceEnvironments,
+    getWorkspaceFeatures,
+} from '../../commands/workspace/common';
 import { traceError, traceInfo, traceVerbose } from '../../common/logging';
+import { normalizePkgName } from '../../core/packageManager';
 import { PixiProjectManager } from '../../core/projectManager';
 import { PixiPackage } from '../../core/types';
 import { PIXI_MANAGER_ID } from './constants';
@@ -137,21 +143,27 @@ export class PixiPythonPackageManager implements PackageManager, Disposable {
                     cancellable: true,
                 },
                 async (_progress, token) => {
-                    let cached: Package[] | undefined;
+                    const [features, envs] = await Promise.all([
+                        getWorkspaceFeatures(details.projectPath),
+                        getWorkspaceEnvironments(details.projectPath),
+                    ]);
+                    let cachedPkgs: PixiPackage[] | undefined;
                     for (const pkg of uninstallList) {
                         if (token.isCancellationRequested) {
                             break;
                         }
-                        const scope = await findPackageScope(details.projectPath, pkg, details.envName);
+                        const scope = await findPackageScope(details.projectPath, pkg, details.envName, {
+                            features,
+                            envs,
+                        });
                         let isPypi = scope?.isPypi ?? false;
                         if (!scope) {
-                            cached ??= (await this.getPackages(environment)) ?? [];
-                            isPypi = Boolean(
-                                cached
-                                    .find((p) => p.name === pkg)
-                                    ?.tooltip?.toString()
-                                    .includes('(pypi)'),
+                            cachedPkgs ??= await this.projectManager.getPackagesForEnvironment(
+                                details.envName,
+                                details.projectPath,
                             );
+                            const normPkg = normalizePkgName(pkg);
+                            isPypi = cachedPkgs.find((p) => normalizePkgName(p.name) === normPkg)?.kind === 'pypi';
                         }
 
                         const args = ['remove'];

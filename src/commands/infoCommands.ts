@@ -12,10 +12,11 @@ import {
 } from 'vscode';
 
 import { clearGlobalManifestCache } from '../cli/globalCli';
-import { cleanGlobalCache, clearPixiCache, clearSearchCache, runPixi } from '../cli/pixiCli';
+import { cleanGlobalCache, clearPixiCache, runPixi } from '../cli/pixiCli';
 import { normalizeLocationPath } from '../common/execUtils';
 import { traceError, traceVerbose } from '../common/logging';
 import { PixiInfoTreeDataProvider } from '../views/infoTreeDataProvider';
+import { runWithProgressNotification } from './workspace/common';
 
 export async function openLocation(target?: unknown): Promise<void> {
     const targetPath = normalizeLocationPath(target);
@@ -133,7 +134,6 @@ export function registerInfoCommands(infoProvider: PixiInfoTreeDataProvider): Di
                         }
                         clearPixiCache();
                         clearGlobalManifestCache();
-                        clearSearchCache();
                         infoProvider.refresh();
                     } catch (err: unknown) {
                         const msg = err instanceof Error ? err.message : String(err);
@@ -156,24 +156,14 @@ export function registerInfoCommands(infoProvider: PixiInfoTreeDataProvider): Di
                 return;
             }
 
-            await window.withProgress(
-                {
-                    location: ProgressLocation.Notification,
-                    title: 'Pixi: Cleaning global package cache...',
-                    cancellable: false,
+            await runWithProgressNotification(
+                'Pixi: Cleaning global package cache...',
+                async (token) => {
+                    await cleanGlobalCache(token);
+                    infoProvider.refresh();
                 },
-                async () => {
-                    try {
-                        await cleanGlobalCache();
-                        infoProvider.refresh();
-                        window.showInformationMessage('Pixi: Global package cache cleaned.');
-                    } catch (err: unknown) {
-                        traceError('Failed to clean package cache:', err);
-                        window.showErrorMessage(
-                            `Failed to clean cache: ${err instanceof Error ? err.message : String(err)}`,
-                        );
-                    }
-                },
+                'Pixi: Global package cache cleaned.',
+                'Failed to clean cache',
             );
         }),
         commands.registerCommand('pixi.openLocation', (target?: unknown) => {

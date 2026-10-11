@@ -280,6 +280,7 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
                     oldEnv.pixiStatus !== newEnv.pixiStatus ||
                     oldEnv.version !== newEnv.version ||
                     oldEnv.displayName !== newEnv.displayName ||
+                    oldEnv.hasIpykernel !== newEnv.hasIpykernel ||
                     oldEnv.execInfo?.run?.executable !== newEnv.execInfo?.run?.executable;
                 if (hasChanged) {
                     changes.push(

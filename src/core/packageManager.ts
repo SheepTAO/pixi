@@ -95,7 +95,7 @@ export async function listPixiPackages(envName: string, projectPath: string): Pr
     const baseArgs = ['list', '--no-install', '--json', '--environment', envName];
     let stdout: string;
     try {
-        stdout = await runPixi(['list', '--no-install', '--frozen', '--json', '--environment', envName], {
+        stdout = await runPixi([...baseArgs, '--frozen'], {
             cwd: projectPath,
         });
     } catch {

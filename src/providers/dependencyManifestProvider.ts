@@ -129,25 +129,6 @@ function getLockedVersionFromLines(lines: string[], pkgName: string): string | u
     return undefined;
 }
 
-/**
- * Locates comment start in a TOML line, ignoring '#' characters inside quotes.
- */
-function findCommentIndex(line: string): number {
-    let inSingleQuote = false;
-    let inDoubleQuote = false;
-    for (let i = 0; i < line.length; i++) {
-        const char = line[i];
-        if (char === '"' && !inSingleQuote && (i === 0 || line[i - 1] !== '\\')) {
-            inDoubleQuote = !inDoubleQuote;
-        } else if (char === "'" && !inDoubleQuote) {
-            inSingleQuote = !inSingleQuote;
-        } else if (char === '#' && !inSingleQuote && !inDoubleQuote) {
-            return i;
-        }
-    }
-    return -1;
-}
-
 const KV_DEP_SECTION_REGEX = /(?:^|\.)(?:pypi-|build-|host-)?dependencies$/i;
 const KV_DEP_REGEX = /^\s*(?:(["'])([^"']+)\1|([a-zA-Z0-9_\-\.]+))\s*=\s*(.*)$/;
 const ARRAY_DEP_REGEX = /^\s*(["'])([a-zA-Z0-9_\-\.]+)(?:[><=~^!].*|\[.*\])?\1,?\s*(?:#.*)?$/;
@@ -223,8 +204,9 @@ export class PixiDependencyManifestProvider
 
         for (let lineIndex = 0; lineIndex < lineCount; lineIndex++) {
             const rawLine = document.lineAt(lineIndex).text;
-            const commentIdx = findCommentIndex(rawLine);
-            const codeLine = (commentIdx !== -1 ? rawLine.substring(0, commentIdx) : rawLine).trimEnd();
+            const codeLine = rawLine
+                .replace(/("(?:\\.|[^"\\])*"|'[^']*')|#.*$/g, (_, quoted) => quoted ?? '')
+                .trimEnd();
             const trimmed = codeLine.trim();
 
             if (!trimmed) {
