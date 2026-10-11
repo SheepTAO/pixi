@@ -202,16 +202,12 @@ export class PixiProjectManager implements Disposable {
         if (envs.length === 0) {
             return undefined;
         }
-        try {
-            const activeName = getWorkspacePersistentState().get<string>(`projectEnvName:${projectPath}`);
-            if (activeName) {
-                const match = envs.find((e) => e.pixiEnvName === activeName);
-                if (match) {
-                    return match;
-                }
+        const activeName = getWorkspacePersistentState().get<string>(`projectEnvName:${projectPath}`);
+        if (activeName) {
+            const match = envs.find((e) => e.pixiEnvName === activeName);
+            if (match) {
+                return match;
             }
-        } catch {
-            // ignore if persistent state is not initialized yet
         }
         return getDefaultEnvironment(envs);
     }
@@ -246,7 +242,7 @@ export class PixiProjectManager implements Disposable {
 
     private async refreshAll(): Promise<void> {
         const oldPaths = new Set(this.projectPaths);
-        this.projectPaths = await resolvePixiProjectPaths();
+        this.projectPaths = resolvePixiProjectPaths();
         await this.updateHasPixiProjectContext();
 
         const currentPaths = new Set(this.projectPaths);

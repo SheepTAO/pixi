@@ -372,7 +372,6 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
     }
 
     public refresh(): void {
-        this.projectManager.clearPackagesCache();
         this.updateViewDescription();
         this._onDidChangeTreeData.fire();
     }

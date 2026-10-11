@@ -1,11 +1,7 @@
-import * as fs from 'fs';
-import * as path from 'path';
 import { MarkdownString, ThemeIcon, Uri, window } from 'vscode';
 
 import { runPixiWithProgress } from '../../cli/workspaceCli';
-import { promptToInstallEnvironment as promptCoreInstall } from '../../core/environmentRules';
 import { PixiProjectManager } from '../../core/projectManager';
-import { scanPythonToolchain } from '../../core/toolchains';
 import { PixiEnvironmentInfo } from '../../core/types';
 import { PIXI_MANAGER_ID } from './constants';
 import { PixiPythonEnvironment } from './types';
@@ -15,12 +11,6 @@ export function isEnvironmentInvalid(env?: PixiPythonEnvironment): boolean {
         return true;
     }
     return env.pixiStatus === 'incompatible' || !!env.error;
-}
-
-export async function promptToInstallEnvironment(env: PixiPythonEnvironment, targetFolder?: Uri): Promise<boolean> {
-    const projectFolder = env.manifestPath ? Uri.file(path.dirname(env.manifestPath)) : undefined;
-    const folder = targetFolder ?? projectFolder ?? env.environmentPath;
-    return promptCoreInstall(env.pixiEnvName, folder);
 }
 
 export async function promptToInstallIpykernel(
@@ -57,30 +47,6 @@ export async function promptToInstallIpykernel(
     return false;
 }
 
-function checkHasIpykernel(envPath: string): boolean {
-    const kernelSpec = path.join(envPath, 'share', 'jupyter', 'kernels', 'python3', 'kernel.json');
-    if (fs.existsSync(kernelSpec)) {
-        return true;
-    }
-    const binPath =
-        process.platform === 'win32'
-            ? path.join(envPath, 'Scripts', 'ipykernel.exe')
-            : path.join(envPath, 'bin', 'ipykernel');
-    if (fs.existsSync(binPath)) {
-        return true;
-    }
-    const metaDir = path.join(envPath, 'conda-meta');
-    try {
-        if (fs.existsSync(metaDir)) {
-            const files = fs.readdirSync(metaDir);
-            return files.some((f) => f.startsWith('ipykernel-') && f.endsWith('.json'));
-        }
-    } catch {
-        // ignore
-    }
-    return false;
-}
-
 export function formatDisplayName(template: string, projectName: string, envName: string, version?: string): string {
     const defaultName = projectName ? `${projectName}:${envName}` : envName || 'default';
     const vars: Record<string, string | undefined> = {
@@ -103,11 +69,11 @@ export function formatDisplayName(template: string, projectName: string, envName
     return cleaned || defaultName;
 }
 
-export async function createPythonEnvironment(
+export function createPythonEnvironment(
     coreInfo: PixiEnvironmentInfo,
     pixiBin: string,
     template: string,
-): Promise<PixiPythonEnvironment> {
+): PixiPythonEnvironment {
     let pythonExecutable = '';
     let pythonVersion = '';
     let hasIpykernel = false;
@@ -116,10 +82,10 @@ export async function createPythonEnvironment(
     let statusDesc = 'pixi';
 
     if (status === 'installed') {
-        const py = coreInfo.toolchains ? coreInfo.toolchains.python : await scanPythonToolchain(coreInfo.prefix);
+        const py = coreInfo.toolchains?.python;
         pythonExecutable = py?.executable || '';
         pythonVersion = py?.version || '';
-        hasIpykernel = checkHasIpykernel(coreInfo.prefix);
+        hasIpykernel = Boolean(py?.hasIpykernel);
 
         if (!pythonExecutable) {
             statusReason = `No Python executable found in environment '${coreInfo.pixiEnvName}'. Ensure 'python' dependency is added.`;

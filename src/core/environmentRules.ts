@@ -14,10 +14,6 @@ function getMatcher(pattern: string): (input: string) => boolean {
     return matcher;
 }
 
-export function clearMatcherCache(): void {
-    matcherCache.clear();
-}
-
 /**
  * Resolves the target environment name from rules and a relative file path.
  */

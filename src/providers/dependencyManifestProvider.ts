@@ -130,16 +130,6 @@ function getLockedVersionFromLines(lines: string[], pkgName: string): string | u
 }
 
 /**
- * Finds the line index of a package in pixi.lock.
- * Prioritizes the detailed package record under top-level 'packages:',
- * then falls back to environment package list.
- */
-async function findPackageLineInLockfile(lockPath: string, pkgName: string): Promise<number> {
-    const lines = await getLockfileLines(lockPath);
-    return lines ? findPackageLineInLines(lines, pkgName) : -1;
-}
-
-/**
  * Locates comment start in a TOML line, ignoring '#' characters inside quotes.
  */
 function findCommentIndex(line: string): number {
@@ -177,7 +167,7 @@ export class PixiDependencyManifestProvider
 
     constructor(
         private readonly projectManager: PixiProjectManager,
-        pixiApi?: PixiExtensionApi,
+        pixiApi: PixiExtensionApi,
     ) {
         const selectors: DocumentFilter[] = [
             { scheme: 'file', pattern: '**/pixi.toml' },
@@ -188,19 +178,14 @@ export class PixiDependencyManifestProvider
             languages.registerInlayHintsProvider(selectors, this),
             languages.registerHoverProvider(selectors, this),
             languages.registerDefinitionProvider(selectors, this),
-        );
-
-        this.disposables.push(
             this.projectManager.onDidChangeEnvironments(() => this.refresh()),
+            pixiApi.onDidChangeActiveEnvironment(() => this.refresh()),
             workspace.onDidChangeConfiguration((e) => {
                 if (e.affectsConfiguration('pixi.dependencies.inlayHints')) {
                     this.refresh();
                 }
             }),
         );
-        if (pixiApi) {
-            this.disposables.push(pixiApi.onDidChangeActiveEnvironment(() => this.refresh()));
-        }
 
         this.disposables.push(
             commands.registerCommand(
@@ -597,11 +582,8 @@ export class PixiDependencyManifestProvider
         }
 
         const lockPath = path.join(projectPath, 'pixi.lock');
-        if (!fs.existsSync(lockPath)) {
-            return undefined;
-        }
-
-        const targetLine = await findPackageLineInLockfile(lockPath, matched.name);
+        const lines = await getLockfileLines(lockPath);
+        const targetLine = lines ? findPackageLineInLines(lines, matched.name) : -1;
         if (targetLine < 0 || token.isCancellationRequested) {
             return undefined;
         }
@@ -653,7 +635,8 @@ export class PixiDependencyManifestProvider
             const editor = await window.showTextDocument(doc);
 
             if (packageName) {
-                const targetLine = await findPackageLineInLockfile(lockPath, packageName);
+                const lines = await getLockfileLines(lockPath);
+                const targetLine = lines ? findPackageLineInLines(lines, packageName) : -1;
                 if (targetLine >= 0) {
                     revealRangeInEditor(editor, targetLine, 0, 0);
                 }

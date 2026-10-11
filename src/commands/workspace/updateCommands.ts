@@ -1,11 +1,12 @@
 import * as path from 'path';
-import { commands, Disposable, ProgressLocation, QuickPickItem, window } from 'vscode';
+import { CancellationError, commands, Disposable, ProgressLocation, QuickPickItem, window } from 'vscode';
 
 import { runPixi } from '../../cli/pixiCli';
 import { runPixiWithProgress } from '../../cli/workspaceCli';
 import { escapeRegex, safeJsonParse } from '../../common/execUtils';
+import { normalizePkgName } from '../../core/packageManager';
 import { PixiProjectManager } from '../../core/projectManager';
-import { extractEnvironmentName, pickPixiProject } from './common';
+import { extractEnvironmentName, pickPixiProject, toEnvQuickPickItem } from './common';
 
 export interface DryRunPackageChange {
     name: string;
@@ -175,7 +176,7 @@ async function handleCheckOutdated(
             },
         );
     } catch (err) {
-        if (err instanceof Error && err.name === 'CancellationError') {
+        if (err instanceof CancellationError) {
             return;
         }
         window.showErrorMessage(
@@ -201,7 +202,7 @@ async function handleCheckOutdated(
     await Promise.all(
         targetEnvs.map(async (env) => {
             const pkgs = await manager.getPackagesForEnvironment(env, projectPath);
-            const explicitNames = new Set(pkgs.filter((p) => p.is_explicit).map((p) => p.name.toLowerCase()));
+            const explicitNames = new Set(pkgs.filter((p) => p.is_explicit).map((p) => normalizePkgName(p.name)));
             envExplicitMap.set(env, explicitNames);
             for (const name of explicitNames) {
                 allExplicitSet.add(name);
@@ -210,9 +211,9 @@ async function handleCheckOutdated(
     );
 
     const explicitChanges = changes.filter((c) => {
-        const lowerName = c.name.toLowerCase();
+        const normName = normalizePkgName(c.name);
         const envSet = c.environment ? envExplicitMap.get(c.environment) : undefined;
-        return envSet ? envSet.has(lowerName) : allExplicitSet.has(lowerName);
+        return envSet ? envSet.has(normName) : allExplicitSet.has(normName);
     });
 
     const displayChanges = allExplicitSet.size > 0 ? explicitChanges : changes;
@@ -431,11 +432,7 @@ export async function executeUnifiedUpdate(
                     description: `All ${envs.length} environments in ${projectName}`,
                     envName: undefined,
                 },
-                ...envs.map((e) => ({
-                    label: `$(layers) ${e.pixiEnvName}`,
-                    description: `Environment '${e.pixiEnvName}' (${e.pixiStatus})`,
-                    envName: e.pixiEnvName,
-                })),
+                ...envs.map(toEnvQuickPickItem),
             ];
 
             const chosenScope = await window.showQuickPick(scopeItems, {

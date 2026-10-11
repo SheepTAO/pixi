@@ -48,7 +48,7 @@ export async function activate(context: ExtensionContext): Promise<PixiExtension
     context.subscriptions.push(manifestSchemaProvider);
 
     const terminalProvider = new PixiTerminalProvider(projectManager);
-    context.subscriptions.push(terminalProvider, terminalProvider.registerCommands());
+    context.subscriptions.push(terminalProvider);
 
     const workspaceCommands = registerWorkspaceCommands(projectManager, taskProvider);
     context.subscriptions.push(workspaceCommands);

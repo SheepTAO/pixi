@@ -27,13 +27,12 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
     private readonly disposables: Disposable[] = [];
 
     constructor(private readonly projectManager: PixiProjectManager) {
-        this.disposables.push(window.registerTerminalProfileProvider('pixi.terminal', this));
-    }
-
-    public registerCommands(): Disposable {
-        return commands.registerCommand('pixi.openTerminal', async (target?: unknown) => {
-            await this.openTerminal(target);
-        });
+        this.disposables.push(
+            window.registerTerminalProfileProvider('pixi.terminal', this),
+            commands.registerCommand('pixi.openTerminal', async (target?: unknown) => {
+                await this.openTerminal(target);
+            }),
+        );
     }
 
     dispose() {
@@ -168,12 +167,11 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
                 (target as { env?: PixiEnvironmentInfo })?.env ?? (target as PixiEnvironmentInfo | undefined);
             let env = candidate?.pixiEnvName ? candidate : undefined;
 
-            const folder = normalizeFolderPath(target);
-            const targetProjectPath = folder
-                ? this.projectManager.findProjectForUri(Uri.file(folder)) || folder
-                : undefined;
-
             if (!env) {
+                const folder = normalizeFolderPath(target);
+                const targetProjectPath = folder
+                    ? this.projectManager.findProjectForUri(Uri.file(folder)) || folder
+                    : undefined;
                 env = await this.pickEnvironment(undefined, targetProjectPath);
             }
             if (!env || (await this.handleUninstalledOrError(env))) {

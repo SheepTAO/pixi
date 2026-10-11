@@ -109,7 +109,6 @@ export class PixiInfoItem extends TreeItem {
 export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>, Disposable {
     private readonly _onDidChangeTreeData = new EventEmitter<PixiInfoItem | undefined | null | void>();
     readonly onDidChangeTreeData: Event<PixiInfoItem | undefined | null | void> = this._onDidChangeTreeData.event;
-    private readonly disposables: Disposable[] = [];
     private cachedSystemInfo: PixiSystemInfo | null = null;
     private cachedCacheSize: string | null = null;
     private isCalculatingCacheSize = false;
@@ -127,9 +126,6 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
 
     public dispose(): void {
         this._onDidChangeTreeData.dispose();
-        for (const d of this.disposables) {
-            d.dispose();
-        }
     }
 
     private async getSystemInfo(): Promise<PixiSystemInfo> {

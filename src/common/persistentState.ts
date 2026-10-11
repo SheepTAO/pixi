@@ -5,7 +5,18 @@ export interface PersistentState {
     set<T>(key: string, value: T): Thenable<void>;
 }
 
-let _workspace: PersistentState | undefined;
+const fallbackStore = new Map<string, unknown>();
+
+let _workspace: PersistentState = {
+    get: <T>(key: string, defaultValue?: T) => (fallbackStore.has(key) ? (fallbackStore.get(key) as T) : defaultValue),
+    set: async <T>(key: string, value: T) => {
+        if (value === undefined) {
+            fallbackStore.delete(key);
+        } else {
+            fallbackStore.set(key, value);
+        }
+    },
+};
 
 export function setPersistentState(context: ExtensionContext): void {
     _workspace = {
@@ -15,8 +26,5 @@ export function setPersistentState(context: ExtensionContext): void {
 }
 
 export function getWorkspacePersistentState(): PersistentState {
-    if (!_workspace) {
-        throw new Error('PersistentState has not been initialized.');
-    }
     return _workspace;
 }

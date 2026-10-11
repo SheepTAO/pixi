@@ -59,7 +59,7 @@ export function getProjectConfiguredChannels(projectPath: string): string[] {
 /**
  * Resolves opened workspace folders and returns deduplicated Pixi project root paths.
  */
-export async function resolvePixiProjectPaths(): Promise<string[]> {
+export function resolvePixiProjectPaths(): string[] {
     if (!workspace.workspaceFolders || workspace.workspaceFolders.length === 0) {
         return [];
     }
