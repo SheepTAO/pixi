@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { commands, ConfigurationTarget, Disposable, QuickPickItem, Uri, window, workspace } from 'vscode';
+import { commands, Disposable, QuickPickItem, Uri, window, workspace } from 'vscode';
 
 import { runPixiWithProgress } from '../../cli/workspaceCli';
 import { revealDefinitionInManifest } from '../../common/execUtils';
@@ -18,6 +18,7 @@ import {
     pickManifestFormat,
     pickPixiProject,
     resolveTargetFolder,
+    updateConfigurationValue,
 } from './common';
 
 async function pickInstallableEnvironment(
@@ -65,8 +66,7 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                 window.showInformationMessage(
                     `A project manifest (${path.basename(manifestPath)}) already exists in this folder.`,
                 );
-                const doc = await workspace.openTextDocument(Uri.file(manifestPath));
-                await window.showTextDocument(doc);
+                await openDocumentIfExists(manifestPath);
                 return;
             }
 
@@ -1069,14 +1069,7 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
             });
 
             if (selected) {
-                const inspect = config.inspect<string>('viewMode');
-                const target =
-                    inspect?.workspaceFolderValue !== undefined
-                        ? ConfigurationTarget.WorkspaceFolder
-                        : inspect?.workspaceValue !== undefined
-                          ? ConfigurationTarget.Workspace
-                          : ConfigurationTarget.Global;
-                await config.update('viewMode', selected.value, target);
+                await updateConfigurationValue(config, 'viewMode', selected.value);
             }
         }),
     ];

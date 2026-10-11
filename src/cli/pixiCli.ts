@@ -266,7 +266,6 @@ export async function searchPixiPackages(
     options?: {
         cwd?: string;
         platform?: string;
-        channel?: string;
         channels?: string[];
         includePypi?: boolean;
     },
@@ -278,9 +277,7 @@ export async function searchPixiPackages(
     }
 
     const platform = options?.platform || getHostCondaPlatform();
-    const allChannels = [
-        ...new Set([...(options?.channels || []), options?.channel].filter((c): c is string => Boolean(c))),
-    ];
+    const allChannels = [...new Set((options?.channels || []).filter(Boolean))];
 
     const channelsKey = allChannels.slice().sort().join(',');
     const cacheKey = `${options?.cwd || ''}:${platform}:${channelsKey}:${cleanQuery}`;
@@ -288,14 +285,9 @@ export async function searchPixiPackages(
         return searchCache.get(cacheKey)!;
     }
 
-    const args = ['search', cleanQuery, '--json'];
-    if (platform) {
-        args.push('-p', platform);
-    }
-    if (allChannels.length > 0) {
-        for (const ch of allChannels) {
-            args.push('-c', ch);
-        }
+    const args = ['search', cleanQuery, '--json', '-p', platform];
+    for (const ch of allChannels) {
+        args.push('-c', ch);
     }
 
     const condaPromise = (async (): Promise<PixiPackageSearchResult[]> => {
@@ -389,7 +381,7 @@ export async function searchPixiPackages(
             .getConfiguration('pixi', options?.cwd ? Uri.file(options.cwd) : undefined)
             .get<boolean>('packageSearch.includePypi', true);
 
-    const pypiPromise = shouldIncludePypi === false ? Promise.resolve(null) : fetchPypiPackage(cleanQuery, token);
+    const pypiPromise = !shouldIncludePypi ? Promise.resolve(null) : fetchPypiPackage(cleanQuery, token);
 
     const [condaRes, pypiRes] = await Promise.allSettled([condaPromise, pypiPromise]);
     const condaResults = condaRes.status === 'fulfilled' ? condaRes.value : [];

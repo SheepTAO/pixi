@@ -35,16 +35,16 @@ export class PixiTaskProjectTreeItem extends TreeItem {
 }
 
 export class PixiTaskTreeItem extends TreeItem {
-    get projectPath(): string | undefined {
-        return this.project?.projectPath || this.task.projectPath;
+    get projectPath(): string {
+        return this.project.projectPath;
     }
-    get manifestPath(): string | undefined {
-        return this.project?.manifestPath;
+    get manifestPath(): string {
+        return this.project.manifestPath;
     }
 
     constructor(
         public readonly task: PixiTask,
-        public readonly project?: PixiProject,
+        public readonly project: PixiProject,
     ) {
         super(task.name, TreeItemCollapsibleState.None);
 
@@ -149,19 +149,17 @@ export class PixiTaskTreeItem extends TreeItem {
 }
 
 export class PixiTaskEmptyTreeItem extends TreeItem {
-    constructor(public readonly project?: PixiProject) {
+    constructor(public readonly project: PixiProject) {
         super('No tasks found', TreeItemCollapsibleState.None);
-        const manifestName = project ? path.basename(project.manifestPath) : 'manifest';
+        const manifestName = path.basename(project.manifestPath);
         this.description = '(click to add task)';
-        this.tooltip = project
-            ? `No tasks defined in ${project.name}. Click to add a task, or define under [tasks] in ${manifestName}.`
-            : 'No tasks found. Click to add a task.';
+        this.tooltip = `No tasks defined in ${project.name}. Click to add a task, or define under [tasks] in ${manifestName}.`;
         this.iconPath = new ThemeIcon('plus', new ThemeColor('charts.blue'));
         this.contextValue = 'pixiTaskEmpty';
         this.command = {
             command: 'pixi.tasks.addTask',
             title: 'Add Task',
-            arguments: [project ? { project } : undefined],
+            arguments: [{ project }],
         };
     }
 }

@@ -128,32 +128,17 @@ export class PixiExtensionApiImpl implements PixiExtensionApi, Disposable {
     }
 
     public async getActiveEnvironment(scope?: Uri): Promise<PixiEnvironmentInfo | undefined> {
-        const storage = getWorkspacePersistentState();
-
         if (scope) {
             const projectPath = this.projectManager.findProjectForUri(scope);
             if (projectPath) {
-                if (!this.activeEnvNames.has(projectPath)) {
-                    const saved = storage.get<string>(`projectEnvName:${projectPath}`);
-                    if (saved) {
-                        this.activeEnvNames.set(projectPath, saved);
-                    }
-                }
                 return this.getEnvironmentForUri(scope);
             }
         }
 
         // Global or first project default
-        let globalName = this.globalActiveEnvName;
-        if (!globalName) {
-            globalName = storage.get<string>('globalEnvName');
-            if (globalName) {
-                this.globalActiveEnvName = globalName;
-            }
-        }
-        if (globalName) {
+        if (this.globalActiveEnvName) {
             const allEnvs = this.projectManager.getAllEnvironments();
-            const match = allEnvs.find((e) => e.pixiEnvName === globalName);
+            const match = allEnvs.find((e) => e.pixiEnvName === this.globalActiveEnvName);
             if (match) {
                 return match;
             }
@@ -162,12 +147,6 @@ export class PixiExtensionApiImpl implements PixiExtensionApi, Disposable {
         const projects = this.projectManager.getProjects();
         if (projects.length > 0) {
             const projectPath = projects[0].projectPath;
-            if (!this.activeEnvNames.has(projectPath)) {
-                const saved = storage.get<string>(`projectEnvName:${projectPath}`);
-                if (saved) {
-                    this.activeEnvNames.set(projectPath, saved);
-                }
-            }
             const envs = this.projectManager.getEnvironmentsForProject(projectPath);
             return this.resolveProjectActiveOrDefault(projectPath, envs);
         }

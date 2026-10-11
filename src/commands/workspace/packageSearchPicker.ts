@@ -453,11 +453,7 @@ export async function promptAddPackageSpec(
                     spec: finalSpec,
                 });
             } else if (selected?.isDirectInput || currentVal) {
-                let rawSpec = currentVal;
-                if (!rawSpec && selected?.label?.startsWith('$(edit) Add: "')) {
-                    rawSpec = selected.label.slice('$(edit) Add: "'.length).replace(/["].*$/, '');
-                }
-                const specs = rawSpec.trim().split(/\s+/).filter(Boolean);
+                const specs = currentVal.split(/\s+/).filter(Boolean);
                 if (specs.length === 0) {
                     resolve(undefined);
                 } else {

@@ -1,6 +1,14 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { QuickPickItem, QuickPickItemKind, Uri, window, workspace } from 'vscode';
+import {
+    ConfigurationTarget,
+    QuickPickItem,
+    QuickPickItemKind,
+    Uri,
+    window,
+    workspace,
+    WorkspaceConfiguration,
+} from 'vscode';
 
 import { runPixi } from '../../cli/pixiCli';
 import { normalizeFolderPath, normalizeLocationPath } from '../../common/execUtils';
@@ -541,4 +549,19 @@ export async function openDocumentIfExists(filePath: string): Promise<void> {
         const doc = await workspace.openTextDocument(Uri.file(filePath));
         await window.showTextDocument(doc);
     }
+}
+
+export async function updateConfigurationValue<T>(
+    config: WorkspaceConfiguration,
+    key: string,
+    value: T,
+): Promise<void> {
+    const inspect = config.inspect<T>(key);
+    const target =
+        inspect?.workspaceFolderValue !== undefined
+            ? ConfigurationTarget.WorkspaceFolder
+            : inspect?.workspaceValue !== undefined
+              ? ConfigurationTarget.Workspace
+              : ConfigurationTarget.Global;
+    await config.update(key, value, target);
 }

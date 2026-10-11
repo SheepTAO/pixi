@@ -11,6 +11,7 @@ import {
 import { Disposable, Event, EventEmitter, LogOutputChannel, ProgressLocation, ThemeIcon, window } from 'vscode';
 
 import { runPixi } from '../../cli/pixiCli';
+import { findPackageScope } from '../../commands/workspace/common';
 import { traceError, traceInfo, traceVerbose } from '../../common/logging';
 import { listPixiPackages } from '../../core/packageManager';
 import { PixiProjectManager } from '../../core/projectManager';
@@ -115,7 +116,10 @@ export class PixiPythonPackageManager implements PackageManager, Disposable {
             if (channel.isPypi) {
                 args.push('--pypi');
             }
-            args.push('-e', details.envName, ...installList);
+            if (details.envName !== 'default') {
+                args.push('-e', details.envName);
+            }
+            args.push(...installList);
 
             await window.withProgress(
                 {
@@ -130,22 +134,6 @@ export class PixiPythonPackageManager implements PackageManager, Disposable {
                 },
             );
         } else if (uninstallList.length > 0) {
-            let cached = this.packagesCache.get(environment.envId.id);
-            if (!cached || cached.length === 0) {
-                cached = (await this.getPackages(environment)) || [];
-            }
-            const pypiPkgs: string[] = [];
-            const condaPkgs: string[] = [];
-
-            for (const pkg of uninstallList) {
-                const found = cached.find((p) => p.name === pkg);
-                if (found?.tooltip?.toString().includes('(pypi)')) {
-                    pypiPkgs.push(pkg);
-                } else {
-                    condaPkgs.push(pkg);
-                }
-            }
-
             await window.withProgress(
                 {
                     location: ProgressLocation.Notification,
@@ -153,19 +141,37 @@ export class PixiPythonPackageManager implements PackageManager, Disposable {
                     cancellable: true,
                 },
                 async (_progress, token) => {
-                    if (condaPkgs.length > 0) {
-                        await runPixi(
-                            ['remove', '-e', details.envName, ...condaPkgs],
-                            { cwd: details.projectPath },
-                            token,
-                        );
-                    }
-                    if (pypiPkgs.length > 0) {
-                        await runPixi(
-                            ['remove', '--pypi', '-e', details.envName, ...pypiPkgs],
-                            { cwd: details.projectPath },
-                            token,
-                        );
+                    let cached: Package[] | undefined;
+                    for (const pkg of uninstallList) {
+                        if (token.isCancellationRequested) {
+                            break;
+                        }
+                        const scope = await findPackageScope(details.projectPath, pkg, details.envName);
+                        let isPypi = scope?.isPypi ?? false;
+                        if (!scope) {
+                            cached ??= (await this.getPackages(environment)) ?? [];
+                            isPypi = Boolean(
+                                cached
+                                    .find((p) => p.name === pkg)
+                                    ?.tooltip?.toString()
+                                    .includes('(pypi)'),
+                            );
+                        }
+
+                        const args = ['remove'];
+                        if (isPypi) {
+                            args.push('--pypi');
+                        }
+                        if (scope?.kind === 'feature' && scope.scopeName) {
+                            args.push('-f', scope.scopeName);
+                        } else if (scope?.kind === 'environment' && scope.scopeName) {
+                            args.push('-e', scope.scopeName);
+                        } else if (!scope && details.envName !== 'default') {
+                            args.push('-e', details.envName);
+                        }
+                        args.push(pkg);
+
+                        await runPixi(args, { cwd: details.projectPath }, token);
                     }
                     this.projectManager?.clearPackagesCache(details.projectPath);
                     await this.refresh(environment);

@@ -230,7 +230,7 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
 
                 // 1. Inline environment tasks ([environments.<env>.tasks])
                 for (const t of envObj.tasks ?? []) {
-                    registerTask(t, { fallbackEnv: envName, inlineEnv: envName });
+                    registerTask(t, { fallbackEnv: envName, inlineEnv: envObj.environment });
                 }
 
                 // 2. Feature tasks ([tasks] under default feature, or [feature.<name>.tasks])

@@ -63,10 +63,10 @@ export class PixiTransitiveGroupTreeItem extends TreeItem {
 
 export class PixiPackageTreeItem extends TreeItem {
     get projectPath(): string {
-        return this.project?.projectPath || this.env.projectPath;
+        return this.project.projectPath;
     }
     get manifestPath(): string {
-        return this.project?.manifestPath || path.join(this.env.projectPath, 'pixi.toml');
+        return this.project.manifestPath;
     }
     get pixiEnvName(): string {
         return this.env.pixiEnvName;
@@ -81,7 +81,7 @@ export class PixiPackageTreeItem extends TreeItem {
     constructor(
         public readonly pkg: PixiPackage,
         public readonly env: PixiEnvironmentInfo,
-        public readonly project?: PixiProject,
+        public readonly project: PixiProject,
         private readonly _featureName?: string,
     ) {
         super(pkg.name, TreeItemCollapsibleState.None);

@@ -1,20 +1,11 @@
 import * as path from 'path';
-import {
-    commands,
-    ConfigurationTarget,
-    Disposable,
-    InputBoxValidationSeverity,
-    QuickPickItem,
-    Uri,
-    window,
-    workspace,
-} from 'vscode';
+import { commands, Disposable, InputBoxValidationSeverity, QuickPickItem, Uri, window, workspace } from 'vscode';
 
 import { runPixiWithProgress } from '../../cli/workspaceCli';
 import { revealDefinitionInManifest } from '../../common/execUtils';
 import { PixiProjectManager } from '../../core/projectManager';
 import { PixiTask, PixiTaskProvider } from '../../providers/taskProvider';
-import { getWorkspaceFeatures, pickPixiProject } from './common';
+import { getWorkspaceFeatures, pickPixiProject, updateConfigurationValue } from './common';
 
 export interface TaskCommandArg {
     task?: PixiTask;
@@ -124,14 +115,7 @@ export function registerTaskCommands(manager: PixiProjectManager, taskProvider: 
             });
 
             if (selected) {
-                const inspect = config.inspect<string>('groupBy');
-                const target =
-                    inspect?.workspaceFolderValue !== undefined
-                        ? ConfigurationTarget.WorkspaceFolder
-                        : inspect?.workspaceValue !== undefined
-                          ? ConfigurationTarget.Workspace
-                          : ConfigurationTarget.Global;
-                await config.update('groupBy', selected.value, target);
+                await updateConfigurationValue(config, 'groupBy', selected.value);
             }
         }),
 

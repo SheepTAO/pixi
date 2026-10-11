@@ -186,15 +186,7 @@ export async function revealDefinitionInManifest(options: RevealDefinitionOption
         const lines = text.split(/\r?\n/);
 
         const escapedName = escapeRegex(targetName);
-        const altName =
-            kind === 'package'
-                ? targetName.includes('-')
-                    ? targetName.replace(/-/g, '_')
-                    : targetName.includes('_')
-                      ? targetName.replace(/_/g, '-')
-                      : undefined
-                : undefined;
-        const namePattern = altName ? `(?:${escapedName}|${escapeRegex(altName)})` : escapedName;
+        const namePattern = kind === 'package' ? escapedName.replace(/[-_]/g, '[-_]') : escapedName;
 
         const keyRegex = new RegExp(`^\\s*["']?${namePattern}["']?\\s*=`, 'i');
         const taskSectionRegex =

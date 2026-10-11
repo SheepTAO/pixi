@@ -80,15 +80,13 @@ export async function findPackageLineInLockfile(lockPath: string, pkgName: strin
         return -1;
     }
 
-    const escaped = escapeRegex(pkgName);
-    const altName = pkgName.includes('_') ? pkgName.replace(/_/g, '-') : pkgName.replace(/-/g, '_');
-    const altEscaped = escapeRegex(altName);
+    const namePattern = escapeRegex(pkgName).replace(/[-_]/g, '[-_]');
 
     const regCondaOrPypi = new RegExp(
-        `^\\s*-\\s*(?:conda|pypi):\\s*.*[/\\\\](?:${escaped}|${altEscaped})(?:-[0-9]|[/\\\\]?\\s*$)`,
+        `^\\s*-\\s*(?:conda|pypi):\\s*.*[/\\\\]${namePattern}(?:-[0-9]|[/\\\\]?\\s*$)`,
         'i',
     );
-    const regName = new RegExp(`^\\s*name:\\s*["']?(?:${escaped}|${altEscaped})["']?\\s*$`, 'i');
+    const regName = new RegExp(`^\\s*name:\\s*["']?${namePattern}["']?\\s*$`, 'i');
 
     const packagesIndex = lines.findIndex((l) => /^packages:\s*$/.test(l));
     const searchStartIndex = packagesIndex !== -1 ? packagesIndex : 0;
@@ -124,13 +122,11 @@ export async function getLockedPackageVersion(lockPath: string, pkgName: string)
     }
     const targetLine = lines[lineIndex];
 
-    const escaped = escapeRegex(pkgName);
-    const altName = pkgName.includes('_') ? pkgName.replace(/_/g, '-') : pkgName.replace(/-/g, '_');
-    const altEscaped = escapeRegex(altName);
+    const namePattern = escapeRegex(pkgName).replace(/[-_]/g, '[-_]');
 
     const urlMatch = targetLine.match(
         new RegExp(
-            `[/\\\\](?:${escaped}|${altEscaped})-([0-9][^/\\\\\\s]*?)(?:-[^/\\\\\\s]+)?\\.(?:conda|tar\\.bz2|whl|tar\\.gz)`,
+            `[/\\\\]${namePattern}-([0-9][^/\\\\\\s]*?)(?:-[^/\\\\\\s]+)?\\.(?:conda|tar\\.bz2|whl|tar\\.gz)`,
             'i',
         ),
     );
@@ -341,6 +337,18 @@ export class PixiDependencyManifestProvider
         return deps;
     }
 
+    private getDependencyAtPosition(document: TextDocument, position: Position): ParsedDependency | undefined {
+        const deps = this.parseManifestDependencies(document);
+        return deps.find(
+            (d) =>
+                d.line === position.line &&
+                ((position.character >= d.nameRange.start.character &&
+                    position.character <= d.nameRange.end.character) ||
+                    (position.character >= d.valueRange.start.character &&
+                        position.character <= d.valueRange.end.character)),
+        );
+    }
+
     /**
      * Provide InlayHints showing locked version inline at the end of each dependency line.
      */
@@ -433,20 +441,7 @@ export class PixiDependencyManifestProvider
             return undefined;
         }
 
-        const deps = this.parseManifestDependencies(document);
-        if (deps.length === 0 || token.isCancellationRequested) {
-            return undefined;
-        }
-
-        const matched = deps.find(
-            (d) =>
-                d.line === position.line &&
-                ((position.character >= d.nameRange.start.character &&
-                    position.character <= d.nameRange.end.character) ||
-                    (position.character >= d.valueRange.start.character &&
-                        position.character <= d.valueRange.end.character)),
-        );
-
+        const matched = this.getDependencyAtPosition(document, position);
         if (!matched || token.isCancellationRequested) {
             return undefined;
         }
@@ -605,20 +600,7 @@ export class PixiDependencyManifestProvider
             return undefined;
         }
 
-        const deps = this.parseManifestDependencies(document);
-        if (deps.length === 0 || token.isCancellationRequested) {
-            return undefined;
-        }
-
-        const matched = deps.find(
-            (d) =>
-                d.line === position.line &&
-                ((position.character >= d.nameRange.start.character &&
-                    position.character <= d.nameRange.end.character) ||
-                    (position.character >= d.valueRange.start.character &&
-                        position.character <= d.valueRange.end.character)),
-        );
-
+        const matched = this.getDependencyAtPosition(document, position);
         if (!matched || token.isCancellationRequested) {
             return undefined;
         }
