@@ -346,7 +346,7 @@ export class PixiDependencyManifestProvider
         const missingDeps: ParsedDependency[] = [];
 
         for (const dep of visibleDeps) {
-            const pkg = this.lookupPackage(activeMap, dep.name);
+            const pkg = activeMap.get(normalizePkgName(dep.name));
             if (pkg && pkg.version) {
                 hints.push(this.createInlayHint(dep, pkg));
             } else {
@@ -375,7 +375,7 @@ export class PixiDependencyManifestProvider
                 const defaultPkgs = await this.projectManager.getPackagesForEnvironment('default', projectPath);
                 const defaultMap = this.createPackageMap(defaultPkgs);
                 for (const dep of stillMissing) {
-                    const pkg = this.lookupPackage(defaultMap, dep.name);
+                    const pkg = defaultMap.get(normalizePkgName(dep.name));
                     if (pkg && pkg.version) {
                         hints.push(this.createInlayHint(dep, pkg));
                     }
@@ -411,8 +411,9 @@ export class PixiDependencyManifestProvider
             return undefined;
         }
 
+        const normMatchedName = normalizePkgName(matched.name);
         const activeMap = this.createPackageMap(activePackages);
-        let targetPkg = this.lookupPackage(activeMap, matched.name);
+        let targetPkg = activeMap.get(normMatchedName);
         let foundEnvName = activeEnvName;
 
         // Collect cross-environment occurrences
@@ -438,7 +439,7 @@ export class PixiDependencyManifestProvider
 
             for (const { envName, packages } of otherResults) {
                 const map = this.createPackageMap(packages);
-                const pkg = this.lookupPackage(map, matched.name);
+                const pkg = map.get(normMatchedName);
                 if (pkg) {
                     envVersions.set(envName, pkg);
                     if (!targetPkg) {
@@ -631,15 +632,7 @@ export class PixiDependencyManifestProvider
     }
 
     private createPackageMap(packages: PixiPackage[]): Map<string, PixiPackage> {
-        const map = new Map<string, PixiPackage>();
-        for (const pkg of packages) {
-            map.set(normalizePkgName(pkg.name), pkg);
-        }
-        return map;
-    }
-
-    private lookupPackage(map: Map<string, PixiPackage>, name: string): PixiPackage | undefined {
-        return map.get(normalizePkgName(name));
+        return new Map(packages.map((pkg) => [normalizePkgName(pkg.name), pkg]));
     }
 
     private createInlayHint(dep: ParsedDependency, pkg: PixiPackage): InlayHint {

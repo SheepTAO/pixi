@@ -81,9 +81,8 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
                 } else {
                     if (e.scope) {
                         const project = this.api.getPythonProject(e.scope);
-                        const projectPath =
-                            project?.uri.fsPath || (e.scope instanceof Uri ? e.scope.fsPath : undefined);
-                        if (projectPath && this.activeEnv.has(projectPath)) {
+                        const projectPath = project?.uri.fsPath || e.scope.fsPath;
+                        if (this.activeEnv.has(projectPath)) {
                             const oldEnv = this.activeEnv.get(projectPath);
                             this.activeEnv.delete(projectPath);
                             this.triggerDidChangeEnvironment(Uri.file(projectPath), oldEnv, undefined);

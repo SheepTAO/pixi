@@ -115,15 +115,14 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
             return [];
         }
 
+        const projectTasksList = await Promise.all(projectPaths.map((p) => this.getTasksForProject(p)));
+
         const allTasks: Task[] = [];
-        for (const projectPath of projectPaths) {
-            const pixiTasks = await this.getTasksForProject(projectPath);
-            for (const t of pixiTasks) {
-                try {
-                    allTasks.push(await this.createVsCodeTask(t));
-                } catch (err) {
-                    traceError(`Failed to create task for ${t.name}:`, err);
-                }
+        for (const t of projectTasksList.flat()) {
+            try {
+                allTasks.push(await this.createVsCodeTask(t));
+            } catch (err) {
+                traceError(`Failed to create task for ${t.name}:`, err);
             }
         }
         return allTasks;
@@ -287,10 +286,7 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
             return undefined;
         }
 
-        const allTasks: PixiTask[] = [];
-        for (const p of projectPaths) {
-            allTasks.push(...(await this.getTasksForProject(p)));
-        }
+        const allTasks = (await Promise.all(projectPaths.map((p) => this.getTasksForProject(p)))).flat();
 
         if (allTasks.length === 0) {
             window.showInformationMessage('No Pixi tasks found.');

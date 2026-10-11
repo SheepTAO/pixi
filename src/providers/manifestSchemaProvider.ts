@@ -238,7 +238,7 @@ export class PixiManifestSchemaProvider implements CompletionItemProvider, Hover
                 },
                 {
                     name: `${prefix}pypi-dependencies`,
-                    snippet: `[${prefix}pypi-dependencies]\n\${1:requests} = "\${2:*"`,
+                    snippet: `[${prefix}pypi-dependencies]\n\${1:requests} = "\${2:*}"`,
                     doc: 'Project PyPI dependencies (installed into pixi environments)',
                 },
                 {

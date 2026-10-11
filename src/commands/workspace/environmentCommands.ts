@@ -48,7 +48,7 @@ async function runSingleEnvironmentInstallCommand(
     presetEnv?: string,
 ): Promise<void> {
     const targetCommand = action === 'reinstall' ? 'pixi.reinstall' : 'pixi.install';
-    const envName = (typeof presetEnv === 'string' && presetEnv.trim()) || extractEnvironmentName(targetItem);
+    const envName = extractEnvironmentName(targetItem, presetEnv);
     if (envName) {
         await commands.executeCommand(targetCommand, targetItem, envName);
         return;
@@ -313,11 +313,11 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
 
             const envs = manager.getEnvironmentsForProject(projectPath);
             if (envs.length === 0) {
-                window.showInformationMessage('No installed environments found to delete in this project.');
+                window.showInformationMessage('No environments found in this project.');
                 return;
             }
 
-            const targetEnvName =
+            const envName =
                 extractEnvironmentName(targetItem) ??
                 (
                     await window.showQuickPick(envs.map(toEnvQuickPickItem), {
@@ -326,11 +326,10 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                     })
                 )?.envName;
 
-            if (!targetEnvName) {
+            if (!envName) {
                 return;
             }
 
-            const envName = targetEnvName;
             const targetEnvInfo = envs.find((e) => e.pixiEnvName === envName);
             const isInstalled = targetEnvInfo?.pixiStatus === 'installed';
 
@@ -528,7 +527,7 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
             }
 
             const projectName = path.basename(projectPath);
-            const explicitEnv = typeof envName === 'string' && envName.trim() ? envName.trim() : undefined;
+            const explicitEnv = extractEnvironmentName(undefined, envName);
 
             if (explicitEnv) {
                 await runPixiWithProgress(
@@ -567,7 +566,7 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
             }
 
             const projectName = path.basename(projectPath);
-            const explicitEnv = (typeof envName === 'string' && envName.trim()) || extractEnvironmentName(targetItem);
+            const explicitEnv = extractEnvironmentName(targetItem, envName);
 
             if (explicitEnv) {
                 await runPixiWithProgress(
@@ -773,7 +772,7 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                 }
 
                 const projectName = path.basename(projectPath);
-                let envName = (typeof presetEnv === 'string' && presetEnv.trim()) || extractEnvironmentName(targetItem);
+                let envName = extractEnvironmentName(targetItem, presetEnv);
                 if (!envName) {
                     const envs = manager.getEnvironmentsForProject(projectPath);
                     const namedEnvs = envs.filter((e) => e.pixiEnvName !== 'default');
@@ -880,8 +879,7 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                 return;
             }
 
-            let featureName =
-                (typeof presetFeature === 'string' && presetFeature.trim()) || extractFeatureName(targetItem);
+            let featureName = extractFeatureName(targetItem, presetFeature);
 
             if (!featureName) {
                 const pick = await window.showQuickPick(
@@ -935,8 +933,7 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                 if (!projectPath) {
                     return;
                 }
-                let featureName =
-                    (typeof presetFeature === 'string' && presetFeature.trim()) || extractFeatureName(targetItem);
+                let featureName = extractFeatureName(targetItem, presetFeature);
                 if (!featureName) {
                     const allFeatures = await getWorkspaceFeatures(projectPath);
                     const pick = await window.showQuickPick(

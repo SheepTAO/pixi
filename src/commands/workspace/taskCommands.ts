@@ -323,7 +323,6 @@ export function registerTaskCommands(manager: PixiProjectManager, taskProvider: 
             );
 
             if (success) {
-                taskProvider.refresh(projectPath);
                 await revealDefinitionInManifest({
                     manifestPath: manager.getManifestPath(projectPath),
                     targetName: taskName,
@@ -374,17 +373,13 @@ export function registerTaskCommands(manager: PixiProjectManager, taskProvider: 
             }
             args.push(targetTask.name);
 
-            const success = await runPixiWithProgress(
+            await runPixiWithProgress(
                 `Pixi: Removing task '${targetTask.name}' from ${projectName}...`,
                 args,
                 projectPath,
                 manager,
                 `Pixi: Task '${targetTask.name}' removed successfully from ${projectName}.`,
             );
-
-            if (success) {
-                taskProvider.refresh(projectPath);
-            }
         }),
     ];
 }

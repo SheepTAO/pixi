@@ -440,12 +440,12 @@ export function extractCommandContext(target?: unknown): ExtractedCommandContext
     return {};
 }
 
-export function extractEnvironmentName(target?: unknown): string | undefined {
-    return extractCommandContext(target).envName;
+export function extractEnvironmentName(target?: unknown, preset?: string): string | undefined {
+    return (typeof preset === 'string' && preset.trim()) || extractCommandContext(target).envName;
 }
 
-export function extractFeatureName(target?: unknown): string | undefined {
-    return extractCommandContext(target).featureName;
+export function extractFeatureName(target?: unknown, preset?: string): string | undefined {
+    return (typeof preset === 'string' && preset.trim()) || extractCommandContext(target).featureName;
 }
 
 export async function resolveTargetEnvironment(

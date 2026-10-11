@@ -381,7 +381,7 @@ export async function executeUnifiedUpdate(
     }
 
     const projectName = path.basename(projectPath);
-    const directEnv = (typeof envName === 'string' && envName.trim()) || extractEnvironmentName(targetItem);
+    const directEnv = extractEnvironmentName(targetItem, envName);
 
     interface UpdateActionItem extends QuickPickItem {
         action: 'check' | 'update' | 'upgrade';
