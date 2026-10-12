@@ -57,7 +57,7 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
         private readonly projectManager: PixiProjectManager,
         private readonly pixiApi: PixiExtensionApi,
     ) {
-        // When PixiProjectManager refreshes or projects change, refresh Python environments
+        // When PixiProjectManager refreshes, projects change, or configuration changes, update Python environments
         this.disposables.push(
             this.projectManager.onDidChangeEnvironments(async () => {
                 await this.refreshFromCore();
@@ -82,14 +82,10 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
                     this.updateGlobalActiveEnv(undefined);
                 }
             }),
-        );
-
-        // Listen for configuration changes
-        this.disposables.push(
             workspace.onDidChangeConfiguration(async (e) => {
                 if (e.affectsConfiguration('pixi.displayNameFormat')) {
                     traceVerbose('pixi.displayNameFormat changed, refreshing environments');
-                    await this.refresh(undefined);
+                    await this.refreshFromCore();
                 }
                 if (e.affectsConfiguration('pixi.environmentRules')) {
                     traceVerbose('pixi.environmentRules changed, updating environments for visible editors');
@@ -194,8 +190,11 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
 
         // Handle deleted projects
         for (const [oldPath, oldEnvs] of oldProjectToEnvs) {
-            if (!this.projectToEnvs.has(oldPath) && oldEnvs.length > 0) {
-                changes.push(...this.diffEnvironments(oldEnvs, []));
+            if (!this.projectToEnvs.has(oldPath)) {
+                this.activeEnv.delete(oldPath);
+                if (oldEnvs.length > 0) {
+                    changes.push(...this.diffEnvironments(oldEnvs, []));
+                }
             }
         }
 
@@ -209,11 +208,6 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
                 this.activeEnv.set(projectPath, found);
             } else {
                 this.activeEnv.delete(projectPath);
-            }
-        }
-        for (const activePath of this.activeEnv.keys()) {
-            if (!this.projectToEnvs.has(activePath)) {
-                this.activeEnv.delete(activePath);
             }
         }
 

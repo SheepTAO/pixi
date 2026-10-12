@@ -166,9 +166,6 @@ export class PixiDependencyManifestProvider
                     this.refresh();
                 }
             }),
-        );
-
-        this.disposables.push(
             commands.registerCommand(
                 'pixi.openLockfile',
                 async (options?: { projectPath?: string; packageName?: string } | Uri) => {
@@ -579,29 +576,12 @@ export class PixiDependencyManifestProvider
      * Helper to open pixi.lock, optionally jumping directly to a package's line.
      */
     public async openLockfileCommand(options?: { projectPath?: string; packageName?: string } | Uri): Promise<void> {
-        let projectPath: string | undefined;
-        let packageName: string | undefined;
-
-        if (options instanceof Uri) {
-            projectPath = this.projectManager.findProjectForUri(options);
-        } else if (options && typeof options === 'object') {
-            projectPath = options.projectPath;
-            packageName = options.packageName;
-        }
-
-        if (!projectPath) {
-            const activeDoc = window.activeTextEditor?.document;
-            if (activeDoc) {
-                projectPath = this.projectManager.findProjectForUri(activeDoc.uri);
-            }
-        }
-
-        if (!projectPath) {
-            const paths = this.projectManager.getProjectPaths();
-            if (paths.length > 0) {
-                projectPath = paths[0];
-            }
-        }
+        const packageName = options instanceof Uri ? undefined : options?.packageName;
+        const activeUri = window.activeTextEditor?.document.uri;
+        const projectPath =
+            (options instanceof Uri ? this.projectManager.findProjectForUri(options) : options?.projectPath) ||
+            (activeUri ? this.projectManager.findProjectForUri(activeUri) : undefined) ||
+            this.projectManager.getProjectPaths()[0];
 
         if (!projectPath) {
             window.showWarningMessage('No Pixi project found in workspace.');

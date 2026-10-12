@@ -167,7 +167,7 @@ export function registerTaskCommands(manager: PixiProjectManager, taskProvider: 
                     const separators = workspace
                         .getConfiguration('pixi.tasks', Uri.file(projectPath))
                         .get<string[]>('prefixSeparators', ['-', '_']);
-                    const sep = (separators && separators[0]) || '-';
+                    const sep = separators[0] || '-';
                     defaultTaskName = `${item.groupName}${sep}`;
                 } else if (item.groupType === 'environment' && item.groupName) {
                     initialEnv = item.groupName;

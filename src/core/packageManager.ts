@@ -45,7 +45,7 @@ export async function enrichLocalPackages(packages: PixiPackage[], projectPath: 
                     candidateDir = path.resolve(projectPath, pkg.source);
                 } else if (pkg.requested_spec) {
                     const pathMatch = pkg.requested_spec.match(/path\s*=\s*["']([^"']+)["']/);
-                    if (pathMatch && pathMatch[1]) {
+                    if (pathMatch?.[1]) {
                         candidateDir = path.resolve(projectPath, pathMatch[1]);
                     }
                 }
@@ -73,7 +73,7 @@ export async function enrichLocalPackages(packages: PixiPackage[], projectPath: 
                         pkg.local_manifest_path = candidateFile;
                         if (!pkg.version) {
                             const m = content.match(candidate.versionRegex);
-                            if (m && m[1]) {
+                            if (m?.[1]) {
                                 pkg.version = m[1];
                             }
                         }

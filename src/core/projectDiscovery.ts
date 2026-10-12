@@ -40,7 +40,7 @@ export function getProjectConfiguredChannels(projectPath: string): string[] {
         try {
             const content = fs.readFileSync(manifestFile, 'utf8');
             const match = content.match(/channels\s*=\s*\[([^\]]*)\]/);
-            if (match && match[1]) {
+            if (match?.[1]) {
                 const parsed = match[1]
                     .split(',')
                     .map((s) => s.trim().replace(/^['"]|['"]$/g, ''))
