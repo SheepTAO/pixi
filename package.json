@@ -96,6 +96,24 @@
                 "icon": "$(trash)"
             },
             {
+                "command": "pixi.platform",
+                "title": "Platform ...",
+                "category": "Pixi",
+                "icon": "$(device-desktop)"
+            },
+            {
+                "command": "pixi.addPlatform",
+                "title": "Add Platform ...",
+                "category": "Pixi",
+                "icon": "$(device-desktop)"
+            },
+            {
+                "command": "pixi.removePlatform",
+                "title": "Remove Platform ...",
+                "category": "Pixi",
+                "icon": "$(trash)"
+            },
+            {
                 "command": "pixi.openManifest",
                 "title": "Open Manifest",
                 "category": "Pixi",
@@ -403,6 +421,10 @@
                     "when": "pixi.hasPixiProject"
                 },
                 {
+                    "command": "pixi.platform",
+                    "when": "pixi.hasPixiProject"
+                },
+                {
                     "command": "pixi.addPackage",
                     "when": "pixi.hasPixiProject"
                 },
@@ -549,6 +571,14 @@
                 {
                     "command": "pixi.removeChannel",
                     "when": "false"
+                },
+                {
+                    "command": "pixi.addPlatform",
+                    "when": "false"
+                },
+                {
+                    "command": "pixi.removePlatform",
+                    "when": "false"
                 }
             ],
             "editor/title": [
@@ -610,19 +640,24 @@
                     "group": "1_manage@2"
                 },
                 {
-                    "command": "pixi.lock",
+                    "command": "pixi.platform",
                     "when": "view == pixi.views.projects && pixi.hasPixiProject",
                     "group": "1_manage@3"
                 },
                 {
-                    "command": "pixi.update",
+                    "command": "pixi.lock",
                     "when": "view == pixi.views.projects && pixi.hasPixiProject",
                     "group": "1_manage@4"
                 },
                 {
-                    "command": "pixi.reinstall",
+                    "command": "pixi.update",
                     "when": "view == pixi.views.projects && pixi.hasPixiProject",
                     "group": "1_manage@5"
+                },
+                {
+                    "command": "pixi.reinstall",
+                    "when": "view == pixi.views.projects && pixi.hasPixiProject",
+                    "group": "1_manage@6"
                 },
                 {
                     "command": "pixi.clean",
@@ -632,7 +667,7 @@
                 {
                     "command": "pixi.init",
                     "when": "view == pixi.views.projects && !pixi.hasPixiProject",
-                    "group": "1_manage@6"
+                    "group": "1_manage@7"
                 },
                 {
                     "command": "pixi.global.install",
@@ -720,6 +755,16 @@
                     "command": "pixi.removeChannel",
                     "when": "view == pixi.views.projects && viewItem == pixiProject",
                     "group": "2_channel@2"
+                },
+                {
+                    "command": "pixi.addPlatform",
+                    "when": "view == pixi.views.projects && viewItem == pixiProject",
+                    "group": "2_channel@3"
+                },
+                {
+                    "command": "pixi.removePlatform",
+                    "when": "view == pixi.views.projects && viewItem == pixiProject",
+                    "group": "2_channel@4"
                 },
                 {
                     "command": "pixi.addPackage",
@@ -832,9 +877,19 @@
                     "group": "1_navigate@1"
                 },
                 {
+                    "command": "pixi.addPlatform",
+                    "when": "view == pixi.views.projects && (viewItem == pixiFeatureItem || viewItem == pixiEnvFeatureGroup)",
+                    "group": "2_manage@1"
+                },
+                {
+                    "command": "pixi.removePlatform",
+                    "when": "view == pixi.views.projects && (viewItem == pixiFeatureItem || viewItem == pixiEnvFeatureGroup)",
+                    "group": "2_manage@2"
+                },
+                {
                     "command": "pixi.removeFeature",
                     "when": "view == pixi.views.projects && viewItem == pixiFeatureItem",
-                    "group": "2_manage@1"
+                    "group": "2_manage@3"
                 },
                 {
                     "command": "pixi.revealPackageInManifest",

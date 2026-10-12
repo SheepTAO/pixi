@@ -18,6 +18,7 @@ import {
     workspace,
 } from 'vscode';
 
+import { CONDA_PLATFORM_PRESETS } from '../commands/workspace/platformCommands';
 import { traceError, traceVerbose } from '../common/logging';
 
 interface SchemaProperty {
@@ -50,12 +51,7 @@ const COMMON_CHANNELS = [
 ];
 
 const COMMON_PLATFORMS = [
-    { label: 'linux-64', detail: 'Linux x86_64 architecture' },
-    { label: 'linux-aarch64', detail: 'Linux ARM64 / aarch64 architecture' },
-    { label: 'osx-arm64', detail: 'macOS Apple Silicon (M1/M2/M3/M4)' },
-    { label: 'osx-64', detail: 'macOS Intel x86_64 architecture' },
-    { label: 'win-64', detail: 'Windows x86_64 architecture' },
-    { label: 'win-arm64', detail: 'Windows ARM64 architecture' },
+    ...CONDA_PLATFORM_PRESETS.map((p) => ({ label: p.name, detail: p.description })),
     { label: 'noarch', detail: 'Platform-independent Conda packages' },
 ];
 
