@@ -6,7 +6,6 @@ import { runPixiWithProgress } from '../../cli/workspaceCli';
 import { normalizeFolderPath, revealDefinitionInManifest } from '../../common/execUtils';
 import { extractPackageNameFromSpec, sortPixiPackages } from '../../core/packageManager';
 import { PixiProjectManager } from '../../core/projectManager';
-import { PixiPackage } from '../../core/types';
 import {
     extractCommandContext,
     extractEnvironmentName,
@@ -31,53 +30,6 @@ import {
 } from './packageSearchPicker';
 import { disposeTreeOutputChannel, showDependencyTreeCommand, whyPackageCommand } from './packageTreeViewer';
 
-export interface PickPackageOptions {
-    title: string;
-    placeHolder: string;
-    emptyWarning?: string;
-    formatItem?: (pkg: PixiPackage) => QuickPickItem;
-}
-
-export async function pickPackageFromEnvironment(
-    manager: PixiProjectManager,
-    projectPath: string,
-    targetEnvName: string | undefined | null,
-    options: PickPackageOptions,
-): Promise<{ pkg: PixiPackage; pkgName: string; envLabel: string; targetEnv?: string } | undefined> {
-    const envs = manager.getEnvironmentsForProject(projectPath);
-    const resolvedEnv =
-        targetEnvName !== undefined
-            ? targetEnvName
-            : await resolveTargetEnvironment(envs, undefined, options.placeHolder);
-    if (resolvedEnv === null) {
-        return undefined;
-    }
-    const envLabel = resolvedEnv || (envs.length > 0 ? envs[0].pixiEnvName : 'default');
-    const packages = await manager.getPackagesForEnvironment(envLabel, projectPath);
-    if (packages.length === 0) {
-        window.showInformationMessage(options.emptyWarning || `No packages found in environment '${envLabel}'.`);
-        return undefined;
-    }
-    const sorted = sortPixiPackages(packages);
-    const items = options.formatItem
-        ? sorted.map((p) => ({ ...options.formatItem!(p), pkgName: p.name, pkg: p }))
-        : sorted.map((p) => ({
-              label: p.name,
-              description: p.version ? `v${p.version}` : undefined,
-              pkgName: p.name,
-              pkg: p,
-          }));
-    const pick = await window.showQuickPick(items, {
-        title: options.title,
-        placeHolder: options.placeHolder,
-        matchOnDescription: true,
-    });
-    if (!pick) {
-        return undefined;
-    }
-    return { pkg: pick.pkg, pkgName: pick.pkgName, envLabel, targetEnv: resolvedEnv };
-}
-
 export interface DeclaredPackageItem {
     pkgName: string;
     rawSpec: string;
@@ -94,27 +46,25 @@ export interface PickDeclaredPackageOptions {
     emptyWarning?: string;
 }
 
-export async function pickDeclaredPackage(
+export interface DeclaredQuickPickItem extends QuickPickItem {
+    declaredPkg?: DeclaredPackageItem;
+}
+
+export async function buildDeclaredPackageQuickPickItems(
     projectPath: string,
-    options?: PickDeclaredPackageOptions,
-): Promise<DeclaredPackageItem | undefined> {
+    options?: Pick<PickDeclaredPackageOptions, 'filterFeature' | 'filterEnv'> & { pickedByDefault?: boolean },
+): Promise<DeclaredQuickPickItem[]> {
     const [features, envs] = await Promise.all([
         getWorkspaceFeatures(projectPath),
         getWorkspaceEnvironments(projectPath),
     ]);
 
+    const envFeatures = options?.filterEnv ? envs.find((e) => e.name === options.filterEnv)?.features : undefined;
     const targetFeatures = options?.filterFeature
         ? features.filter((f) => f.name === options.filterFeature)
         : options?.filterEnv
-          ? features.filter((f) => {
-                const envEntry = envs.find((e) => e.name === options.filterEnv);
-                return f.name === 'default' || Boolean(envEntry?.features?.includes(f.name));
-            })
+          ? features.filter((f) => f.name === 'default' || Boolean(envFeatures?.includes(f.name)))
           : features;
-
-    interface DeclaredQuickPickItem extends QuickPickItem {
-        declaredPkg?: DeclaredPackageItem;
-    }
 
     const items: DeclaredQuickPickItem[] = [];
 
@@ -146,6 +96,7 @@ export async function pickDeclaredPackage(
                 label: `${icon} ${pkgName}`,
                 description: versionConstraint ? `${badge} ${versionConstraint}` : badge,
                 detail: `Scope: ${scopeLabel}`,
+                picked: options?.pickedByDefault,
                 declaredPkg: {
                     pkgName,
                     rawSpec,
@@ -201,6 +152,15 @@ export async function pickDeclaredPackage(
         }
     }
 
+    return items;
+}
+
+export async function pickDeclaredPackage(
+    projectPath: string,
+    options?: PickDeclaredPackageOptions,
+): Promise<DeclaredPackageItem | undefined> {
+    const items = await buildDeclaredPackageQuickPickItems(projectPath, options);
+
     if (items.length === 0) {
         window.showInformationMessage(
             options?.emptyWarning || 'No declared packages found in this Pixi project manifest.',
@@ -247,25 +207,24 @@ export async function executeAddPackage(
 export async function executeRemovePackage(
     manager: PixiProjectManager,
     projectPath: string,
-    pkg: Pick<PixiPackage, 'name' | 'kind'>,
+    pkgName: string,
     scope: PackageScopeResult,
 ): Promise<void> {
-    const isPypi = scope.isPypi || pkg.kind === 'pypi';
     const args = ['remove'];
-    if (isPypi) {
+    if (scope.isPypi) {
         args.push('--pypi');
     }
-    args.push(...getScopeArgs(scope), pkg.name);
+    args.push(...getScopeArgs(scope), pkgName);
 
     const projectName = path.basename(projectPath);
     const scopeLabel = formatScopeLabel(scope);
-    const sourceLabel = isPypi ? 'PyPI' : 'Conda';
+    const sourceLabel = scope.isPypi ? 'PyPI' : 'Conda';
     await runPixiWithProgress(
-        `Pixi: Removing '${pkg.name}' (${sourceLabel}) from ${scopeLabel} in '${projectName}'...`,
+        `Pixi: Removing '${pkgName}' (${sourceLabel}) from ${scopeLabel} in '${projectName}'...`,
         args,
         projectPath,
         manager,
-        `Pixi: Successfully removed '${pkg.name}' (${sourceLabel}) from ${scopeLabel} in '${projectName}'.`,
+        `Pixi: Successfully removed '${pkgName}' (${sourceLabel}) from ${scopeLabel} in '${projectName}'.`,
     );
 }
 
@@ -292,18 +251,38 @@ export async function executeUpdatePackage(
 }
 
 export function registerPackageCommands(manager: PixiProjectManager): Disposable[] {
-    const disposables: Disposable[] = [];
+    async function resolveDeclaredPackageTarget(
+        targetItem: unknown,
+        projectPlaceHolder: string,
+        pickerOptions: { title: string; placeHolder: string; emptyWarning: string },
+    ): Promise<{ pkgName: string; manifestPath?: string } | undefined> {
+        const ctx = extractCommandContext(targetItem);
+        let { pkgName, projectPath } = ctx;
 
-    // Pixi: Search Packages...
-    disposables.push(
+        if (!pkgName) {
+            projectPath ||= await pickPixiProject(manager, projectPlaceHolder, targetItem);
+            if (!projectPath) {
+                return undefined;
+            }
+            const picked = await pickDeclaredPackage(projectPath, pickerOptions);
+            if (!picked) {
+                return undefined;
+            }
+            pkgName = picked.pkgName;
+        }
+
+        const manifestPath = ctx.manifestPath || (projectPath ? manager.getManifestPath(projectPath) : undefined);
+        return { pkgName, manifestPath };
+    }
+
+    return [
+        // Pixi: Search Packages...
         commands.registerCommand('pixi.searchPackages', async (targetItem?: unknown) => {
             const targetProjectPath = normalizeFolderPath(targetItem);
             await showPackageSearchPicker(targetProjectPath);
         }),
-    );
 
-    // Pixi: Add Package...
-    disposables.push(
+        // Pixi: Add Package...
         commands.registerCommand(
             'pixi.addPackage',
             async (
@@ -393,10 +372,8 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
                 );
             },
         ),
-    );
 
-    // Pixi: Remove Package...
-    disposables.push(
+        // Pixi: Remove Package...
         commands.registerCommand('pixi.removePackage', async (targetItem?: unknown) => {
             const ctx = extractCommandContext(targetItem);
             if (ctx.pkg && ctx.projectPath) {
@@ -431,7 +408,10 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
                     return;
                 }
 
-                return executeRemovePackage(manager, projectPath, pkg, scope);
+                return executeRemovePackage(manager, projectPath, pkg.name, {
+                    ...scope,
+                    isPypi: scope.isPypi || pkg.kind === 'pypi',
+                });
             }
 
             const projectPath = await pickPixiProject(
@@ -465,31 +445,20 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
                 return;
             }
 
-            return executeRemovePackage(
-                manager,
-                projectPath,
-                { name: picked.pkgName, kind: picked.kind },
-                picked.scope,
-            );
+            return executeRemovePackage(manager, projectPath, picked.pkgName, picked.scope);
         }),
-    );
 
-    // Pixi: Show Dependency Tree
-    disposables.push(
+        // Pixi: Show Dependency Tree
         commands.registerCommand('pixi.showDependencyTree', async (targetItem?: unknown) => {
             await showDependencyTreeCommand(manager, targetItem);
         }),
-    );
 
-    // Pixi: Why is This Package Installed? (Reverse Tree)
-    disposables.push(
+        // Pixi: Why is This Package Installed? (Reverse Tree)
         commands.registerCommand('pixi.whyPackage', async (targetItem?: unknown) => {
             await whyPackageCommand(manager, targetItem);
         }),
-    );
 
-    // Pixi: Update Package
-    disposables.push(
+        // Pixi: Update Package
         commands.registerCommand('pixi.updatePackage', async (targetItem?: unknown) => {
             const ctx = extractCommandContext(targetItem);
             if (ctx.pkg && ctx.env && ctx.projectPath) {
@@ -501,55 +470,45 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
                 return;
             }
 
-            const targetEnv = extractEnvironmentName(targetItem);
-            const picked = await pickPackageFromEnvironment(manager, projectPath, targetEnv, {
+            const placeHolder = 'Select a package to update to latest compatible version';
+            const envs = manager.getEnvironmentsForProject(projectPath);
+            const targetEnv = await resolveTargetEnvironment(envs, targetItem, placeHolder);
+            if (targetEnv === null) {
+                return;
+            }
+
+            const envLabel = targetEnv || (envs.length > 0 ? envs[0].pixiEnvName : 'default');
+            const packages = await manager.getPackagesForEnvironment(envLabel, projectPath);
+            if (packages.length === 0) {
+                window.showInformationMessage(`No packages found in environment '${envLabel}'.`);
+                return;
+            }
+
+            const items = sortPixiPackages(packages).map((p) => {
+                const channelBadge = p.kind === 'pypi' ? '[PyPI]' : '[Conda]';
+                const explicitBadge = p.is_explicit ? 'explicit' : 'transitive';
+                return {
+                    label: `${p.is_explicit ? '$(package)' : '$(symbol-field)'} ${p.name}`,
+                    description: p.version
+                        ? `${channelBadge} v${p.version} (${explicitBadge})`
+                        : `${channelBadge} (${explicitBadge})`,
+                    pkgName: p.name,
+                };
+            });
+
+            const picked = await window.showQuickPick(items, {
                 title: 'Pixi: Update Package',
-                placeHolder: 'Select a package to update to latest compatible version',
-                formatItem: (p) => {
-                    const channelBadge = p.kind === 'pypi' ? '[PyPI]' : '[Conda]';
-                    const explicitBadge = p.is_explicit ? 'explicit' : 'transitive';
-                    return {
-                        label: `${p.is_explicit ? '$(package)' : '$(symbol-field)'} ${p.name}`,
-                        description: p.version
-                            ? `${channelBadge} v${p.version} (${explicitBadge})`
-                            : `${channelBadge} (${explicitBadge})`,
-                    };
-                },
+                placeHolder,
+                matchOnDescription: true,
             });
             if (!picked) {
                 return;
             }
 
-            return executeUpdatePackage(manager, projectPath, picked.pkgName, picked.targetEnv);
+            return executeUpdatePackage(manager, projectPath, picked.pkgName, targetEnv);
         }),
-    );
 
-    async function resolveDeclaredPackageTarget(
-        targetItem: unknown,
-        projectPlaceHolder: string,
-        pickerOptions: { title: string; placeHolder: string; emptyWarning: string },
-    ): Promise<{ pkgName: string; manifestPath?: string } | undefined> {
-        const ctx = extractCommandContext(targetItem);
-        let { pkgName, projectPath } = ctx;
-
-        if (!pkgName) {
-            projectPath ||= await pickPixiProject(manager, projectPlaceHolder, targetItem);
-            if (!projectPath) {
-                return undefined;
-            }
-            const picked = await pickDeclaredPackage(projectPath, pickerOptions);
-            if (!picked) {
-                return undefined;
-            }
-            pkgName = picked.pkgName;
-        }
-
-        const manifestPath = ctx.manifestPath || (projectPath ? manager.getManifestPath(projectPath) : undefined);
-        return { pkgName, manifestPath };
-    }
-
-    // Pixi: Reveal Package in Manifest (pixi.toml / pyproject.toml)
-    disposables.push(
+        // Pixi: Reveal Package in Manifest (pixi.toml / pyproject.toml)
         commands.registerCommand('pixi.revealPackageInManifest', async (targetItem?: unknown) => {
             const target = await resolveDeclaredPackageTarget(targetItem, 'Select Pixi project', {
                 title: 'Select Package to Reveal in Manifest',
@@ -566,10 +525,8 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
                 kind: 'package',
             });
         }),
-    );
 
-    // Pixi: Copy Package Name
-    disposables.push(
+        // Pixi: Copy Package Name
         commands.registerCommand('pixi.copyPackageName', async (targetItem?: unknown) => {
             const target = await resolveDeclaredPackageTarget(targetItem, 'Select Pixi project to copy package from', {
                 title: 'Select Package to Copy Name',
@@ -583,13 +540,7 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
             await vscodeEnv.clipboard.writeText(target.pkgName);
             window.showInformationMessage(`Copied '${target.pkgName}' to clipboard.`);
         }),
-    );
 
-    disposables.push({
-        dispose: () => {
-            disposeTreeOutputChannel();
-        },
-    });
-
-    return disposables;
+        { dispose: disposeTreeOutputChannel },
+    ];
 }

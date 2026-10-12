@@ -29,7 +29,7 @@ import {
 } from '../../core/environmentRules';
 import { PixiProjectManager } from '../../core/projectManager';
 import { PIXI_MANAGER_ID } from './constants';
-import { createPythonEnvironment, isEnvironmentInvalid, promptToInstallIpykernel } from './pythonDiscovery';
+import { createPythonEnvironment, promptToInstallIpykernel } from './pythonDiscovery';
 import { PixiPythonEnvironment } from './types';
 
 export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
@@ -118,9 +118,7 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
     public dispose(): void {
         this._onDidChangeEnvironment.dispose();
         this._onDidChangeEnvironments.dispose();
-        for (const d of this.disposables) {
-            d.dispose();
-        }
+        Disposable.from(...this.disposables).dispose();
         this.globalEnv = undefined;
         this.activeEnv.clear();
         this.projectToEnvs.clear();
@@ -265,6 +263,10 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
         return changes;
     }
 
+    private resolveProjectPath(uri: Uri): string | undefined {
+        return this.api.getPythonProject(uri)?.uri.fsPath || this.projectManager.findProjectForUri(uri);
+    }
+
     async getEnvironments(scope: GetEnvironmentsScope): Promise<PythonEnvironment[]> {
         await this.initialize();
 
@@ -274,8 +276,7 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
         }
 
         if (scope instanceof Uri) {
-            const project = this.api.getPythonProject(scope);
-            const projectPath = project?.uri.fsPath || this.projectManager.findProjectForUri(scope);
+            const projectPath = this.resolveProjectPath(scope);
             const envs = projectPath ? this.projectToEnvs.get(projectPath) || [] : [];
             return [...envs];
         }
@@ -290,8 +291,7 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
             return this.globalEnv;
         }
 
-        const project = this.api.getPythonProject(scope);
-        const projectPath = project?.uri.fsPath || this.projectManager.findProjectForUri(scope);
+        const projectPath = this.resolveProjectPath(scope);
         if (!projectPath) {
             return this.globalEnv;
         }
@@ -319,11 +319,9 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
                 return;
             }
 
-            if (isEnvironmentInvalid(pyEnv)) {
+            if (pyEnv.pixiStatus === 'incompatible') {
                 const reason =
-                    pyEnv.statusReason ||
-                    pyEnv.error ||
-                    'The environment is incompatible with the current platform or missing Python.';
+                    pyEnv.statusReason || 'The environment is incompatible with the current platform or missing Python.';
                 void window.showErrorMessage(`Cannot activate environment '${pyEnv.displayName}': ${reason}`);
                 return;
             }
@@ -334,7 +332,7 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
                 (Array.isArray(scope) && scope.some((u) => u.fsPath.endsWith('.ipynb'))) ||
                 (!scope && (window.activeNotebookEditor?.notebook.uri.fsPath.endsWith('.ipynb') ?? false));
 
-            if (isNotebook && pyEnv.pixiStatus === 'installed' && pyEnv.hasIpykernel === false) {
+            if (isNotebook && !pyEnv.hasIpykernel) {
                 const projectPath = pyEnv.projectPath;
                 const altEnvs = this.projectToEnvs.get(projectPath) || [];
                 void promptToInstallIpykernel(pyEnv, this.projectManager, altEnvs, async (target) => {
@@ -376,7 +374,7 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
         } else {
             this.activeEnv.delete(projectPath);
         }
-        this.triggerDidChangeEnvironment(Uri.file(projectPath), oldEnv, pyEnv);
+        this._onDidChangeEnvironment.fire({ uri: Uri.file(projectPath), old: oldEnv, new: pyEnv });
     }
 
     private updateGlobalActiveEnv(pyEnv: PixiPythonEnvironment | undefined): void {
@@ -385,18 +383,6 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
             return;
         }
         this.globalEnv = pyEnv;
-        this.triggerDidChangeEnvironment(undefined, oldGlobal, pyEnv);
-    }
-
-    private triggerDidChangeEnvironment(
-        uri: Uri | undefined,
-        oldEnv: PythonEnvironment | undefined,
-        newEnv: PythonEnvironment | undefined,
-    ): void {
-        this._onDidChangeEnvironment.fire({
-            uri,
-            old: oldEnv,
-            new: newEnv,
-        });
+        this._onDidChangeEnvironment.fire({ uri: undefined, old: oldGlobal, new: pyEnv });
     }
 }

@@ -40,21 +40,6 @@ export function matchEnvironmentName(rules: string[] | Record<string, string>, r
 }
 
 /**
- * Generic environment matcher that finds the matching environment object from a list.
- */
-export function matchEnvironmentRule<T extends { pixiEnvName: string }>(
-    rules: string[] | Record<string, string>,
-    relPath: string,
-    envs: T[],
-): T | undefined {
-    const target = matchEnvironmentName(rules, relPath);
-    if (!target) {
-        return undefined;
-    }
-    return envs.find((e) => e.pixiEnvName === target);
-}
-
-/**
  * Resolves the matching environment for a given document URI according to configured environment rules.
  */
 export function matchEnvironmentForUri<T extends { pixiEnvName: string }>(
@@ -68,8 +53,9 @@ export function matchEnvironmentForUri<T extends { pixiEnvName: string }>(
             const rules = workspace
                 .getConfiguration('pixi', uri)
                 .get<string[] | Record<string, string>>('environmentRules');
-            if (rules) {
-                return matchEnvironmentRule(rules, relPath, envs);
+            const target = rules ? matchEnvironmentName(rules, relPath) : undefined;
+            if (target) {
+                return envs.find((e) => e.pixiEnvName === target);
             }
         }
     }

@@ -127,7 +127,7 @@ export class PixiProjectManager implements Disposable {
 
     public getProjects(): PixiProject[] {
         const projects = this.projectPaths.map((p) => {
-            const envs = this.projectToEnvs.get(path.normalize(p));
+            const envs = this.projectToEnvs.get(p);
             return {
                 name: envs && envs.length > 0 ? envs[0].projectName : path.basename(p),
                 projectPath: p,
@@ -185,10 +185,6 @@ export class PixiProjectManager implements Disposable {
                     this.packagesCache.set(cacheKey, pkgs);
                     traceVerbose(`Loaded ${pkgs.length} packages for environment '${envName}' in ${projectPath}`);
                     return pkgs;
-                })
-                .catch((error) => {
-                    traceError(`Failed to fetch packages for environment '${envName}':`, error);
-                    return [];
                 })
                 .finally(() => {
                     this.packagesInFlight.delete(cacheKey);
@@ -249,8 +245,7 @@ export class PixiProjectManager implements Disposable {
         if (scope) {
             const projectPath = this.findProjectForUri(scope);
             if (projectPath && isPixiProject(projectPath)) {
-                const normalized = path.normalize(projectPath);
-                await this.refreshProject(normalized);
+                await this.refreshProject(projectPath);
                 this._onDidChangeEnvironments.fire();
                 return;
             }
@@ -365,31 +360,30 @@ export class PixiProjectManager implements Disposable {
 
     private async checkAutoInstall(): Promise<void> {
         for (const projectPath of this.projectPaths) {
-            const normalized = path.normalize(projectPath);
-            const envs = this.getEnvironmentsForProject(normalized);
+            const envs = this.getEnvironmentsForProject(projectPath);
             const uninstalledEnvs = envs.filter((e) => e.pixiStatus === 'uninstalled');
 
             if (uninstalledEnvs.length === 0) {
-                this.promptedAutoInstallProjects.delete(normalized);
+                this.promptedAutoInstallProjects.delete(projectPath);
                 continue;
             }
 
-            if (this.promptedAutoInstallProjects.has(normalized)) {
+            if (this.promptedAutoInstallProjects.has(projectPath)) {
                 continue;
             }
 
-            const config = workspace.getConfiguration('pixi', Uri.file(normalized));
+            const config = workspace.getConfiguration('pixi', Uri.file(projectPath));
             const policy = config.get<'prompt' | 'always' | 'never'>('autoInstallOnOpen', 'prompt');
             if (policy === 'never') {
                 continue;
             }
 
-            this.promptedAutoInstallProjects.add(normalized);
-            const projectName = envs[0]?.projectName || path.basename(normalized);
+            this.promptedAutoInstallProjects.add(projectPath);
+            const projectName = envs[0]?.projectName || path.basename(projectPath);
 
             if (policy === 'always') {
-                traceVerbose(`Auto-installing environments for '${projectName}' (${normalized})`);
-                await commands.executeCommand('pixi.install', Uri.file(normalized));
+                traceVerbose(`Auto-installing environments for '${projectName}' (${projectPath})`);
+                await commands.executeCommand('pixi.install', Uri.file(projectPath));
             } else if (policy === 'prompt') {
                 const uninstalledNames = uninstalledEnvs.map((e) => `'${e.pixiEnvName}'`).join(', ');
                 window
@@ -400,7 +394,7 @@ export class PixiProjectManager implements Disposable {
                     )
                     .then(async (selection) => {
                         if (selection === 'Install') {
-                            await commands.executeCommand('pixi.install', Uri.file(normalized));
+                            await commands.executeCommand('pixi.install', Uri.file(projectPath));
                         } else if (selection === 'Never for this Project') {
                             await config.update('autoInstallOnOpen', 'never', ConfigurationTarget.WorkspaceFolder);
                         }

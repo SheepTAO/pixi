@@ -4,7 +4,7 @@ import { commands, Disposable, env as vscodeEnv, QuickPickItem, Uri, window, wor
 
 import { cleanGlobalCache, clearPixiCache, runPixi } from '../cli/pixiCli';
 import { normalizeLocationPath, runWithProgressNotification } from '../common/execUtils';
-import { traceError, traceVerbose } from '../common/logging';
+import { traceVerbose } from '../common/logging';
 import { PixiInfoTreeDataProvider } from '../views/infoTreeDataProvider';
 
 export async function openLocation(target?: unknown): Promise<void> {
@@ -103,15 +103,10 @@ export function registerInfoCommands(infoProvider: PixiInfoTreeDataProvider): Di
                 'Updating Pixi CLI...',
                 async () => {
                     traceVerbose('Running pixi self-update...');
-                    try {
-                        const output = await runPixi(['self-update'], { includeStderr: true });
-                        clearPixiCache();
-                        infoProvider.refresh();
-                        return output;
-                    } catch (err: unknown) {
-                        traceError('Pixi self-update failed:', err);
-                        throw err;
-                    }
+                    const output = await runPixi(['self-update'], { includeStderr: true });
+                    clearPixiCache();
+                    infoProvider.refresh();
+                    return output;
                 },
                 (output) => {
                     const lines = output

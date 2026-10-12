@@ -227,9 +227,7 @@ interface GlobalToolCommandArg {
 }
 
 export function registerGlobalCommands(): Disposable {
-    const disposables: Disposable[] = [];
-
-    disposables.push(
+    return Disposable.from(
         commands.registerCommand('pixi.refreshGlobal', () => {
             refreshGlobalEnvironments();
         }),
@@ -255,10 +253,7 @@ export function registerGlobalCommands(): Disposable {
         commands.registerCommand('pixi.global.openManifest', async () => {
             await handleOpenGlobalManifest();
         }),
-    );
-
-    // Main Submenu Entry Point: Pixi: Global Tools...
-    disposables.push(
+        // Main Submenu Entry Point: Pixi: Global Tools...
         commands.registerCommand('pixi.global', async () => {
             const menuItems: GlobalActionQuickPickItem[] = [
                 {
@@ -323,6 +318,4 @@ export function registerGlobalCommands(): Disposable {
             }
         }),
     );
-
-    return Disposable.from(...disposables);
 }

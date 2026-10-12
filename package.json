@@ -877,19 +877,29 @@
                     "group": "1_navigate@1"
                 },
                 {
-                    "command": "pixi.addPlatform",
+                    "command": "pixi.addChannel",
                     "when": "view == pixi.views.projects && (viewItem == pixiFeatureItem || viewItem == pixiEnvFeatureGroup)",
                     "group": "2_manage@1"
                 },
                 {
-                    "command": "pixi.removePlatform",
+                    "command": "pixi.removeChannel",
                     "when": "view == pixi.views.projects && (viewItem == pixiFeatureItem || viewItem == pixiEnvFeatureGroup)",
                     "group": "2_manage@2"
                 },
                 {
+                    "command": "pixi.addPlatform",
+                    "when": "view == pixi.views.projects && (viewItem == pixiFeatureItem || viewItem == pixiEnvFeatureGroup)",
+                    "group": "2_manage@3"
+                },
+                {
+                    "command": "pixi.removePlatform",
+                    "when": "view == pixi.views.projects && (viewItem == pixiFeatureItem || viewItem == pixiEnvFeatureGroup)",
+                    "group": "2_manage@4"
+                },
+                {
                     "command": "pixi.removeFeature",
                     "when": "view == pixi.views.projects && viewItem == pixiFeatureItem",
-                    "group": "2_manage@3"
+                    "group": "2_manage@5"
                 },
                 {
                     "command": "pixi.revealPackageInManifest",

@@ -241,24 +241,10 @@ function scanRustToolchain(envPath: string, metaFiles: string[]): RustToolchainI
  */
 export async function scanEnvironmentToolchains(envPath: string): Promise<EnvironmentToolchains> {
     const metaFiles = await readCondaMetaFiles(envPath);
-    const python = scanPythonToolchain(envPath, metaFiles);
-    const cpp = scanCppToolchain(envPath, metaFiles);
-    const r = scanRToolchain(envPath, metaFiles);
-    const rust = scanRustToolchain(envPath, metaFiles);
-
-    const result: EnvironmentToolchains = {};
-    if (python) {
-        result.python = python;
-    }
-    if (cpp) {
-        result.cpp = cpp;
-    }
-    if (r) {
-        result.r = r;
-    }
-    if (rust) {
-        result.rust = rust;
-    }
-
-    return result;
+    return {
+        python: scanPythonToolchain(envPath, metaFiles),
+        cpp: scanCppToolchain(envPath, metaFiles),
+        r: scanRToolchain(envPath, metaFiles),
+        rust: scanRustToolchain(envPath, metaFiles),
+    };
 }

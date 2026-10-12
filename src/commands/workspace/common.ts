@@ -11,6 +11,7 @@ import {
 } from 'vscode';
 
 import { runPixi } from '../../cli/pixiCli';
+import { runPixiWithProgress } from '../../cli/workspaceCli';
 import { normalizeFolderPath, normalizeLocationPath } from '../../common/execUtils';
 import { getEnvironmentStatusBadge } from '../../core/environmentRules';
 import { normalizePkgName } from '../../core/packageManager';
@@ -557,4 +558,150 @@ export async function updateConfigurationValue<T>(
               ? ConfigurationTarget.Workspace
               : ConfigurationTarget.Global;
     await config.update(key, value, target);
+}
+
+export interface WorkspaceOrFeatureScopeOptions {
+    title: string;
+    placeHolder: string;
+    globalLabel: string;
+    globalDescription: string;
+    featureDescription: (featureName: string) => string;
+}
+
+export async function resolveWorkspaceOrFeatureScope(
+    projectPath: string,
+    options: WorkspaceOrFeatureScopeOptions,
+    targetItem?: unknown,
+    presetFeature?: string,
+): Promise<string | undefined | null> {
+    const contextFeature = extractFeatureName(targetItem, presetFeature);
+    if (contextFeature) {
+        return contextFeature === 'default' ? undefined : contextFeature;
+    }
+
+    const features = await getWorkspaceFeatures(projectPath);
+    const namedFeatures = features.filter((f) => f.name !== 'default');
+    if (namedFeatures.length === 0) {
+        return undefined;
+    }
+
+    interface ScopePickItem extends QuickPickItem {
+        featureName?: string;
+    }
+
+    const items: ScopePickItem[] = [
+        {
+            label: 'Workspace Scope',
+            kind: QuickPickItemKind.Separator,
+        },
+        {
+            label: options.globalLabel,
+            description: options.globalDescription,
+            featureName: undefined,
+        },
+        {
+            label: 'Feature Scope',
+            kind: QuickPickItemKind.Separator,
+        },
+        ...namedFeatures.map((f) => ({
+            label: `$(symbol-namespace) Feature: ${f.name}`,
+            description: options.featureDescription(f.name),
+            featureName: f.name,
+        })),
+    ];
+
+    const selected = await window.showQuickPick(items, {
+        title: options.title,
+        placeHolder: options.placeHolder,
+    });
+
+    if (!selected) {
+        return null;
+    }
+    return selected.featureName;
+}
+
+export interface ScopedRemovalQuickPickItem extends QuickPickItem {
+    itemName: string;
+    featureScope?: string;
+}
+
+export interface ExecuteScopedWorkspaceRemoveOptions {
+    subcommand: 'channel' | 'platform';
+    noun: string;
+    nounPlural: string;
+    projectPath: string;
+    manager: PixiProjectManager;
+    items: ScopedRemovalQuickPickItem[];
+    totalGlobalCount: number;
+    filterFeature?: string;
+    emptyGlobalWarning: string;
+}
+
+export async function executeScopedWorkspaceRemove(options: ExecuteScopedWorkspaceRemoveOptions): Promise<void> {
+    const {
+        subcommand,
+        noun,
+        nounPlural,
+        projectPath,
+        manager,
+        items,
+        totalGlobalCount,
+        filterFeature,
+        emptyGlobalWarning,
+    } = options;
+
+    if (items.length === 0) {
+        window.showInformationMessage(
+            filterFeature
+                ? `No custom ${nounPlural} configured on feature '${filterFeature}'.`
+                : `No removable ${nounPlural} found in this Pixi project.`,
+        );
+        return;
+    }
+
+    const capitalizedNoun = noun.charAt(0).toUpperCase() + noun.slice(1);
+    const selected = await window.showQuickPick(items, {
+        title: filterFeature
+            ? `Pixi: Remove ${capitalizedNoun} (feature '${filterFeature}')`
+            : `Pixi: Remove ${capitalizedNoun}`,
+        placeHolder: `Select one or more ${nounPlural} to remove from project manifest`,
+        canPickMany: true,
+    });
+    if (!selected || selected.length === 0) {
+        return;
+    }
+
+    const removingGlobalCount = selected.filter((s) => !s.featureScope).length;
+    if (totalGlobalCount > 0 && removingGlobalCount >= totalGlobalCount) {
+        window.showWarningMessage(emptyGlobalWarning);
+        return;
+    }
+
+    const byScope = new Map<string | undefined, string[]>();
+    for (const item of selected) {
+        const list = byScope.get(item.featureScope) || [];
+        list.push(item.itemName);
+        byScope.set(item.featureScope, list);
+    }
+
+    const commandBatch: string[][] = [];
+    for (const [feat, names] of byScope.entries()) {
+        const args = ['workspace', subcommand, 'remove'];
+        if (feat) {
+            args.push('-f', feat);
+        }
+        args.push(...names);
+        commandBatch.push(args);
+    }
+
+    const projectName = path.basename(projectPath);
+    const removedSummary = [...new Set(selected.map((s) => s.itemName))].join(', ');
+    await runPixiWithProgress(
+        `Pixi: Removing ${noun}(s) ${removedSummary} from '${projectName}'...`,
+        commandBatch,
+        projectPath,
+        manager,
+        `Pixi: Removed ${noun}(s) ${removedSummary} from '${projectName}'.`,
+    );
 }

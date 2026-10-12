@@ -132,7 +132,7 @@ export class PixiTaskManifestProvider implements CodeLensProvider, HoverProvider
 
             const range = new Range(parsed.line, 0, parsed.line, 0);
             const knownTask = taskMap.get(parsed.name);
-            const pixiTask = this.resolvePixiTask(parsed.name, projectPath, parsed.env, knownTask);
+            const pixiTask: PixiTask = knownTask ?? { name: parsed.name, projectPath, feature: parsed.env };
             const taskEnv = pixiTask.default_environment;
 
             const depDetails =
@@ -206,7 +206,7 @@ export class PixiTaskManifestProvider implements CodeLensProvider, HoverProvider
         }
 
         const knownTask = projectTasks.find((t) => t.name === matched.name);
-        const pixiTask = this.resolvePixiTask(matched.name, projectPath, matched.env, knownTask);
+        const pixiTask: PixiTask = knownTask ?? { name: matched.name, projectPath, feature: matched.env };
         const taskEnv = pixiTask.default_environment;
 
         const md = new MarkdownString('', true);
@@ -254,30 +254,8 @@ export class PixiTaskManifestProvider implements CodeLensProvider, HoverProvider
         return new Hover(md, highlightRange);
     }
 
-    private resolvePixiTask(
-        name: string,
-        projectPath: string,
-        sectionFeature?: string,
-        knownTask?: PixiTask,
-    ): PixiTask {
-        const defaultEnv = sectionFeature || knownTask?.default_environment;
-        return knownTask
-            ? {
-                  ...knownTask,
-                  default_environment: defaultEnv,
-                  feature: sectionFeature,
-                  inline_environment: undefined,
-              }
-            : { name, projectPath, default_environment: defaultEnv, feature: sectionFeature };
-    }
-
     private getManifestActionMode(document: TextDocument): ManifestActionMode {
-        const config = workspace.getConfiguration('pixi.tasks', document.uri);
-        const mode = config.get<string>('manifestActions');
-        if (mode && ['hover', 'compact', 'full', 'header', 'off'].includes(mode)) {
-            return mode as ManifestActionMode;
-        }
-        return 'hover';
+        return workspace.getConfiguration('pixi.tasks', document.uri).get<ManifestActionMode>('manifestActions', 'hover');
     }
 
     private parseManifestTasks(document: TextDocument): ParsedManifestResult {
@@ -367,8 +345,7 @@ export class PixiTaskManifestProvider implements CodeLensProvider, HoverProvider
     }
 
     public dispose(): void {
-        this.disposables.forEach((d) => d.dispose());
-        this.disposables.length = 0;
         this._onDidChangeCodeLenses.dispose();
+        Disposable.from(...this.disposables).dispose();
     }
 }

@@ -236,36 +236,35 @@ export async function whyPackageCommand(manager: PixiProjectManager, targetItem?
 
     if (packages.length > 0) {
         const sorted = sortPixiPackages(packages);
-        const transitivePkgs = sorted.filter((p) => !p.is_explicit);
-        const explicitPkgs = sorted.filter((p) => p.is_explicit);
+        const groups = [
+            {
+                label: 'Transitive Dependencies',
+                pkgs: sorted.filter((p) => !p.is_explicit),
+                icon: 'symbol-field',
+                tag: 'transitive',
+            },
+            {
+                label: 'Explicit Dependencies (Top-level)',
+                pkgs: sorted.filter((p) => p.is_explicit),
+                icon: 'package',
+                tag: 'explicit',
+            },
+        ];
 
         const items: (QuickPickItem & { pkgName?: string })[] = [];
-
-        if (transitivePkgs.length > 0) {
-            items.push({
-                label: 'Transitive Dependencies',
-                kind: QuickPickItemKind.Separator,
-            });
-            for (const p of transitivePkgs) {
+        for (const g of groups) {
+            if (g.pkgs.length > 0) {
                 items.push({
-                    label: `$(symbol-field) ${p.name}`,
-                    description: p.version ? `v${p.version} (transitive)` : '(transitive)',
-                    pkgName: p.name,
+                    label: g.label,
+                    kind: QuickPickItemKind.Separator,
                 });
-            }
-        }
-
-        if (explicitPkgs.length > 0) {
-            items.push({
-                label: 'Explicit Dependencies (Top-level)',
-                kind: QuickPickItemKind.Separator,
-            });
-            for (const p of explicitPkgs) {
-                items.push({
-                    label: `$(package) ${p.name}`,
-                    description: p.version ? `v${p.version} (explicit)` : '(explicit)',
-                    pkgName: p.name,
-                });
+                for (const p of g.pkgs) {
+                    items.push({
+                        label: `$(${g.icon}) ${p.name}`,
+                        description: p.version ? `v${p.version} (${g.tag})` : `(${g.tag})`,
+                        pkgName: p.name,
+                    });
+                }
             }
         }
 

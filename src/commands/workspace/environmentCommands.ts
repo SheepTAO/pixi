@@ -566,51 +566,43 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
             }
 
             const projectName = path.basename(projectPath);
-            const explicitEnv = extractEnvironmentName(targetItem, envName);
+            let targetEnv = extractEnvironmentName(targetItem, envName);
 
-            if (explicitEnv) {
-                await runPixiWithProgress(
-                    `Pixi: Re-installing environment '${explicitEnv}' for ${projectName}...`,
-                    ['reinstall', '-e', explicitEnv],
-                    projectPath,
-                    manager,
-                    `Pixi: Environment '${explicitEnv}' re-installed successfully for ${projectName}.`,
-                );
-                return;
-            }
-
-            const choice = await window.showQuickPick(
-                [
+            if (!targetEnv) {
+                const choice = await window.showQuickPick(
+                    [
+                        {
+                            label: '$(debug-restart) Reinstall All Environments',
+                            description: `Reinstall all environments declared in ${projectName} (pixi reinstall --all)`,
+                            action: 'all' as const,
+                        },
+                        {
+                            label: '$(refresh) Reinstall Specific Environment...',
+                            description: `Select a single environment to reinstall in ${projectName} (pixi reinstall -e <env>)`,
+                            action: 'single' as const,
+                        },
+                    ],
                     {
-                        label: '$(debug-restart) Reinstall All Environments',
-                        description: `Reinstall all environments declared in ${projectName} (pixi reinstall --all)`,
-                        action: 'all',
+                        title: `Pixi: Reinstall Environments (${projectName})`,
+                        placeHolder: 'Select reinstall scope',
                     },
-                    {
-                        label: '$(refresh) Reinstall Specific Environment...',
-                        description: `Select a single environment to reinstall in ${projectName} (pixi reinstall -e <env>)`,
-                        action: 'single',
-                    },
-                ],
-                {
-                    title: `Pixi: Reinstall Environments (${projectName})`,
-                    placeHolder: 'Select reinstall scope',
-                },
-            );
-            if (!choice) {
-                return;
-            }
-
-            if (choice.action === 'all') {
-                await runPixiWithProgress(
-                    `Pixi: Re-installing all environments for ${projectName}...`,
-                    ['reinstall', '--all'],
-                    projectPath,
-                    manager,
-                    `Pixi: All environments re-installed successfully for ${projectName}.`,
                 );
-            } else if (choice.action === 'single') {
-                const targetEnv = await pickInstallableEnvironment(
+                if (!choice) {
+                    return;
+                }
+
+                if (choice.action === 'all') {
+                    await runPixiWithProgress(
+                        `Pixi: Re-installing all environments for ${projectName}...`,
+                        ['reinstall', '--all'],
+                        projectPath,
+                        manager,
+                        `Pixi: All environments re-installed successfully for ${projectName}.`,
+                    );
+                    return;
+                }
+
+                targetEnv = await pickInstallableEnvironment(
                     manager,
                     projectPath,
                     'Pixi: Reinstall Environment',
@@ -619,14 +611,15 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                 if (!targetEnv) {
                     return;
                 }
-                await runPixiWithProgress(
-                    `Pixi: Re-installing environment '${targetEnv}' for ${projectName}...`,
-                    ['reinstall', '-e', targetEnv],
-                    projectPath,
-                    manager,
-                    `Pixi: Environment '${targetEnv}' re-installed successfully for ${projectName}.`,
-                );
             }
+
+            await runPixiWithProgress(
+                `Pixi: Re-installing environment '${targetEnv}' for ${projectName}...`,
+                ['reinstall', '-e', targetEnv],
+                projectPath,
+                manager,
+                `Pixi: Environment '${targetEnv}' re-installed successfully for ${projectName}.`,
+            );
         }),
 
         // Pixi: Open Manifest (pixi.toml / pyproject.toml)
@@ -841,9 +834,7 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                     envName,
                     ...(customFeatures.length > 0
                         ? customFeatures.flatMap((fn) => ['--feature', fn])
-                        : includesDefault
-                          ? ['--feature', 'default']
-                          : []),
+                        : ['--feature', 'default']),
                     ...(includesDefault ? [] : ['--no-default-feature']),
                     '--force',
                 ];
@@ -853,7 +844,7 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                     [args, ['install', '-e', envName]],
                     projectPath,
                     manager,
-                    `Pixi: Environment '${envName}' updated with features: ${selectedFeatureNames.join(', ') || 'none'}.`,
+                    `Pixi: Environment '${envName}' updated with features: ${selectedFeatureNames.join(', ')}.`,
                 );
             },
         ),

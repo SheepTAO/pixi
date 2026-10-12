@@ -92,26 +92,21 @@ export async function enrichLocalPackages(packages: PixiPackage[], projectPath: 
  * Executes 'pixi list' and returns all packages for the specified environment.
  */
 export async function listPixiPackages(envName: string, projectPath: string): Promise<PixiPackage[]> {
-    const baseArgs = ['list', '--no-install', '--json', '--environment', envName];
     let stdout: string;
     try {
-        stdout = await runPixi([...baseArgs, '--frozen'], {
+        stdout = await runPixi(['list', '--no-install', '--json', '--environment', envName, '--frozen'], {
             cwd: projectPath,
         });
-    } catch {
-        try {
-            stdout = await runPixi(baseArgs, { cwd: projectPath });
-        } catch (error) {
-            const msg = error instanceof Error ? error.message : String(error);
-            if (msg.includes('no platform supported') || msg.includes('unsupported-platform')) {
-                traceVerbose(
-                    `Skipping package listing for platform-incompatible environment '${envName}' in ${projectPath}`,
-                );
-            } else {
-                traceError(`Failed to list packages for environment '${envName}' in ${projectPath}:`, error);
-            }
-            return [];
+    } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        if (msg.includes('no platform supported') || msg.includes('unsupported-platform')) {
+            traceVerbose(
+                `Skipping package listing for platform-incompatible environment '${envName}' in ${projectPath}`,
+            );
+        } else {
+            traceError(`Failed to list packages for environment '${envName}' in ${projectPath}:`, error);
         }
+        return [];
     }
 
     const packages = safeJsonParse<PixiPackage[]>(stdout, []);

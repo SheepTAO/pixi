@@ -151,9 +151,7 @@ export class PixiExtensionApiImpl implements PixiExtensionApi, Disposable {
     }
 
     public dispose(): void {
-        for (const d of this.disposables) {
-            d.dispose();
-        }
+        Disposable.from(...this.disposables).dispose();
     }
 }
 

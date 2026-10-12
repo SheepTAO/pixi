@@ -130,17 +130,19 @@ export class PixiEnvironmentTreeItem extends TreeItem {
         super(env.pixiEnvName, isInstalled ? TreeItemCollapsibleState.Collapsed : TreeItemCollapsibleState.None);
 
         const toolchains: { label: string; shortName: string }[] = [];
+        const toolchainLines: string[] = [];
+
         if (env.toolchains?.python) {
-            const v = env.toolchains.python.version;
+            const py = env.toolchains.python;
             toolchains.push({
-                label: v ? `Python ${v}` : 'Python',
+                label: py.version ? `Python ${py.version}` : 'Python',
                 shortName: 'Python',
             });
+            toolchainLines.push(py.version ? `Python: ${py.version} (${py.executable})` : `Python: ${py.executable}`);
         }
-        let cppCompilerLabel: string | undefined;
         if (env.toolchains?.cpp?.compiler) {
             const cpp = env.toolchains.cpp;
-            cppCompilerLabel =
+            const cppCompilerLabel =
                 cpp.compilerType === 'gcc'
                     ? 'GCC'
                     : cpp.compilerType === 'clang'
@@ -148,25 +150,43 @@ export class PixiEnvironmentTreeItem extends TreeItem {
                       : cpp.compilerType === 'msvc'
                         ? 'MSVC'
                         : 'C++';
-            const label = cpp.version ? `${cppCompilerLabel} ${cpp.version}` : cppCompilerLabel;
             toolchains.push({
-                label,
+                label: cpp.version ? `${cppCompilerLabel} ${cpp.version}` : cppCompilerLabel,
                 shortName: 'C++',
             });
+            toolchainLines.push(
+                cpp.version
+                    ? `C/C++ (${cppCompilerLabel}): ${cpp.version} (${cpp.compiler})`
+                    : `C/C++: ${cpp.compiler}`,
+            );
+        }
+        if (env.toolchains?.cpp?.cmake) {
+            toolchainLines.push(`CMake: ${env.toolchains.cpp.cmake}`);
+        }
+        if (env.toolchains?.cpp?.ninja) {
+            toolchainLines.push(`Ninja: ${env.toolchains.cpp.ninja}`);
         }
         if (env.toolchains?.rust?.rustc) {
-            const v = env.toolchains.rust.version;
+            const rust = env.toolchains.rust;
             toolchains.push({
-                label: v ? `Rust ${v}` : 'Rust',
+                label: rust.version ? `Rust ${rust.version}` : 'Rust',
                 shortName: 'Rust',
             });
+            toolchainLines.push(rust.version ? `Rust: ${rust.version} (${rust.rustc})` : `Rust: ${rust.rustc}`);
+        }
+        if (env.toolchains?.rust?.cargo) {
+            toolchainLines.push(`Cargo: ${env.toolchains.rust.cargo}`);
         }
         if (env.toolchains?.r?.executable) {
-            const v = env.toolchains.r.version;
+            const r = env.toolchains.r;
             toolchains.push({
-                label: v ? `R ${v}` : 'R',
+                label: r.version ? `R ${r.version}` : 'R',
                 shortName: 'R',
             });
+            toolchainLines.push(r.version ? `R: ${r.version} (${r.executable})` : `R: ${r.executable}`);
+        }
+        if (env.toolchains?.r?.rscript) {
+            toolchainLines.push(`Rscript: ${env.toolchains.r.rscript}`);
         }
 
         if (isInstalled) {
@@ -207,38 +227,7 @@ export class PixiEnvironmentTreeItem extends TreeItem {
         if (env.statusReason) {
             lines.push(`Reason: ${env.statusReason}`);
         }
-        if (env.toolchains?.python) {
-            const py = env.toolchains.python;
-            lines.push(py.version ? `Python: ${py.version} (${py.executable})` : `Python: ${py.executable}`);
-        }
-        if (env.toolchains?.cpp?.compiler) {
-            const cpp = env.toolchains.cpp;
-            lines.push(
-                cpp.version
-                    ? `C/C++ (${cppCompilerLabel}): ${cpp.version} (${cpp.compiler})`
-                    : `C/C++: ${cpp.compiler}`,
-            );
-        }
-        if (env.toolchains?.cpp?.cmake) {
-            lines.push(`CMake: ${env.toolchains.cpp.cmake}`);
-        }
-        if (env.toolchains?.cpp?.ninja) {
-            lines.push(`Ninja: ${env.toolchains.cpp.ninja}`);
-        }
-        if (env.toolchains?.rust?.rustc) {
-            const rust = env.toolchains.rust;
-            lines.push(rust.version ? `Rust: ${rust.version} (${rust.rustc})` : `Rust: ${rust.rustc}`);
-        }
-        if (env.toolchains?.rust?.cargo) {
-            lines.push(`Cargo: ${env.toolchains.rust.cargo}`);
-        }
-        if (env.toolchains?.r?.executable) {
-            const r = env.toolchains.r;
-            lines.push(r.version ? `R: ${r.version} (${r.executable})` : `R: ${r.executable}`);
-        }
-        if (env.toolchains?.r?.rscript) {
-            lines.push(`Rscript: ${env.toolchains.r.rscript}`);
-        }
+        lines.push(...toolchainLines);
         if (env.platforms && env.platforms.length > 0) {
             const platformNames = env.platforms.map((p) => (typeof p === 'string' ? p : p.name));
             lines.push(`Platforms: ${platformNames.join(', ')}`);
@@ -396,9 +385,7 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
         this.featuresCache.clear();
         this.envsCache.clear();
         this._onDidChangeTreeData.dispose();
-        for (const d of this.disposables) {
-            d.dispose();
-        }
+        Disposable.from(...this.disposables).dispose();
     }
 
     public getTreeItem(element: PixiProjectsTreeItem): TreeItem {
@@ -473,23 +460,17 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
         }
 
         if (element instanceof PixiFeatureTreeItem) {
-            const items: PixiProjectsTreeItem[] = [];
-            for (const dep of element.feature.dependencies) {
-                items.push(new PixiDeclaredPackageTreeItem(dep, 'conda', element.feature, element.project));
-            }
-            for (const dep of element.feature.pypiDependencies) {
-                items.push(new PixiDeclaredPackageTreeItem(dep, 'pypi', element.feature, element.project));
-            }
-            if (items.length === 0) {
-                items.push(new PixiEmptyTreeItem('No dependencies declared in this feature', element.project));
-            }
-            return items;
+            return [
+                ...element.feature.dependencies.map(
+                    (dep) => new PixiDeclaredPackageTreeItem(dep, 'conda', element.feature, element.project),
+                ),
+                ...element.feature.pypiDependencies.map(
+                    (dep) => new PixiDeclaredPackageTreeItem(dep, 'pypi', element.feature, element.project),
+                ),
+            ];
         }
 
         if (element instanceof PixiEnvFeatureGroupTreeItem) {
-            if (element.packages.length === 0) {
-                return [new PixiEmptyTreeItem('No packages found in this feature', element.project, element.env)];
-            }
             return element.packages.map(
                 (pkg) => new PixiPackageTreeItem(pkg, element.env, element.project, element.featureName),
             );
@@ -540,16 +521,10 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
             }
 
             // Project has custom features: group explicit dependencies by their declared feature
-            const envFeatureNames = new Set(element.envFeatures ?? []);
-            const defaultFeature = allFeatures.find((f) => f.name === 'default');
-            if (
-                defaultFeature &&
-                (defaultFeature.dependencies.length > 0 || defaultFeature.pypiDependencies.length > 0)
-            ) {
-                envFeatureNames.add('default');
-            }
-
-            const targetFeatures = allFeatures.filter((f) => envFeatureNames.has(f.name));
+            const envFeatureNames = new Set([...(element.envFeatures ?? []), 'default']);
+            const targetFeatures = allFeatures.filter(
+                (f) => envFeatureNames.has(f.name) && (f.dependencies.length > 0 || f.pypiDependencies.length > 0),
+            );
             const matchedPackages = new Set<PixiPackage>();
             const featureItems: PixiProjectsTreeItem[] = [];
 
@@ -564,17 +539,15 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
                     matchedPackages.add(p);
                 }
 
-                if (f.dependencies.length > 0 || f.pypiDependencies.length > 0) {
-                    featureItems.push(
-                        new PixiEnvFeatureGroupTreeItem(
-                            f.name,
-                            featurePkgs,
-                            element.env,
-                            element.project,
-                            f.name === 'default',
-                        ),
-                    );
-                }
+                featureItems.push(
+                    new PixiEnvFeatureGroupTreeItem(
+                        f.name,
+                        featurePkgs,
+                        element.env,
+                        element.project,
+                        f.name === 'default',
+                    ),
+                );
             }
 
             const transitive = sorted.filter((pkg) => !matchedPackages.has(pkg));

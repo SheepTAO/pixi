@@ -472,14 +472,14 @@ export class PixiManifestSchemaProvider implements CompletionItemProvider, Hover
             return false;
         }
 
-        let foundClosing = false;
+        const arrayStartRegex = new RegExp(`^\\s*${arrayKey}\\s*=\\s*\\[`);
         for (let i = position.line - 1; i >= Math.max(0, position.line - 15); i--) {
             const text = document.lineAt(i).text;
             if (text.includes(']')) {
-                foundClosing = true;
+                return false;
             }
-            if (new RegExp(`^\\s*${arrayKey}\\s*=\\s*\\[`).test(text)) {
-                return !foundClosing;
+            if (arrayStartRegex.test(text)) {
+                return true;
             }
             if (text.trim().startsWith('[')) {
                 break;

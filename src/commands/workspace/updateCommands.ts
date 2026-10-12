@@ -7,6 +7,7 @@ import { escapeRegex, safeJsonParse } from '../../common/execUtils';
 import { normalizePkgName } from '../../core/packageManager';
 import { PixiProjectManager } from '../../core/projectManager';
 import { extractEnvironmentName, pickPixiProject, toEnvQuickPickItem } from './common';
+import { buildDeclaredPackageQuickPickItems } from './packageCommands';
 
 export interface DryRunPackageChange {
     name: string;
@@ -130,18 +131,10 @@ export function parseDryRunOutput(jsonStr: string): DryRunPackageChange[] {
                     if (!existing.platforms.includes(platform)) {
                         existing.platforms.push(platform);
                     }
-                    if (!existing.beforeVer && beforeVer) {
-                        existing.beforeVer = beforeVer;
-                    }
-                    if (!existing.afterVer && afterVer) {
-                        existing.afterVer = afterVer;
-                    }
-                    if (!existing.beforeBuild && beforeBuild) {
-                        existing.beforeBuild = beforeBuild;
-                    }
-                    if (!existing.afterBuild && afterBuild) {
-                        existing.afterBuild = afterBuild;
-                    }
+                    existing.beforeVer ||= beforeVer;
+                    existing.afterVer ||= afterVer;
+                    existing.beforeBuild ||= beforeBuild;
+                    existing.afterBuild ||= afterBuild;
                 }
             }
         }
@@ -242,12 +235,8 @@ async function handleCheckOutdated(
                     existing.platforms.push(plat);
                 }
             }
-            if (!existing.afterVer && c.afterVer) {
-                existing.afterVer = c.afterVer;
-            }
-            if (!existing.beforeVer && c.beforeVer) {
-                existing.beforeVer = c.beforeVer;
-            }
+            existing.afterVer ||= c.afterVer;
+            existing.beforeVer ||= c.beforeVer;
         }
     }
 
@@ -298,16 +287,6 @@ async function handleCheckOutdated(
         return;
     }
 
-    const confirmMsg =
-        selectedPkgNames.length === 1
-            ? `Update package '${selectedPkgNames[0]}' in ${projectName}${targetEnv ? ` (${targetEnv})` : ''}?`
-            : `Update ${selectedPkgNames.length} selected packages in ${projectName}${targetEnv ? ` (${targetEnv})` : ''}?`;
-
-    const confirm = await window.showInformationMessage(confirmMsg, 'Update Now');
-    if (confirm !== 'Update Now') {
-        return;
-    }
-
     const updateArgs = ['update'];
     if (targetEnv) {
         updateArgs.push('-e', targetEnv);
@@ -351,22 +330,49 @@ async function handleUpgradeDependencies(
     manager: PixiProjectManager,
     projectPath: string,
     projectName: string,
+    filterEnv?: string,
 ): Promise<void> {
-    const warning = `Upgrade dependencies in ${projectName}? This will loosen and bump version constraints in the manifest to the latest available versions.`;
+    const items = await buildDeclaredPackageQuickPickItems(projectPath, {
+        filterEnv,
+        pickedByDefault: true,
+    });
+    const extractUniqueNames = (list: typeof items): string[] => [
+        ...new Set(list.flatMap((s) => (s.declaredPkg ? [s.declaredPkg.pkgName] : []))),
+    ];
 
-    const confirmed = await window.showWarningMessage(warning, 'Upgrade Manifest');
-    if (confirmed !== 'Upgrade Manifest') {
+    const totalUniqueNames = extractUniqueNames(items).length;
+    if (totalUniqueNames === 0) {
+        window.showInformationMessage('No declared packages found in this Pixi project manifest.');
         return;
     }
 
-    const upgradeArgs = ['upgrade'];
+    const selected = await window.showQuickPick(items, {
+        title: `Pixi: Select Packages to Upgrade (${projectName}${filterEnv ? ` - ${filterEnv}` : ''})`,
+        placeHolder: 'Select packages to bump version constraints in manifest (all selected by default)',
+        canPickMany: true,
+        matchOnDescription: true,
+        matchOnDetail: true,
+    });
+    if (!selected || selected.length === 0) {
+        return;
+    }
+
+    const selectedNames = extractUniqueNames(selected);
+    const isUpgradeAll = !filterEnv && selectedNames.length === totalUniqueNames;
+
+    const upgradeArgs = isUpgradeAll ? ['upgrade'] : ['upgrade', ...selectedNames];
+    const pkgSummary = selectedNames.length <= 4 ? selectedNames.join(', ') : `${selectedNames.length} packages`;
 
     await runPixiWithProgress(
-        `Pixi: Upgrading dependencies for ${projectName}...`,
+        isUpgradeAll
+            ? `Pixi: Upgrading all dependencies for ${projectName}...`
+            : `Pixi: Upgrading ${pkgSummary} for ${projectName}...`,
         upgradeArgs,
         projectPath,
         manager,
-        `Pixi: All dependencies upgraded successfully for ${projectName}.`,
+        isUpgradeAll
+            ? `Pixi: All dependencies upgraded successfully for ${projectName}.`
+            : `Pixi: Upgraded ${pkgSummary} successfully for ${projectName}.`,
     );
 }
 
@@ -415,7 +421,7 @@ export async function executeUnifiedUpdate(
     }
 
     if (chosenAction.action === 'upgrade') {
-        await handleUpgradeDependencies(manager, projectPath, projectName);
+        await handleUpgradeDependencies(manager, projectPath, projectName, directEnv);
         return;
     }
 

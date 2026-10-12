@@ -401,21 +401,17 @@ export async function searchPixiPackages(
     // Sort Conda results: exact match first, then by name length / alphabetical
     const lowerQ = cleanQuery.toLowerCase();
     combined.sort((a, b) => {
-        const aExact = a.name.toLowerCase() === lowerQ;
-        const bExact = b.name.toLowerCase() === lowerQ;
-        if (aExact && !bExact) {
-            return -1;
+        const aName = a.name.toLowerCase();
+        const bName = b.name.toLowerCase();
+        const aExact = aName === lowerQ;
+        const bExact = bName === lowerQ;
+        if (aExact !== bExact) {
+            return aExact ? -1 : 1;
         }
-        if (!aExact && bExact) {
-            return 1;
-        }
-        const aStarts = a.name.toLowerCase().startsWith(lowerQ);
-        const bStarts = b.name.toLowerCase().startsWith(lowerQ);
-        if (aStarts && !bStarts) {
-            return -1;
-        }
-        if (!aStarts && bStarts) {
-            return 1;
+        const aStarts = aName.startsWith(lowerQ);
+        const bStarts = bName.startsWith(lowerQ);
+        if (aStarts !== bStarts) {
+            return aStarts ? -1 : 1;
         }
         return a.name.localeCompare(b.name);
     });

@@ -89,30 +89,30 @@ A dedicated Activity Bar container providing complete visibility and control ove
 
 Launch any command via the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) by typing `Pixi:`:
 
-| Command                                         | Identifier                | Description                                                                                             |
-| :---------------------------------------------- | :------------------------ | :------------------------------------------------------------------------------------------------------ |
-| **Pixi: Initialize Project ...**                | `pixi.init`               | Initialize a new Pixi project (`pixi.toml` or `pyproject.toml`) in the workspace.                       |
-| **Pixi: Environment ...**                       | `pixi.environment`        | Interactive hub to create/delete environments, configure environment features, install, or open shells. |
-| **Pixi: Feature ...**                           | `pixi.feature`            | Interactive hub to create/remove features, add packages to a feature, or jump to feature definitions.   |
-| **Pixi: Channel ...**                           | `pixi.channel`            | Interactive hub to add Conda presets/mirrors (prepend/append) or remove channels.                       |
-| **Pixi: Platform ...**                          | `pixi.platform`           | Interactive hub to add or remove target Conda platforms at workspace or feature scope.                  |
-| **Pixi: Search Packages ...**                   | `pixi.searchPackages`     | Search Conda & PyPI packages to inspect platforms, licenses, metadata, and docs.                        |
-| **Pixi: Add Package ...**                       | `pixi.addPackage`         | Add packages to features, inline environments, or global scope with channel/version picking.            |
-| **Pixi: Remove Package ...**                    | `pixi.removePackage`      | Remove packages from manifest with automatic feature/environment scope resolution.                      |
-| **Pixi: Install (Sync Environments)**           | `pixi.install`            | Install dependencies and synchronize all project environments.                                          |
-| **Pixi: Reinstall ...**                         | `pixi.reinstall`          | Interactive menu to rebuild all environments or a specific environment.                                 |
-| **Pixi: Update / Upgrade ...**                  | `pixi.update`             | Unified menu to check outdated packages (dry-run), update dependencies, or upgrade manifest.            |
-| **Pixi: Lock Dependencies**                     | `pixi.lock`               | Solve dependencies and update the lockfile without modifying environments.                              |
-| **Pixi: Clean ...**                             | `pixi.clean`              | Interactive menu to clean project environments, a single environment, or cache.                         |
-| **Pixi: Add Task ...**                          | `pixi.tasks.addTask`      | Guided wizard to create a new runnable task in the project manifest.                                    |
-| **Pixi: Run Task ...**                          | `pixi.runTask`            | QuickPick menu to search and run any task defined in the project.                                       |
-| **Pixi: Open Terminal in Environment ...**      | `pixi.openTerminal`       | Open an integrated terminal pre-activated in a selected environment.                                    |
-| **Pixi: Open Manifest**                         | `pixi.openManifest`       | Open the project manifest file (`pixi.toml` or `pyproject.toml`).                                       |
-| **Pixi: Open Lockfile**                         | `pixi.openLockfile`       | Open `pixi.lock` and inspect resolved package records.                                                  |
-| **Pixi: Show Dependency Tree**                  | `pixi.showDependencyTree` | Inspect the full resolved dependency hierarchy for an environment or package.                           |
-| **Pixi: Why is This Installed? (Reverse Tree)** | `pixi.whyPackage`         | Trace reverse dependency chains explaining why a package is installed.                                  |
-| **Pixi: Global Tools ...**                      | `pixi.global`             | Interactive menu to install, list, update, and uninstall global CLI tools.                              |
-| **Pixi: Update Pixi CLI ...**                   | `pixi.selfUpdate`         | Update the Pixi CLI binary to the latest or a specific release version.                                 |
+| Command                                         | Identifier                | Description                                                                                                     |
+| :---------------------------------------------- | :------------------------ | :-------------------------------------------------------------------------------------------------------------- |
+| **Pixi: Initialize Project ...**                | `pixi.init`               | Initialize a new Pixi project (`pixi.toml` or `pyproject.toml`) in the workspace.                               |
+| **Pixi: Environment ...**                       | `pixi.environment`        | Interactive hub to create/delete environments, configure environment features, install, or open shells.         |
+| **Pixi: Feature ...**                           | `pixi.feature`            | Interactive hub to create/remove features, add packages to a feature, or jump to feature definitions.           |
+| **Pixi: Channel ...**                           | `pixi.channel`            | Interactive hub to add Conda presets/mirrors (prepend/append) or remove channels at workspace or feature scope. |
+| **Pixi: Platform ...**                          | `pixi.platform`           | Interactive hub to add or remove target Conda platforms at workspace or feature scope.                          |
+| **Pixi: Search Packages ...**                   | `pixi.searchPackages`     | Search Conda & PyPI packages to inspect platforms, licenses, metadata, and docs.                                |
+| **Pixi: Add Package ...**                       | `pixi.addPackage`         | Add packages to features, inline environments, or global scope with channel/version picking.                    |
+| **Pixi: Remove Package ...**                    | `pixi.removePackage`      | Remove packages from manifest with automatic feature/environment scope resolution.                              |
+| **Pixi: Install (Sync Environments)**           | `pixi.install`            | Install dependencies and synchronize all project environments.                                                  |
+| **Pixi: Reinstall ...**                         | `pixi.reinstall`          | Interactive menu to rebuild all environments or a specific environment.                                         |
+| **Pixi: Update / Upgrade ...**                  | `pixi.update`             | Unified menu to check outdated packages (dry-run), update dependencies, or upgrade manifest.                    |
+| **Pixi: Lock Dependencies**                     | `pixi.lock`               | Solve dependencies and update the lockfile without modifying environments.                                      |
+| **Pixi: Clean ...**                             | `pixi.clean`              | Interactive menu to clean project environments, a single environment, or cache.                                 |
+| **Pixi: Add Task ...**                          | `pixi.tasks.addTask`      | Guided wizard to create a new runnable task in the project manifest.                                            |
+| **Pixi: Run Task ...**                          | `pixi.runTask`            | QuickPick menu to search and run any task defined in the project.                                               |
+| **Pixi: Open Terminal in Environment ...**      | `pixi.openTerminal`       | Open an integrated terminal pre-activated in a selected environment.                                            |
+| **Pixi: Open Manifest**                         | `pixi.openManifest`       | Open the project manifest file (`pixi.toml` or `pyproject.toml`).                                               |
+| **Pixi: Open Lockfile**                         | `pixi.openLockfile`       | Open `pixi.lock` and inspect resolved package records.                                                          |
+| **Pixi: Show Dependency Tree**                  | `pixi.showDependencyTree` | Inspect the full resolved dependency hierarchy for an environment or package.                                   |
+| **Pixi: Why is This Installed? (Reverse Tree)** | `pixi.whyPackage`         | Trace reverse dependency chains explaining why a package is installed.                                          |
+| **Pixi: Global Tools ...**                      | `pixi.global`             | Interactive menu to install, list, update, and uninstall global CLI tools.                                      |
+| **Pixi: Update Pixi CLI ...**                   | `pixi.selfUpdate`         | Update the Pixi CLI binary to the latest or a specific release version.                                         |
 
 > [!TIP]
 > Contextual and view-specific actions (such as switching Environment/Feature or Task grouping modes via view title buttons, creating/removing features and environments, adding/removing tasks or packages, jumping to manifest declarations, and running tasks in custom environments) are also directly available via inline icon buttons and right-click context menus in the Pixi Explorer tree views and editor title bar.

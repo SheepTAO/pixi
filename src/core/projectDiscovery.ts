@@ -31,29 +31,88 @@ export function findManifestPath(folderPath: string): string | undefined {
     return undefined;
 }
 
+export interface WorkspaceChannelEntry {
+    channel: string;
+    feature?: string;
+}
+
+const GLOBAL_WORKSPACE_HEADERS = new Set(['workspace', 'project', 'tool.pixi.workspace', 'tool.pixi.project']);
+const FEATURE_HEADER_RE = /^(?:tool\.pixi\.)?feature\.(?:"([^"]+)"|'([^']+)'|([A-Za-z0-9_-]+))$/;
+const CHANNELS_ARRAY_RE = /^\s*channels\s*=\s*\[([\s\S]*?)\]/m;
+const CHANNEL_ITEM_RE = /\{[^}]*?\bchannel\s*=\s*(?:"([^"]+)"|'([^']+)')[^}]*\}|(?:"([^"]+)"|'([^']+)')/g;
+
+/**
+ * Parses configured Conda channels (both global workspace and feature-scoped) from TOML manifest text.
+ */
+export function parseManifestChannels(text: string): WorkspaceChannelEntry[] {
+    const uncommented = text.replace(
+        /("(?:\\.|[^"\\])*"|'[^']*')|#.*$/gm,
+        (_, quoted: string | undefined) => quoted ?? '',
+    );
+    const entries: WorkspaceChannelEntry[] = [];
+    const seenScopeEntries = new Set<string>();
+
+    const parseSection = (header: string, body: string): void => {
+        let featureScope: string | undefined;
+        if (!GLOBAL_WORKSPACE_HEADERS.has(header)) {
+            const featMatch = header.match(FEATURE_HEADER_RE);
+            if (!featMatch) {
+                return;
+            }
+            featureScope = featMatch[1] || featMatch[2] || featMatch[3];
+        }
+
+        const channelsArrayMatch = body.match(CHANNELS_ARRAY_RE);
+        if (!channelsArrayMatch) {
+            return;
+        }
+
+        for (const m of channelsArrayMatch[1].matchAll(CHANNEL_ITEM_RE)) {
+            const channel = (m[1] || m[2] || m[3] || m[4] || '').trim();
+            const scopeKey = `${featureScope ?? ''}::${channel}`;
+            if (channel && !seenScopeEntries.has(scopeKey)) {
+                seenScopeEntries.add(scopeKey);
+                entries.push({ channel, feature: featureScope });
+            }
+        }
+    };
+
+    let currentHeader = '';
+    let sectionStart = 0;
+    for (const match of uncommented.matchAll(/^\s*\[([^\[\]]+)\]\s*$/gm)) {
+        if (currentHeader) {
+            parseSection(currentHeader, uncommented.slice(sectionStart, match.index));
+        }
+        currentHeader = match[1].trim();
+        sectionStart = (match.index ?? 0) + match[0].length;
+    }
+    if (currentHeader) {
+        parseSection(currentHeader, uncommented.slice(sectionStart));
+    }
+
+    return entries;
+}
+
+/**
+ * Reads configured Conda channel entries (with scope metadata) from pixi.toml or pyproject.toml.
+ */
+export function getWorkspaceChannels(projectPath: string): WorkspaceChannelEntry[] {
+    const manifestFile = findManifestPath(projectPath);
+    if (!manifestFile) {
+        return [];
+    }
+    try {
+        return parseManifestChannels(fs.readFileSync(manifestFile, 'utf8'));
+    } catch {
+        return [];
+    }
+}
+
 /**
  * Reads configured Conda channels from pixi.toml or pyproject.toml in a project directory.
  */
 export function getProjectConfiguredChannels(projectPath: string): string[] {
-    const manifestFile = findManifestPath(projectPath);
-    if (manifestFile) {
-        try {
-            const content = fs.readFileSync(manifestFile, 'utf8');
-            const match = content.match(/channels\s*=\s*\[([^\]]*)\]/);
-            if (match?.[1]) {
-                const parsed = match[1]
-                    .split(',')
-                    .map((s) => s.trim().replace(/^['"]|['"]$/g, ''))
-                    .filter(Boolean);
-                if (parsed.length > 0) {
-                    return parsed;
-                }
-            }
-        } catch {
-            // ignore
-        }
-    }
-    return [];
+    return Array.from(new Set(getWorkspaceChannels(projectPath).map((e) => e.channel)));
 }
 
 /**

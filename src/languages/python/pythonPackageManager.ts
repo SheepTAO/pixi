@@ -69,11 +69,9 @@ export class PixiPythonPackageManager implements PackageManager, Disposable {
         );
     }
 
-    dispose() {
+    public dispose(): void {
         this._onDidChangePackages.dispose();
-        for (const d of this.disposables) {
-            d.dispose();
-        }
+        Disposable.from(...this.disposables).dispose();
     }
 
     async clearCache(): Promise<void> {
@@ -178,16 +176,11 @@ export class PixiPythonPackageManager implements PackageManager, Disposable {
 
     private resolveEnvDetails(environment: PythonEnvironment): { envName: string; projectPath: string } | undefined {
         const pyEnv = environment as Partial<PixiPythonEnvironment>;
-        if (pyEnv.pixiEnvName && pyEnv.projectPath) {
-            return { envName: pyEnv.pixiEnvName, projectPath: pyEnv.projectPath };
-        }
-
-        const pixiEnv = this.envManager.getPixiEnvironment(environment.envId.id);
-        if (pixiEnv?.pixiEnvName && pixiEnv?.projectPath) {
-            return { envName: pixiEnv.pixiEnvName, projectPath: pixiEnv.projectPath };
-        }
-
-        return undefined;
+        const resolved =
+            pyEnv.pixiEnvName && pyEnv.projectPath
+                ? (pyEnv as PixiPythonEnvironment)
+                : this.envManager.getPixiEnvironment(environment.envId.id);
+        return resolved ? { envName: resolved.pixiEnvName, projectPath: resolved.projectPath } : undefined;
     }
 
     private async fetchAndCachePackages(environment: PythonEnvironment): Promise<Package[] | undefined> {
@@ -198,19 +191,11 @@ export class PixiPythonPackageManager implements PackageManager, Disposable {
             return undefined;
         }
 
-        try {
-            const pixiPackages = await this.projectManager.getPackagesForEnvironment(
-                details.envName,
-                details.projectPath,
-            );
-            const packages = pixiPkgsToPackages(pixiPackages, envId);
-            this.packagesCache.set(envId, packages);
-            traceInfo(`Loaded ${packages.length} packages for environment '${details.envName}'`);
-            return packages;
-        } catch (error) {
-            traceError(`Failed to fetch packages for environment '${details.envName}': ${error}`);
-            return undefined;
-        }
+        const pixiPackages = await this.projectManager.getPackagesForEnvironment(details.envName, details.projectPath);
+        const packages = pixiPkgsToPackages(pixiPackages, envId);
+        this.packagesCache.set(envId, packages);
+        traceInfo(`Loaded ${packages.length} packages for environment '${details.envName}'`);
+        return packages;
     }
 
     async refresh(environment: PythonEnvironment): Promise<void> {

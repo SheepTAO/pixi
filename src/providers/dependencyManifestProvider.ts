@@ -99,7 +99,7 @@ function findPackageLineInLines(lines: string[], pkgName: string): number {
 
 function getLockedVersionFromLines(lines: string[], pkgName: string): string | undefined {
     const lineIndex = findPackageLineInLines(lines, pkgName);
-    if (lineIndex < 0 || lineIndex >= lines.length) {
+    if (lineIndex < 0) {
         return undefined;
     }
     const targetLine = lines[lineIndex];
@@ -388,16 +388,6 @@ export class PixiDependencyManifestProvider
                         hints.push(this.createInlayHint(dep, { version: lockedVer } as PixiPackage));
                     }
                 }
-            } else if (activeEnvName !== 'default' && !token.isCancellationRequested) {
-                // Fallback when lockfile is unavailable: check default environment if not active
-                const defaultPkgs = await this.projectManager.getPackagesForEnvironment('default', projectPath);
-                const defaultMap = this.createPackageMap(defaultPkgs);
-                for (const dep of missingDeps) {
-                    const pkg = defaultMap.get(normalizePkgName(dep.name));
-                    if (pkg && pkg.version) {
-                        hints.push(this.createInlayHint(dep, pkg));
-                    }
-                }
             }
         }
 
@@ -597,9 +587,7 @@ export class PixiDependencyManifestProvider
                 }
             }
 
-            if (actions.length > 0) {
-                md.appendMarkdown(`---\n${actions.join(' &nbsp;&nbsp;|&nbsp;&nbsp; ')}`);
-            }
+            md.appendMarkdown(`---\n${actions.join(' &nbsp;&nbsp;|&nbsp;&nbsp; ')}`);
         }
 
         const highlightRange = new Range(matched.nameRange.start, matched.valueRange.end);

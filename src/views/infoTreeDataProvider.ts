@@ -32,52 +32,38 @@ export function formatBytes(bytes: number): string {
 }
 
 export async function computeDirectorySize(dirPath: string): Promise<number | null> {
-    try {
-        if (!fs.existsSync(dirPath)) {
-            return null;
-        }
-        if (process.platform !== 'win32') {
-            return await new Promise<number | null>((resolve) => {
-                ch.execFile('du', ['-sk', dirPath], { timeout: 15000 }, (err, stdout) => {
-                    if (err || !stdout) {
-                        return resolve(null);
-                    }
-                    const match = stdout.trim().match(/^(\d+)/);
-                    if (match) {
-                        resolve(parseInt(match[1], 10) * 1024);
-                    } else {
-                        resolve(null);
-                    }
-                });
-            });
-        }
-
-        // Windows support via robocopy (orders of magnitude faster than PowerShell on large directories)
-        return await new Promise<number | null>((resolve) => {
-            const normalizedPath = dirPath.replace(/[/\\]+$/, '');
-            ch.execFile(
-                'robocopy',
-                [normalizedPath, normalizedPath, '/L', '/E', '/BYTES', '/NFL', '/NDL', '/NJH', '/XJ', '/R:0', '/W:0'],
-                { timeout: 30000, windowsHide: true },
-                (_err, stdout) => {
-                    if (!stdout) {
-                        return resolve(null);
-                    }
-                    // robocopy returns exit code 1 when files are found; match Bytes in summary table
-                    const match = stdout.match(/Bytes\s*:\s*(\d+)/i);
-                    if (match) {
-                        const bytes = parseInt(match[1], 10);
-                        resolve(isNaN(bytes) ? null : bytes);
-                    } else {
-                        resolve(null);
-                    }
-                },
-            );
-        });
-    } catch {
-        // Fall back
+    if (!fs.existsSync(dirPath)) {
+        return null;
     }
-    return null;
+    if (process.platform !== 'win32') {
+        return new Promise<number | null>((resolve) => {
+            ch.execFile('du', ['-sk', dirPath], { timeout: 15000 }, (err, stdout) => {
+                if (err || !stdout) {
+                    return resolve(null);
+                }
+                const match = stdout.trim().match(/^(\d+)/);
+                resolve(match ? parseInt(match[1], 10) * 1024 : null);
+            });
+        });
+    }
+
+    // Windows support via robocopy (orders of magnitude faster than PowerShell on large directories)
+    return new Promise<number | null>((resolve) => {
+        const normalizedPath = dirPath.replace(/[/\\]+$/, '');
+        ch.execFile(
+            'robocopy',
+            [normalizedPath, normalizedPath, '/L', '/E', '/BYTES', '/NFL', '/NDL', '/NJH', '/XJ', '/R:0', '/W:0'],
+            { timeout: 30000, windowsHide: true },
+            (_err, stdout) => {
+                if (!stdout) {
+                    return resolve(null);
+                }
+                // robocopy returns exit code 1 when files are found; match Bytes in summary table
+                const match = stdout.match(/Bytes\s*:\s*(\d+)/i);
+                resolve(match ? parseInt(match[1], 10) : null);
+            },
+        );
+    });
 }
 
 export interface PixiSystemInfo {
@@ -166,8 +152,6 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
             if (bytes !== null) {
                 this.cachedCacheSize = formatBytes(bytes);
             }
-        } catch {
-            // ignore
         } finally {
             if (this.cacheCalculationEpoch === currentEpoch) {
                 this.isCalculatingCacheSize = false;

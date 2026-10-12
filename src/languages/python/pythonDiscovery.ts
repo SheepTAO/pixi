@@ -6,13 +6,6 @@ import { PixiEnvironmentInfo } from '../../core/types';
 import { PIXI_MANAGER_ID } from './constants';
 import { PixiPythonEnvironment } from './types';
 
-export function isEnvironmentInvalid(env?: PixiPythonEnvironment): boolean {
-    if (!env) {
-        return true;
-    }
-    return env.pixiStatus === 'incompatible' || !!env.error;
-}
-
 export async function promptToInstallIpykernel(
     env: PixiPythonEnvironment,
     projectManager: PixiProjectManager,

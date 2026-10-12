@@ -1,10 +1,16 @@
 import * as path from 'path';
 import { commands, Disposable, QuickPickItem, window } from 'vscode';
 
-import { runPixi } from '../../cli/pixiCli';
 import { runPixiWithProgress } from '../../cli/workspaceCli';
+import { getWorkspaceChannels } from '../../core/projectDiscovery';
 import { PixiProjectManager } from '../../core/projectManager';
-import { pickPixiProject } from './common';
+import {
+    executeScopedWorkspaceRemove,
+    extractFeatureName,
+    pickPixiProject,
+    resolveWorkspaceOrFeatureScope,
+    ScopedRemovalQuickPickItem,
+} from './common';
 
 export interface CondaChannelPreset {
     label: string;
@@ -54,6 +60,7 @@ export interface PromptCondaChannelOptions {
     title?: string;
     placeHolder?: string;
     defaultChannelValue?: string | undefined;
+    excludeChannels?: ReadonlySet<string>;
 }
 
 /**
@@ -68,8 +75,12 @@ export async function promptCondaChannel(options?: PromptCondaChannelOptions): P
         isCustom?: boolean;
     }
 
+    const availablePresets = CONDA_CHANNEL_PRESETS.filter(
+        (p) => !p.channel || !options?.excludeChannels?.has(p.channel),
+    );
+
     const items: ChannelItem[] = [
-        ...CONDA_CHANNEL_PRESETS.map((p) => ({
+        ...availablePresets.map((p) => ({
             label: p.label,
             description: p.description,
             channel: p.channel === 'conda-forge' ? defaultVal : p.channel,
@@ -108,15 +119,38 @@ export async function promptCondaChannel(options?: PromptCondaChannelOptions): P
 export function registerChannelCommands(manager: PixiProjectManager): Disposable[] {
     return [
         // Pixi: Add Channel...
-        commands.registerCommand('pixi.addChannel', async (targetItem?: unknown) => {
+        commands.registerCommand('pixi.addChannel', async (targetItem?: unknown, presetFeature?: string) => {
             const projectPath = await pickPixiProject(manager, 'Select Pixi project to add channel to', targetItem);
             if (!projectPath) {
                 return;
             }
 
+            const targetFeature = await resolveWorkspaceOrFeatureScope(
+                projectPath,
+                {
+                    title: 'Pixi: Select Channel Target Scope',
+                    placeHolder: 'Select scope to add channel to',
+                    globalLabel: '$(globe) [workspace] (Global Channels)',
+                    globalDescription: 'Shared across all environments and features (default)',
+                    featureDescription: (name) => `Channels specific to feature '${name}'`,
+                },
+                targetItem,
+                presetFeature,
+            );
+            if (targetFeature === null) {
+                return;
+            }
+
+            const existingChannels = getWorkspaceChannels(projectPath);
+            const existingInScope = new Set(
+                existingChannels.filter((c) => c.feature === targetFeature).map((c) => c.channel),
+            );
+            const scopeLabel = targetFeature ? `feature '${targetFeature}'` : 'workspace';
+
             const targetChannel = await promptCondaChannel({
-                title: 'Pixi: Add Channel',
+                title: `Pixi: Add Channel (${scopeLabel})`,
                 placeHolder: 'Select a channel preset or enter a custom channel / mirror URL',
+                excludeChannels: existingInScope,
             });
             if (!targetChannel) {
                 return;
@@ -136,7 +170,7 @@ export function registerChannelCommands(manager: PixiProjectManager): Disposable
                     },
                 ],
                 {
-                    title: 'Pixi: Channel Priority',
+                    title: `Pixi: Channel Priority (${scopeLabel})`,
                     placeHolder: 'Choose priority position in channels list',
                 },
             );
@@ -145,6 +179,9 @@ export function registerChannelCommands(manager: PixiProjectManager): Disposable
             }
 
             const args = ['workspace', 'channel', 'add'];
+            if (targetFeature) {
+                args.push('-f', targetFeature);
+            }
             if (priorityPick.prepend) {
                 args.push('--prepend');
             }
@@ -152,16 +189,16 @@ export function registerChannelCommands(manager: PixiProjectManager): Disposable
 
             const projectName = path.basename(projectPath);
             await runPixiWithProgress(
-                `Pixi: Adding channel '${targetChannel}' to '${projectName}'...`,
+                `Pixi: Adding channel '${targetChannel}' to ${scopeLabel} in '${projectName}'...`,
                 args,
                 projectPath,
                 manager,
-                `Pixi: Channel '${targetChannel}' added successfully to '${projectName}'.`,
+                `Pixi: Added channel '${targetChannel}' to ${scopeLabel} in '${projectName}'.`,
             );
         }),
 
         // Pixi: Remove Channel...
-        commands.registerCommand('pixi.removeChannel', async (targetItem?: unknown) => {
+        commands.registerCommand('pixi.removeChannel', async (targetItem?: unknown, presetFeature?: string) => {
             const projectPath = await pickPixiProject(
                 manager,
                 'Select Pixi project to remove channel from',
@@ -171,61 +208,52 @@ export function registerChannelCommands(manager: PixiProjectManager): Disposable
                 return;
             }
 
-            let output = '';
-            try {
-                output = await runPixi(['workspace', 'channel', 'list'], { cwd: projectPath });
-            } catch (err) {
-                window.showErrorMessage(`Failed to list channels: ${err instanceof Error ? err.message : String(err)}`);
-                return;
-            }
-
-            const channels = output
-                .split(/\r?\n/)
-                .map((l) => l.trim())
-                .filter((l) => l.startsWith('- '))
-                .map((l) => l.substring(2).trim());
-
-            const uniqueChannels = Array.from(new Set(channels));
-            if (uniqueChannels.length === 0) {
+            const existingChannels = getWorkspaceChannels(projectPath);
+            if (existingChannels.length === 0) {
                 window.showInformationMessage('No configurable channels found in this Pixi project.');
                 return;
             }
 
-            const selected = await window.showQuickPick(
-                uniqueChannels.map((c) => ({
-                    label: `$(globe) ${c}`,
-                    channel: c,
-                })),
-                {
-                    title: 'Pixi: Remove Channel',
-                    placeHolder: 'Select a channel to remove from project manifest',
-                },
-            );
-            if (!selected) {
-                return;
-            }
+            const contextFeature = extractFeatureName(targetItem, presetFeature);
+            const filterFeature = contextFeature && contextFeature !== 'default' ? contextFeature : undefined;
 
-            const projectName = path.basename(projectPath);
-            await runPixiWithProgress(
-                `Pixi: Removing channel '${selected.channel}' from '${projectName}'...`,
-                ['workspace', 'channel', 'remove', selected.channel],
+            const filteredEntries = filterFeature
+                ? existingChannels.filter((c) => c.feature === filterFeature)
+                : existingChannels;
+
+            const items: ScopedRemovalQuickPickItem[] = filteredEntries.map((c) => ({
+                label: `$(globe) ${c.channel}`,
+                description: c.feature ? `Feature: ${c.feature}` : 'Workspace (global)',
+                itemName: c.channel,
+                featureScope: c.feature,
+            }));
+
+            await executeScopedWorkspaceRemove({
+                subcommand: 'channel',
+                noun: 'channel',
+                nounPlural: 'channels',
                 projectPath,
                 manager,
-                `Pixi: Channel '${selected.channel}' removed successfully from '${projectName}'.`,
-            );
+                items,
+                totalGlobalCount: existingChannels.filter((c) => !c.feature).length,
+                filterFeature,
+                emptyGlobalWarning:
+                    'Cannot remove all workspace channels. A Pixi project must have at least one channel.',
+            });
         }),
 
         // Pixi: Channel Management (Hub)
-        commands.registerCommand('pixi.channel', async (targetItem?: unknown) => {
+        commands.registerCommand('pixi.channel', async (targetItem?: unknown, presetFeature?: string) => {
             const actions = [
                 {
                     label: '$(plus) Add Channel...',
-                    description: 'Add a Conda channel preset, mirror URL, or custom channel to the project',
+                    description:
+                        'Add a Conda channel preset, mirror URL, or custom channel to the workspace or a feature',
                     command: 'pixi.addChannel',
                 },
                 {
                     label: '$(trash) Remove Channel...',
-                    description: 'Remove a configured channel from the project manifest',
+                    description: 'Remove configured channel(s) from the project manifest',
                     command: 'pixi.removeChannel',
                 },
             ];
@@ -235,7 +263,7 @@ export function registerChannelCommands(manager: PixiProjectManager): Disposable
                 placeHolder: 'Select channel operation',
             });
             if (pick) {
-                await commands.executeCommand(pick.command, targetItem);
+                await commands.executeCommand(pick.command, targetItem, presetFeature);
             }
         }),
     ];

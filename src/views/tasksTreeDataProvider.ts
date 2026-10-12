@@ -198,9 +198,7 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
 
     public dispose(): void {
         this._onDidChangeTreeData.dispose();
-        for (const d of this.disposables) {
-            d.dispose();
-        }
+        Disposable.from(...this.disposables).dispose();
     }
 
     public getTreeItem(element: PixiTasksTreeItem): TreeItem {

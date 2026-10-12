@@ -102,13 +102,11 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
         this._onDidChangeTasks.fire();
     }
 
-    dispose() {
+    public dispose(): void {
         this.taskCache.clear();
         this.taskPromises.clear();
         this._onDidChangeTasks.dispose();
-        for (const d of this.disposables) {
-            d.dispose();
-        }
+        Disposable.from(...this.disposables).dispose();
     }
 
     async provideTasks(): Promise<Task[]> {
@@ -179,65 +177,59 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
     }
 
     private parsePixiTasksJson(jsonStr: string, projectPath: string): PixiTask[] {
+        const raw = safeJsonParse<RawPixiTaskEnvironment[]>(jsonStr, []);
+        if (!Array.isArray(raw)) {
+            return [];
+        }
+
         const taskMap = new Map<string, PixiTask>();
-        try {
-            const raw = safeJsonParse<RawPixiTaskEnvironment[]>(jsonStr, []);
+        const registerTask = (
+            t: RawPixiTask,
+            scope: { fallbackEnv?: string; feature?: string; inlineEnv?: string },
+        ) => {
+            if (!t || !t.name) {
+                return;
+            }
+            const existing = taskMap.get(t.name);
+            if (!existing) {
+                taskMap.set(t.name, {
+                    name: t.name,
+                    cmd: typeof t.cmd === 'string' ? t.cmd : Array.isArray(t.cmd) ? t.cmd.join(' ') : undefined,
+                    description: t.description || undefined,
+                    default_environment: t.default_environment || scope.fallbackEnv,
+                    feature: scope.feature,
+                    inline_environment: scope.inlineEnv,
+                    depends_on: Array.isArray(t.depends_on) && t.depends_on.length > 0 ? t.depends_on : undefined,
+                    inputs: Array.isArray(t.inputs) && t.inputs.length > 0 ? t.inputs : undefined,
+                    outputs: Array.isArray(t.outputs) && t.outputs.length > 0 ? t.outputs : undefined,
+                    clean_env: typeof t.clean_env === 'boolean' ? t.clean_env : undefined,
+                    projectPath,
+                });
+            } else {
+                existing.default_environment ||= scope.fallbackEnv;
+                existing.feature ||= scope.feature;
+                existing.inline_environment ||= scope.inlineEnv;
+            }
+        };
 
-            const registerTask = (
-                t: RawPixiTask,
-                scope: { fallbackEnv?: string; feature?: string; inlineEnv?: string },
-            ) => {
-                if (!t || !t.name) {
-                    return;
-                }
-                const existing = taskMap.get(t.name);
-                if (!existing) {
-                    taskMap.set(t.name, {
-                        name: t.name,
-                        cmd: typeof t.cmd === 'string' ? t.cmd : Array.isArray(t.cmd) ? t.cmd.join(' ') : undefined,
-                        description: t.description || undefined,
-                        default_environment: t.default_environment || scope.fallbackEnv,
-                        feature: scope.feature,
-                        inline_environment: scope.inlineEnv,
-                        depends_on: Array.isArray(t.depends_on) && t.depends_on.length > 0 ? t.depends_on : undefined,
-                        inputs: Array.isArray(t.inputs) && t.inputs.length > 0 ? t.inputs : undefined,
-                        outputs: Array.isArray(t.outputs) && t.outputs.length > 0 ? t.outputs : undefined,
-                        clean_env: typeof t.clean_env === 'boolean' ? t.clean_env : undefined,
-                        projectPath,
-                    });
-                } else {
-                    if (!existing.default_environment && scope.fallbackEnv) {
-                        existing.default_environment = scope.fallbackEnv;
-                    }
-                    if (!existing.feature && scope.feature) {
-                        existing.feature = scope.feature;
-                    }
-                    if (!existing.inline_environment && scope.inlineEnv) {
-                        existing.inline_environment = scope.inlineEnv;
-                    }
-                }
-            };
+        for (const envObj of raw) {
+            const envName = envObj.environment && envObj.environment !== 'default' ? envObj.environment : undefined;
 
-            for (const envObj of raw) {
-                const envName = envObj.environment && envObj.environment !== 'default' ? envObj.environment : undefined;
+            // 1. Inline environment tasks ([environments.<env>.tasks])
+            for (const t of envObj.tasks ?? []) {
+                registerTask(t, { fallbackEnv: envName, inlineEnv: envObj.environment });
+            }
 
-                // 1. Inline environment tasks ([environments.<env>.tasks])
-                for (const t of envObj.tasks ?? []) {
-                    registerTask(t, { fallbackEnv: envName, inlineEnv: envObj.environment });
-                }
-
-                // 2. Feature tasks ([tasks] under default feature, or [feature.<name>.tasks])
-                for (const f of envObj.features ?? []) {
-                    const featureName = f.name && f.name !== 'default' ? f.name : undefined;
-                    const fallbackEnv = featureName ? envName || featureName : undefined;
-                    for (const t of f.tasks ?? []) {
-                        registerTask(t, { fallbackEnv, feature: featureName });
-                    }
+            // 2. Feature tasks ([tasks] under default feature, or [feature.<name>.tasks])
+            for (const f of envObj.features ?? []) {
+                const featureName = f.name && f.name !== 'default' ? f.name : undefined;
+                const fallbackEnv = featureName ? envName || featureName : undefined;
+                for (const t of f.tasks ?? []) {
+                    registerTask(t, { fallbackEnv, feature: featureName });
                 }
             }
-        } catch (e) {
-            traceError('Failed to parse pixi task list JSON:', e);
         }
+
         return Array.from(taskMap.values()).sort((a, b) =>
             a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
         );
@@ -281,7 +273,7 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
         let projectPaths = this.projectManager.getProjectPaths();
         if (options.targetProjectPath) {
             const normalized = path.normalize(options.targetProjectPath);
-            projectPaths = projectPaths.filter((p) => path.normalize(p) === normalized);
+            projectPaths = projectPaths.filter((p) => p === normalized);
         }
         if (projectPaths.length === 0) {
             window.showWarningMessage('No Pixi projects found in the workspace.');
@@ -295,7 +287,7 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
             return undefined;
         }
 
-        const isMultiProject = !options.targetProjectPath && this.projectManager.getProjectPaths().length > 1;
+        const isMultiProject = projectPaths.length > 1;
         const formatEnv = options.formatEnvTag || ((env?: string) => (env ? `[${env}]` : ''));
 
         const items: TaskQuickPickItem[] = allTasks.map((t) => {

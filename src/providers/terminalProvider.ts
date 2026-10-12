@@ -35,10 +35,8 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
         );
     }
 
-    dispose() {
-        for (const d of this.disposables) {
-            d.dispose();
-        }
+    public dispose(): void {
+        Disposable.from(...this.disposables).dispose();
     }
 
     private async handleUninstalledOrError(env: PixiEnvironmentInfo): Promise<boolean> {
@@ -84,22 +82,12 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
         const defaultEnvSetting = config.get<string>('terminal.defaultEnvironment')?.trim();
 
         if (defaultEnvSetting) {
-            let matchedEnv: PixiEnvironmentInfo | undefined;
-            if (targetProjectPath) {
-                matchedEnv = envs.find((e) => e.pixiEnvName === defaultEnvSetting);
-            } else if (activeUri) {
-                const projectPath = this.projectManager.findProjectForUri(activeUri);
-                if (projectPath) {
-                    const projectEnvs = this.projectManager.getEnvironmentsForProject(projectPath);
-                    matchedEnv = projectEnvs.find((e) => e.pixiEnvName === defaultEnvSetting);
-                }
-            }
-            if (!matchedEnv) {
-                const matching = envs.filter((e) => e.pixiEnvName === defaultEnvSetting);
-                if (matching.length === 1) {
-                    matchedEnv = matching[0];
-                }
-            }
+            const activeProjectPath =
+                !targetProjectPath && activeUri ? this.projectManager.findProjectForUri(activeUri) : undefined;
+            const matching = envs.filter((e) => e.pixiEnvName === defaultEnvSetting);
+            const matchedEnv =
+                (activeProjectPath ? matching.find((e) => e.projectPath === activeProjectPath) : undefined) ??
+                (matching.length === 1 ? matching[0] : undefined);
             if (matchedEnv) {
                 return matchedEnv;
             }

@@ -1,11 +1,17 @@
 import * as path from 'path';
-import { commands, Disposable, QuickPickItem, QuickPickItemKind, window } from 'vscode';
+import { commands, Disposable, window } from 'vscode';
 
 import { getHostCondaPlatform, runPixi } from '../../cli/pixiCli';
 import { runPixiWithProgress } from '../../cli/workspaceCli';
 import { safeJsonParse } from '../../common/execUtils';
 import { PixiProjectManager } from '../../core/projectManager';
-import { extractFeatureName, getWorkspaceFeatures, pickPixiProject } from './common';
+import {
+    executeScopedWorkspaceRemove,
+    extractFeatureName,
+    pickPixiProject,
+    resolveWorkspaceOrFeatureScope,
+    ScopedRemovalQuickPickItem,
+} from './common';
 
 export interface CondaPlatformPreset {
     name: string;
@@ -57,82 +63,9 @@ export async function getWorkspacePlatforms(projectPath: string): Promise<Worksp
                 }));
         }
     } catch {
-        // Fall back to text output parsing
+        // Ignore CLI errors and return empty list
     }
-
-    try {
-        const textOut = await runPixi(['workspace', 'platform', 'list'], { cwd: projectPath });
-        const entries: WorkspacePlatformEntry[] = [];
-        for (const rawLine of textOut.split(/\r?\n/)) {
-            const line = rawLine.trim();
-            const name = line.startsWith('- ')
-                ? line.slice(2).trim()
-                : rawLine.match(/^([a-zA-Z0-9_\-]+):\s+platform=/)?.[1];
-            if (name) {
-                entries.push({
-                    name,
-                    virtualPackages: [],
-                    features: [],
-                    environments: [],
-                });
-            }
-        }
-        return entries;
-    } catch {
-        return [];
-    }
-}
-
-async function resolvePlatformTargetFeature(
-    projectPath: string,
-    targetItem?: unknown,
-    presetFeature?: string,
-): Promise<string | undefined | null> {
-    const contextFeature = extractFeatureName(targetItem, presetFeature);
-    if (contextFeature) {
-        return contextFeature === 'default' ? undefined : contextFeature;
-    }
-
-    const features = await getWorkspaceFeatures(projectPath);
-    const namedFeatures = features.filter((f) => f.name !== 'default');
-    if (namedFeatures.length === 0) {
-        return undefined;
-    }
-
-    interface ScopePickItem extends QuickPickItem {
-        featureName?: string;
-    }
-
-    const items: ScopePickItem[] = [
-        {
-            label: 'Workspace Scope',
-            kind: QuickPickItemKind.Separator,
-        },
-        {
-            label: '$(globe) [workspace] (Global Platforms)',
-            description: 'Shared across all environments and features (default)',
-            featureName: undefined,
-        },
-        {
-            label: 'Feature Scope',
-            kind: QuickPickItemKind.Separator,
-        },
-        ...namedFeatures.map((f) => ({
-            label: `$(symbol-namespace) Feature: ${f.name}`,
-            description: `Target platforms specific to feature '${f.name}'`,
-            featureName: f.name,
-        })),
-    ];
-
-    const selected = await window.showQuickPick(items, {
-        title: 'Pixi: Select Platform Target Scope',
-        placeHolder: 'Select scope to add platform(s) to',
-    });
-
-    if (!selected) {
-        return null;
-    }
-    return selected.featureName;
+    return [];
 }
 
 export function registerPlatformCommands(manager: PixiProjectManager): Disposable[] {
@@ -145,7 +78,18 @@ export function registerPlatformCommands(manager: PixiProjectManager): Disposabl
             }
 
             const platformsPromise = getWorkspacePlatforms(projectPath);
-            const targetFeature = await resolvePlatformTargetFeature(projectPath, targetItem, presetFeature);
+            const targetFeature = await resolveWorkspaceOrFeatureScope(
+                projectPath,
+                {
+                    title: 'Pixi: Select Platform Target Scope',
+                    placeHolder: 'Select scope to add platform(s) to',
+                    globalLabel: '$(globe) [workspace] (Global Platforms)',
+                    globalDescription: 'Shared across all environments and features (default)',
+                    featureDescription: (name) => `Target platforms specific to feature '${name}'`,
+                },
+                targetItem,
+                presetFeature,
+            );
             if (targetFeature === null) {
                 return;
             }
@@ -217,12 +161,7 @@ export function registerPlatformCommands(manager: PixiProjectManager): Disposabl
             const contextFeature = extractFeatureName(targetItem, presetFeature);
             const filterFeature = contextFeature && contextFeature !== 'default' ? contextFeature : undefined;
 
-            interface RemovePlatformItem extends QuickPickItem {
-                platformName: string;
-                featureScope?: string;
-            }
-
-            const items: RemovePlatformItem[] = [];
+            const items: ScopedRemovalQuickPickItem[] = [];
             for (const p of existingPlatforms) {
                 const vpDetail = p.virtualPackages.length > 0 ? ` [${p.virtualPackages.join(', ')}]` : '';
                 if (filterFeature) {
@@ -230,7 +169,7 @@ export function registerPlatformCommands(manager: PixiProjectManager): Disposabl
                         items.push({
                             label: `$(device-desktop) ${p.name}`,
                             description: `Feature: ${filterFeature}${vpDetail}`,
-                            platformName: p.name,
+                            itemName: p.name,
                             featureScope: filterFeature,
                         });
                     }
@@ -241,7 +180,7 @@ export function registerPlatformCommands(manager: PixiProjectManager): Disposabl
                     items.push({
                         label: `$(device-desktop) ${p.name}`,
                         description: `Workspace (global)${vpDetail}`,
-                        platformName: p.name,
+                        itemName: p.name,
                         featureScope: undefined,
                     });
                 }
@@ -249,69 +188,28 @@ export function registerPlatformCommands(manager: PixiProjectManager): Disposabl
                     items.push({
                         label: `$(device-desktop) ${p.name}`,
                         description: `Feature: ${feat}${vpDetail}`,
-                        platformName: p.name,
+                        itemName: p.name,
                         featureScope: feat,
                     });
                 }
             }
 
-            if (items.length === 0) {
-                window.showInformationMessage(
-                    filterFeature
-                        ? `No custom platforms configured on feature '${filterFeature}'.`
-                        : 'No removable platforms found in this Pixi project.',
-                );
-                return;
-            }
-
-            const selected = await window.showQuickPick(items, {
-                title: filterFeature ? `Pixi: Remove Platform (feature '${filterFeature}')` : 'Pixi: Remove Platform',
-                placeHolder: 'Select one or more platforms to remove from project manifest',
-                canPickMany: true,
-            });
-            if (!selected || selected.length === 0) {
-                return;
-            }
-
-            const totalGlobalCount = existingPlatforms.filter(isGlobalPlatform).length;
-            const removingGlobalCount = selected.filter((s) => !s.featureScope).length;
-            if (totalGlobalCount > 0 && removingGlobalCount >= totalGlobalCount) {
-                window.showWarningMessage(
-                    'Cannot remove all workspace platforms. A Pixi project must have at least one target platform.',
-                );
-                return;
-            }
-
-            const byScope = new Map<string | undefined, string[]>();
-            for (const item of selected) {
-                const list = byScope.get(item.featureScope) || [];
-                list.push(item.platformName);
-                byScope.set(item.featureScope, list);
-            }
-
-            const commandBatch: string[][] = [];
-            for (const [feat, names] of byScope.entries()) {
-                const args = ['workspace', 'platform', 'remove'];
-                if (feat) {
-                    args.push('-f', feat);
-                }
-                args.push(...names);
-                commandBatch.push(args);
-            }
-
-            const projectName = path.basename(projectPath);
-            const removedSummary = [...new Set(selected.map((s) => s.platformName))].join(', ');
-            await runPixiWithProgress(
-                `Pixi: Removing platform(s) ${removedSummary} from '${projectName}'...`,
-                commandBatch,
+            await executeScopedWorkspaceRemove({
+                subcommand: 'platform',
+                noun: 'platform',
+                nounPlural: 'platforms',
                 projectPath,
                 manager,
-                `Pixi: Removed platform(s) ${removedSummary} from '${projectName}'.`,
-            );
+                items,
+                totalGlobalCount: existingPlatforms.filter(isGlobalPlatform).length,
+                filterFeature,
+                emptyGlobalWarning:
+                    'Cannot remove all workspace platforms. A Pixi project must have at least one target platform.',
+            });
         }),
 
         // Pixi: Platform Management (Hub)
-        commands.registerCommand('pixi.platform', async (targetItem?: unknown) => {
+        commands.registerCommand('pixi.platform', async (targetItem?: unknown, presetFeature?: string) => {
             const actions = [
                 {
                     label: '$(plus) Add Platform...',
@@ -330,7 +228,7 @@ export function registerPlatformCommands(manager: PixiProjectManager): Disposabl
                 placeHolder: 'Select platform operation',
             });
             if (pick) {
-                await commands.executeCommand(pick.command, targetItem);
+                await commands.executeCommand(pick.command, targetItem, presetFeature);
             }
         }),
     ];
