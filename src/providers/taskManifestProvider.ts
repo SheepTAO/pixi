@@ -17,6 +17,7 @@ import {
     workspace,
 } from 'vscode';
 
+import { PixiProjectManager } from '../core/projectManager';
 import { PixiTask, PixiTaskProvider } from './taskProvider';
 
 export type ManifestActionMode = 'hover' | 'compact' | 'full' | 'header' | 'off';
@@ -45,7 +46,10 @@ export class PixiTaskManifestProvider implements CodeLensProvider, HoverProvider
     public readonly onDidChangeCodeLenses: Event<void> = this._onDidChangeCodeLenses.event;
     private readonly disposables: Disposable[] = [];
 
-    constructor(private readonly taskProvider: PixiTaskProvider) {
+    constructor(
+        private readonly projectManager: PixiProjectManager,
+        private readonly taskProvider: PixiTaskProvider,
+    ) {
         const selectors: DocumentFilter[] = [
             { scheme: 'file', pattern: '**/pixi.toml' },
             { scheme: 'file', pattern: '**/pyproject.toml' },
@@ -72,12 +76,15 @@ export class PixiTaskManifestProvider implements CodeLensProvider, HoverProvider
             return [];
         }
 
+        const projectPath = this.projectManager.findProjectForUri(document.uri);
+        if (!projectPath) {
+            return [];
+        }
+
         const { tasks, sections } = this.parseManifestTasks(document);
         if ((tasks.length === 0 && sections.length === 0) || token.isCancellationRequested) {
             return [];
         }
-
-        const projectPath = path.dirname(document.uri.fsPath);
 
         // 1. Header mode: Only show an aggregated action line on section headers ([tasks], etc.)
         if (mode === 'header') {
@@ -176,6 +183,11 @@ export class PixiTaskManifestProvider implements CodeLensProvider, HoverProvider
             return undefined;
         }
 
+        const projectPath = this.projectManager.findProjectForUri(document.uri);
+        if (!projectPath) {
+            return undefined;
+        }
+
         const { tasks } = this.parseManifestTasks(document);
         if (tasks.length === 0 || token.isCancellationRequested) {
             return undefined;
@@ -188,7 +200,6 @@ export class PixiTaskManifestProvider implements CodeLensProvider, HoverProvider
             return undefined;
         }
 
-        const projectPath = path.dirname(document.uri.fsPath);
         const projectTasks = await this.taskProvider.getTasksForProject(projectPath);
         if (token.isCancellationRequested) {
             return undefined;
@@ -258,12 +269,7 @@ export class PixiTaskManifestProvider implements CodeLensProvider, HoverProvider
     }
 
     private parseManifestTasks(document: TextDocument): ParsedManifestResult {
-        const fileName = path.basename(document.uri.fsPath);
-        if (fileName !== 'pixi.toml' && fileName !== 'pyproject.toml') {
-            return { tasks: [], sections: [] };
-        }
-
-        const isPyproject = fileName === 'pyproject.toml';
+        const isPyproject = path.basename(document.uri.fsPath) === 'pyproject.toml';
         const tasks: ParsedTaskLine[] = [];
         const sections: ParsedTaskSection[] = [];
         const lineCount = document.lineCount;

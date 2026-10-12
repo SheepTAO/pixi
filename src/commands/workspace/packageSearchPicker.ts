@@ -381,12 +381,7 @@ export async function promptAddPackageSpec(
     initialQuery?: string,
 ): Promise<AddPackagePromptResult | undefined> {
     return new Promise((resolve) => {
-        interface AddPackageQuickPickItem extends QuickPickItem {
-            pkg?: PixiPackageSearchResult;
-            isDirectInput?: boolean;
-        }
-
-        const quickPick = window.createQuickPick<AddPackageQuickPickItem>();
+        const quickPick = window.createQuickPick<SearchResultQuickPickItem>();
         quickPick.title = targetEnvName
             ? `Pixi: Add Package to '${targetEnvName}' (Search Conda & PyPI)`
             : 'Pixi: Add Package (Search Conda & PyPI)';
@@ -399,7 +394,7 @@ export async function promptAddPackageSpec(
 
         const search = attachDebouncedPackageSearch(quickPick, {
             projectPath,
-            buildPrefixItems: (query: string): AddPackageQuickPickItem[] => {
+            buildPrefixItems: (query: string): SearchResultQuickPickItem[] => {
                 if (!query) {
                     return [];
                 }
@@ -408,7 +403,6 @@ export async function promptAddPackageSpec(
                         label: `$(edit) Add: "${query}"`,
                         description: 'Press Enter to select source channel and install directly',
                         alwaysShow: true,
-                        isDirectInput: true,
                     },
                 ];
             },
@@ -441,16 +435,11 @@ export async function promptAddPackageSpec(
                     pkg,
                     spec: finalSpec,
                 });
-            } else if (selected?.isDirectInput || currentVal) {
-                const specs = currentVal.split(/\s+/).filter(Boolean);
-                if (specs.length === 0) {
-                    resolve(undefined);
-                } else {
-                    resolve({
-                        kind: 'direct',
-                        specs,
-                    });
-                }
+            } else if (currentVal) {
+                resolve({
+                    kind: 'direct',
+                    specs: currentVal.split(/\s+/),
+                });
             } else {
                 resolve(undefined);
             }

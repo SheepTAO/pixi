@@ -377,10 +377,6 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
                 }
 
                 const specs = promptResult.specs;
-                if (specs.length === 0) {
-                    return;
-                }
-
                 const sourceConfig = await promptAddPackageSource(projectPath, specs);
                 if (!sourceConfig) {
                     return;

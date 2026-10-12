@@ -17,6 +17,7 @@ import {
     getWorkspaceEnvironments,
     getWorkspaceFeatures,
 } from '../../commands/workspace/common';
+import { runWithProgressNotification } from '../../common/execUtils';
 import { traceError, traceInfo, traceVerbose } from '../../common/logging';
 import { normalizePkgName } from '../../core/packageManager';
 import { PixiProjectManager } from '../../core/projectManager';
@@ -124,65 +125,54 @@ export class PixiPythonPackageManager implements PackageManager, Disposable {
             }
             args.push(...installList);
 
-            await window.withProgress(
-                {
-                    location: ProgressLocation.Notification,
-                    title: `Pixi: Installing ${installList.join(', ')} (${channel.isPypi ? 'PyPI' : 'Conda'})...`,
-                    cancellable: true,
-                },
-                async (_progress, token) => {
+            await runWithProgressNotification(
+                `Pixi: Installing ${installList.join(', ')} (${channel.isPypi ? 'PyPI' : 'Conda'})...`,
+                async (token) => {
                     await runPixi(args, { cwd: details.projectPath }, token);
                     await this.refresh(environment);
                 },
             );
         } else if (uninstallList.length > 0) {
-            await window.withProgress(
-                {
-                    location: ProgressLocation.Notification,
-                    title: `Pixi: Uninstalling ${uninstallList.join(', ')}...`,
-                    cancellable: true,
-                },
-                async (_progress, token) => {
-                    const [features, envs] = await Promise.all([
-                        getWorkspaceFeatures(details.projectPath),
-                        getWorkspaceEnvironments(details.projectPath),
-                    ]);
-                    let cachedPkgs: PixiPackage[] | undefined;
-                    for (const pkg of uninstallList) {
-                        if (token.isCancellationRequested) {
-                            break;
-                        }
-                        const scope = await findPackageScope(details.projectPath, pkg, details.envName, {
-                            features,
-                            envs,
-                        });
-                        let isPypi = scope?.isPypi ?? false;
-                        if (!scope) {
-                            cachedPkgs ??= await this.projectManager.getPackagesForEnvironment(
-                                details.envName,
-                                details.projectPath,
-                            );
-                            const normPkg = normalizePkgName(pkg);
-                            isPypi = cachedPkgs.find((p) => normalizePkgName(p.name) === normPkg)?.kind === 'pypi';
-                        }
-
-                        const args = ['remove'];
-                        if (isPypi) {
-                            args.push('--pypi');
-                        }
-                        const scopeArgs = getScopeArgs(scope);
-                        if (scopeArgs.length > 0) {
-                            args.push(...scopeArgs);
-                        } else if (!scope && details.envName !== 'default') {
-                            args.push('-e', details.envName);
-                        }
-                        args.push(pkg);
-
-                        await runPixi(args, { cwd: details.projectPath }, token);
+            await runWithProgressNotification(`Pixi: Uninstalling ${uninstallList.join(', ')}...`, async (token) => {
+                const [features, envs] = await Promise.all([
+                    getWorkspaceFeatures(details.projectPath),
+                    getWorkspaceEnvironments(details.projectPath),
+                ]);
+                let cachedPkgs: PixiPackage[] | undefined;
+                for (const pkg of uninstallList) {
+                    if (token.isCancellationRequested) {
+                        break;
                     }
-                    await this.refresh(environment);
-                },
-            );
+                    const scope = await findPackageScope(details.projectPath, pkg, details.envName, {
+                        features,
+                        envs,
+                    });
+                    let isPypi = scope?.isPypi ?? false;
+                    if (!scope) {
+                        cachedPkgs ??= await this.projectManager.getPackagesForEnvironment(
+                            details.envName,
+                            details.projectPath,
+                        );
+                        const normPkg = normalizePkgName(pkg);
+                        isPypi = cachedPkgs.find((p) => normalizePkgName(p.name) === normPkg)?.kind === 'pypi';
+                    }
+
+                    const args = ['remove'];
+                    if (isPypi) {
+                        args.push('--pypi');
+                    }
+                    const scopeArgs = getScopeArgs(scope);
+                    if (scopeArgs.length > 0) {
+                        args.push(...scopeArgs);
+                    } else if (!scope && details.envName !== 'default') {
+                        args.push('-e', details.envName);
+                    }
+                    args.push(pkg);
+
+                    await runPixi(args, { cwd: details.projectPath }, token);
+                }
+                await this.refresh(environment);
+            });
         }
     }
 

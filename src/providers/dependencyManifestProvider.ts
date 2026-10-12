@@ -363,22 +363,19 @@ export class PixiDependencyManifestProvider
             // Fast in-memory path: check pixi.lock directly without spawning child processes
             const lockPath = path.join(projectPath, 'pixi.lock');
             const lockLines = await getLockfileLines(lockPath);
-            const stillMissing: ParsedDependency[] = [];
 
-            for (const dep of missingDeps) {
-                const lockedVer = lockLines ? getLockedVersionFromLines(lockLines, dep.name) : undefined;
-                if (lockedVer) {
-                    hints.push(this.createInlayHint(dep, { version: lockedVer } as PixiPackage));
-                } else {
-                    stillMissing.push(dep);
+            if (lockLines) {
+                for (const dep of missingDeps) {
+                    const lockedVer = getLockedVersionFromLines(lockLines, dep.name);
+                    if (lockedVer) {
+                        hints.push(this.createInlayHint(dep, { version: lockedVer } as PixiPackage));
+                    }
                 }
-            }
-
-            // Fallback for any dependencies still missing: check default environment if not active
-            if (stillMissing.length > 0 && activeEnvName !== 'default' && !token.isCancellationRequested) {
+            } else if (activeEnvName !== 'default' && !token.isCancellationRequested) {
+                // Fallback when lockfile is unavailable: check default environment if not active
                 const defaultPkgs = await this.projectManager.getPackagesForEnvironment('default', projectPath);
                 const defaultMap = this.createPackageMap(defaultPkgs);
-                for (const dep of stillMissing) {
+                for (const dep of missingDeps) {
                     const pkg = defaultMap.get(normalizePkgName(dep.name));
                     if (pkg && pkg.version) {
                         hints.push(this.createInlayHint(dep, pkg));

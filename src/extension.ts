@@ -37,7 +37,7 @@ export async function activate(context: ExtensionContext): Promise<PixiExtension
     const taskProvider = new PixiTaskProvider(projectManager);
     context.subscriptions.push(taskProvider);
 
-    const taskManifestProvider = new PixiTaskManifestProvider(taskProvider);
+    const taskManifestProvider = new PixiTaskManifestProvider(projectManager, taskProvider);
     context.subscriptions.push(taskManifestProvider);
 
     const dependencyManifestProvider = new PixiDependencyManifestProvider(projectManager, pixiApi);

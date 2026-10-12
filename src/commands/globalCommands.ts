@@ -54,7 +54,7 @@ export async function executeGlobalSync(): Promise<boolean> {
 
 export async function handleGlobalInstall(initialTool?: string): Promise<void> {
     let tools: string[] = [];
-    if (initialTool && typeof initialTool === 'string' && initialTool.trim()) {
+    if (initialTool?.trim()) {
         tools = [initialTool.trim()];
     } else {
         const toolInput = await window.showInputBox({
@@ -63,13 +63,11 @@ export async function handleGlobalInstall(initialTool?: string): Promise<void> {
             placeHolder: 'e.g. ruff ripgrep uv jupyter bat',
             ignoreFocusOut: true,
         });
-        if (!toolInput || !toolInput.trim()) {
+        const trimmed = toolInput?.trim();
+        if (!trimmed) {
             return;
         }
-        tools = toolInput.trim().split(/\s+/).filter(Boolean);
-        if (tools.length === 0) {
-            return;
-        }
+        tools = trimmed.split(/\s+/);
     }
 
     const targetChannel = await promptCondaChannel({

@@ -300,7 +300,7 @@ export interface ProgressNotificationOptions {
 export async function runWithProgressNotification<T>(
     title: string,
     action: (token: CancellationToken) => Promise<T>,
-    successMsg: string | ((result: T) => string),
+    successMsg?: string | ((result: T) => string),
     options?: string | ProgressNotificationOptions,
 ): Promise<boolean> {
     const opts: ProgressNotificationOptions = typeof options === 'string' ? { errorPrefix: options } : (options ?? {});
@@ -313,8 +313,12 @@ export async function runWithProgressNotification<T>(
             },
             async (_progress, token) => {
                 const result = await action(token);
-                const finalMsg = typeof successMsg === 'function' ? successMsg(result) : successMsg;
-                window.showInformationMessage(finalMsg);
+                if (successMsg && !token.isCancellationRequested) {
+                    const finalMsg = typeof successMsg === 'function' ? successMsg(result) : successMsg;
+                    if (finalMsg) {
+                        window.showInformationMessage(finalMsg);
+                    }
+                }
             },
         );
         return true;
