@@ -549,22 +549,6 @@
                 {
                     "command": "pixi.removeChannel",
                     "when": "false"
-                },
-                {
-                    "command": "pixi.views.projects.focus",
-                    "when": "false"
-                },
-                {
-                    "command": "pixi.views.tasks.focus",
-                    "when": "false"
-                },
-                {
-                    "command": "pixi.views.global.focus",
-                    "when": "false"
-                },
-                {
-                    "command": "pixi.views.info.focus",
-                    "when": "false"
                 }
             ],
             "editor/title": [
@@ -1200,9 +1184,11 @@
                     },
                     "default": [
                         "-",
-                        "_"
+                        "_",
+                        ":",
+                        "::"
                     ],
-                    "description": "Characters used to extract namespace prefixes from task names.",
+                    "description": "Separators used to extract namespace prefixes from task names.",
                     "scope": "resource"
                 },
                 "pixi.tasks.minGroupSize": {

@@ -23,6 +23,8 @@ import { traceError, traceVerbose } from '../common/logging';
 import { promptToInstallEnvironment } from '../core/environmentRules';
 import { PixiProjectManager } from '../core/projectManager';
 
+export const DEFAULT_TASK_PREFIX_SEPARATORS = ['-', '_', ':', '::'];
+
 export interface PixiTaskDefinition extends TaskDefinition {
     type: 'pixi';
     task: string;

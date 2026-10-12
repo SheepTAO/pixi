@@ -4,7 +4,7 @@ import { commands, Disposable, InputBoxValidationSeverity, QuickPickItem, Uri, w
 import { runPixiWithProgress } from '../../cli/workspaceCli';
 import { revealDefinitionInManifest } from '../../common/execUtils';
 import { PixiProjectManager } from '../../core/projectManager';
-import { PixiTask, PixiTaskProvider } from '../../providers/taskProvider';
+import { DEFAULT_TASK_PREFIX_SEPARATORS, PixiTask, PixiTaskProvider } from '../../providers/taskProvider';
 import { getWorkspaceFeatures, pickPixiProject, updateConfigurationValue } from './common';
 
 export interface TaskCommandArg {
@@ -162,13 +162,23 @@ export function registerTaskCommands(manager: PixiProjectManager, taskProvider: 
                 const item = targetItem as {
                     groupType?: 'prefix' | 'environment';
                     groupName?: string;
+                    tasks?: Array<{ name: string }>;
                 };
                 if (item.groupType === 'prefix' && item.groupName) {
                     const separators = workspace
                         .getConfiguration('pixi.tasks', Uri.file(projectPath))
-                        .get<string[]>('prefixSeparators', ['-', '_']);
-                    const sep = separators[0] || '-';
-                    defaultTaskName = `${item.groupName}${sep}`;
+                        .get<string[]>('prefixSeparators', DEFAULT_TASK_PREFIX_SEPARATORS);
+                    const sortedSeps = separators.filter(Boolean).sort((a, b) => b.length - a.length);
+                    const sampleName = item.tasks?.[0]?.name;
+                    const matchedSep = sampleName
+                        ? sortedSeps.find((s) => sampleName.includes(`${item.groupName}${s}`))
+                        : undefined;
+                    if (sampleName && matchedSep) {
+                        const token = `${item.groupName}${matchedSep}`;
+                        defaultTaskName = sampleName.slice(0, sampleName.indexOf(token) + token.length);
+                    } else {
+                        defaultTaskName = `${item.groupName}${separators[0] || '-'}`;
+                    }
                 } else if (item.groupType === 'environment' && item.groupName) {
                     initialEnv = item.groupName;
                 }

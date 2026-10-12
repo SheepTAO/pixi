@@ -15,7 +15,7 @@ import {
 import { escapeRegex } from '../common/execUtils';
 import { PixiProjectManager } from '../core/projectManager';
 import { PixiProject } from '../core/types';
-import { PixiTask, PixiTaskProvider } from '../providers/taskProvider';
+import { DEFAULT_TASK_PREFIX_SEPARATORS, PixiTask, PixiTaskProvider } from '../providers/taskProvider';
 
 export class PixiTaskProjectTreeItem extends TreeItem {
     constructor(public readonly project: PixiProject) {
@@ -249,7 +249,7 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
             return this.groupTasksByEnvironment(tasks, project);
         }
 
-        const prefixSeparators = config.get<string[]>('prefixSeparators', ['-', '_']);
+        const prefixSeparators = config.get<string[]>('prefixSeparators', DEFAULT_TASK_PREFIX_SEPARATORS);
         const minGroupSize = Math.max(1, config.get<number>('minGroupSize', 2));
 
         return this.groupTasksByPrefix(tasks, project, prefixSeparators, minGroupSize, 1);
@@ -301,7 +301,7 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
             .filter(Boolean)
             .sort((a, b) => b.length - a.length)
             .map(escapeRegex);
-        const sepRegex = patterns.length > 0 ? new RegExp(patterns.join('|')) : /[-_]/;
+        const sepRegex = patterns.length > 0 ? new RegExp(patterns.join('|')) : /::|[-_:]/;
 
         for (const task of tasks) {
             const parts = task.name.split(sepRegex).filter(Boolean);
@@ -352,7 +352,7 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
             const config = workspace.getConfiguration('pixi.tasks', Uri.file(project.projectPath));
             const maxDepth = Math.max(1, Math.min(3, config.get<number>('maxDepth', 1)));
             if (groupItem.depth < maxDepth) {
-                const prefixSeparators = config.get<string[]>('prefixSeparators', ['-', '_']);
+                const prefixSeparators = config.get<string[]>('prefixSeparators', DEFAULT_TASK_PREFIX_SEPARATORS);
                 const minGroupSize = Math.max(1, config.get<number>('minGroupSize', 2));
                 return this.groupTasksByPrefix(
                     groupItem.tasks,
