@@ -53,16 +53,35 @@ export class PixiProjectManager implements Disposable {
                 let targetScope: Uri | undefined = undefined;
                 if (uris.length > 0) {
                     const projectUris = new Set<string>();
+                    let needsFullRefresh = false;
                     for (const u of uris) {
+                        const filePath = path.normalize(u.fsPath);
                         const projectDir = this.findProjectForUri(u);
+                        if (path.basename(filePath) === 'pyproject.toml') {
+                            const knownManifest = projectDir ? this.getManifestPath(projectDir) : undefined;
+                            const isKnownManifest =
+                                knownManifest !== undefined && Uri.file(knownManifest).fsPath === filePath;
+                            const isCurrentManifest = findManifestPath(path.dirname(filePath)) === filePath;
+                            if (!isKnownManifest && !isCurrentManifest) {
+                                continue;
+                            }
+                        }
                         if (projectDir) {
-                            projectUris.add(projectDir);
-                        } else {
-                            projectUris.clear();
+                            if (isPixiProject(projectDir)) {
+                                projectUris.add(projectDir);
+                            } else {
+                                needsFullRefresh = true;
+                                break;
+                            }
+                        } else if (isPixiProject(path.dirname(filePath))) {
+                            needsFullRefresh = true;
                             break;
                         }
                     }
-                    if (projectUris.size === 1) {
+                    if (!needsFullRefresh && projectUris.size === 0) {
+                        return;
+                    }
+                    if (!needsFullRefresh && projectUris.size === 1) {
                         targetScope = Uri.file(Array.from(projectUris)[0]);
                     }
                 }

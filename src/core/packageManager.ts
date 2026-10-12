@@ -136,8 +136,19 @@ export function sortPixiPackages(packages: PixiPackage[]): PixiPackage[] {
 }
 
 /**
+ * Extracts the bare package name from a version specification string (e.g., "numpy>=1.20" -> "numpy").
+ */
+export function extractPackageNameFromSpec(spec: string): string {
+    const cleaned = spec.trim();
+    const name = cleaned.split(/[<>=~!\s\[]/)[0].trim();
+    return name || cleaned;
+}
+
+/**
  * Normalizes package names for resilient cross-ecosystem lookup (PEP 503).
  */
 export function normalizePkgName(name: string): string {
-    return name.toLowerCase().replace(/[-_.]+/g, '-');
+    return extractPackageNameFromSpec(name)
+        .toLowerCase()
+        .replace(/[-_.]+/g, '-');
 }

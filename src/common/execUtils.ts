@@ -1,7 +1,19 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { Position, Range, Selection, TextEditor, TextEditorRevealType, Uri, window, workspace } from 'vscode';
+import {
+    CancellationError,
+    CancellationToken,
+    Position,
+    ProgressLocation,
+    Range,
+    Selection,
+    TextEditor,
+    TextEditorRevealType,
+    Uri,
+    window,
+    workspace,
+} from 'vscode';
 
 const SINGLE_OPERATOR_REGEX = /^[&|<>;()[\]{}]$/;
 const SHELL_SPECIAL_CHARS_REGEX = /[\s&|<>;'"`()\[\]{}$]/;
@@ -58,13 +70,7 @@ export function untildify(p: string): string {
  * Automatically slices between the outermost JSON brackets ({...} or [...]).
  */
 export function safeJsonParse<T>(text: string, fallback?: T): T {
-    if (!text || typeof text !== 'string') {
-        return fallback as T;
-    }
-    const trimmed = text.trim();
-    if (!trimmed) {
-        return fallback as T;
-    }
+    const trimmed = typeof text === 'string' ? text.trim() : '';
     const firstBrace = trimmed.indexOf('{');
     const firstBracket = trimmed.indexOf('[');
 
@@ -278,6 +284,46 @@ export async function revealDefinitionInManifest(options: RevealDefinitionOption
         return false;
     } catch (err: unknown) {
         window.showErrorMessage(`Failed to open manifest: ${err instanceof Error ? err.message : String(err)}`);
+        return false;
+    }
+}
+
+export interface ProgressNotificationOptions {
+    errorPrefix?: string;
+    cancellable?: boolean;
+}
+
+/**
+ * Executes an async action inside a VS Code notification progress indicator,
+ * showing a success message on completion or an error message on failure.
+ */
+export async function runWithProgressNotification<T>(
+    title: string,
+    action: (token: CancellationToken) => Promise<T>,
+    successMsg: string | ((result: T) => string),
+    options?: string | ProgressNotificationOptions,
+): Promise<boolean> {
+    const opts: ProgressNotificationOptions = typeof options === 'string' ? { errorPrefix: options } : (options ?? {});
+    try {
+        await window.withProgress(
+            {
+                location: ProgressLocation.Notification,
+                title,
+                cancellable: opts.cancellable ?? true,
+            },
+            async (_progress, token) => {
+                const result = await action(token);
+                const finalMsg = typeof successMsg === 'function' ? successMsg(result) : successMsg;
+                window.showInformationMessage(finalMsg);
+            },
+        );
+        return true;
+    } catch (error) {
+        if (error instanceof CancellationError) {
+            return false;
+        }
+        const msg = error instanceof Error ? error.message : String(error);
+        window.showErrorMessage(opts.errorPrefix ? `${opts.errorPrefix}: ${msg}` : msg);
         return false;
     }
 }

@@ -14,7 +14,7 @@ import {
 } from 'vscode';
 
 import { getWorkspaceEnvironments, getWorkspaceFeatures, WorkspaceListEntry } from '../commands/workspace/common';
-import { normalizePkgName, sortPixiPackages } from '../core/packageManager';
+import { extractPackageNameFromSpec, normalizePkgName, sortPixiPackages } from '../core/packageManager';
 import { PixiProjectManager } from '../core/projectManager';
 import { PixiEnvironmentInfo, PixiPackage, PixiProject } from '../core/types';
 
@@ -281,22 +281,28 @@ export class PixiFeatureTreeItem extends TreeItem {
 }
 
 export class PixiDeclaredPackageTreeItem extends TreeItem {
+    public readonly pkgName: string;
+
     get pkg(): { name: string; kind: 'conda' | 'pypi' } {
         return { name: this.pkgName, kind: this.kind };
     }
 
     constructor(
-        public readonly pkgName: string,
+        public readonly rawSpec: string,
         public readonly kind: 'conda' | 'pypi',
         public readonly feature: WorkspaceListEntry,
         public readonly project: PixiProject,
     ) {
+        const pkgName = extractPackageNameFromSpec(rawSpec);
         super(pkgName, TreeItemCollapsibleState.None);
-        this.description = kind === 'pypi' ? 'pypi' : 'conda';
+        this.pkgName = pkgName;
+        const constraint = rawSpec.slice(pkgName.length).trim();
+        const kindTag = kind === 'pypi' ? 'pypi' : 'conda';
+        this.description = constraint ? `${constraint} (${kindTag})` : kindTag;
         this.iconPath =
             kind === 'pypi' ? new ThemeIcon('symbol-keyword', new ThemeColor('charts.blue')) : new ThemeIcon('package');
         this.contextValue = 'pixiDeclaredPackage';
-        this.tooltip = `${pkgName}\nSource: ${kind.toUpperCase()}\nDeclared in feature: ${feature.name}\nProject: ${project.name}`;
+        this.tooltip = `${rawSpec}\nSource: ${kind.toUpperCase()}\nDeclared in feature: ${feature.name}\nProject: ${project.name}`;
     }
 }
 

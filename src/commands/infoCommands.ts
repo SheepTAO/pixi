@@ -1,22 +1,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import {
-    commands,
-    Disposable,
-    env as vscodeEnv,
-    ProgressLocation,
-    QuickPickItem,
-    Uri,
-    window,
-    workspace,
-} from 'vscode';
+import { commands, Disposable, env as vscodeEnv, QuickPickItem, Uri, window, workspace } from 'vscode';
 
-import { clearGlobalManifestCache } from '../cli/globalCli';
 import { cleanGlobalCache, clearPixiCache, runPixi } from '../cli/pixiCli';
-import { normalizeLocationPath } from '../common/execUtils';
+import { normalizeLocationPath, runWithProgressNotification } from '../common/execUtils';
 import { traceError, traceVerbose } from '../common/logging';
 import { PixiInfoTreeDataProvider } from '../views/infoTreeDataProvider';
-import { runWithProgressNotification } from './workspace/common';
 
 export async function openLocation(target?: unknown): Promise<void> {
     const targetPath = normalizeLocationPath(target);
@@ -110,37 +99,33 @@ export function registerInfoCommands(infoProvider: PixiInfoTreeDataProvider): Di
                 return;
             }
 
-            await window.withProgress(
-                {
-                    location: ProgressLocation.Notification,
-                    title: 'Updating Pixi CLI...',
-                    cancellable: false,
-                },
+            await runWithProgressNotification(
+                'Updating Pixi CLI...',
                 async () => {
+                    traceVerbose('Running pixi self-update...');
                     try {
-                        traceVerbose('Running pixi self-update...');
                         const output = await runPixi(['self-update'], { includeStderr: true });
-                        const lines = output
-                            .trim()
-                            .split(/\r?\n/)
-                            .map((l) => l.trim())
-                            .filter(Boolean);
-                        const lastLine = lines[lines.length - 1] || output.trim();
-                        const cleanOutput = lastLine.replace(/^✔\s*/, '');
-                        if (cleanOutput.toLowerCase().includes('already up-to-date')) {
-                            window.showInformationMessage(cleanOutput);
-                        } else {
-                            window.showInformationMessage(`Pixi update: ${cleanOutput}`);
-                        }
                         clearPixiCache();
-                        clearGlobalManifestCache();
                         infoProvider.refresh();
+                        return output;
                     } catch (err: unknown) {
-                        const msg = err instanceof Error ? err.message : String(err);
                         traceError('Pixi self-update failed:', err);
-                        window.showErrorMessage(`Failed to update Pixi CLI: ${msg}`);
+                        throw err;
                     }
                 },
+                (output) => {
+                    const lines = output
+                        .trim()
+                        .split(/\r?\n/)
+                        .map((l) => l.trim())
+                        .filter(Boolean);
+                    const lastLine = lines[lines.length - 1] || output.trim();
+                    const cleanOutput = lastLine.replace(/^✔\s*/, '');
+                    return cleanOutput.toLowerCase().includes('already up-to-date')
+                        ? cleanOutput
+                        : `Pixi update: ${cleanOutput}`;
+                },
+                { errorPrefix: 'Failed to update Pixi CLI', cancellable: false },
             );
         }),
         commands.registerCommand('pixi.refreshInfo', () => {

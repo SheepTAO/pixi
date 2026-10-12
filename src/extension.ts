@@ -1,7 +1,6 @@
 import { ExtensionContext, window, workspace } from 'vscode';
 
 import { createPixiApi, PixiExtensionApi } from './api';
-import { clearGlobalManifestCache } from './cli/globalCli';
 import { clearPixiCache, validatePixiCli } from './cli/pixiCli';
 import { registerGlobalCommands } from './commands/globalCommands';
 import { registerInfoCommands } from './commands/infoCommands';
@@ -109,7 +108,6 @@ export async function activate(context: ExtensionContext): Promise<PixiExtension
         workspace.onDidChangeConfiguration(async (e) => {
             if (e.affectsConfiguration('pixi.executablePath')) {
                 clearPixiCache();
-                clearGlobalManifestCache();
                 infoTreeDataProvider.refresh();
                 if (await validatePixiCli()) {
                     await projectManager.refresh(undefined);

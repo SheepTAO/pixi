@@ -29,22 +29,12 @@ export function refreshGlobalEnvironments(): void {
     _onDidChangeGlobalEnvironments.fire();
 }
 
-let _cachedGlobalManifestPath: string | undefined;
-
-export function clearGlobalManifestCache(): void {
-    _cachedGlobalManifestPath = undefined;
-}
-
 export async function getGlobalManifestPath(): Promise<string> {
-    if (_cachedGlobalManifestPath) {
-        return _cachedGlobalManifestPath;
-    }
     try {
         const stdout = await runPixi(['info', '--json']);
         const info = safeJsonParse<{ global_info?: { manifest?: string } }>(stdout, {});
         const manifest = info.global_info?.manifest;
         if (typeof manifest === 'string' && manifest.trim()) {
-            _cachedGlobalManifestPath = manifest;
             return manifest;
         }
     } catch {

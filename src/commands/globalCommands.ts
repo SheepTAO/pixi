@@ -10,8 +10,8 @@ import {
     uninstallGlobalTool,
     updateGlobalTool,
 } from '../cli/globalCli';
+import { runWithProgressNotification } from '../common/execUtils';
 import { promptCondaChannel } from './workspace/channelCommands';
-import { runWithProgressNotification } from './workspace/common';
 
 interface GlobalActionQuickPickItem extends QuickPickItem {
     action: 'install' | 'list' | 'sync' | 'update' | 'uninstall' | 'edit';

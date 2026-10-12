@@ -1,10 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import {
-    CancellationError,
-    CancellationToken,
     ConfigurationTarget,
-    ProgressLocation,
     QuickPickItem,
     QuickPickItemKind,
     Uri,
@@ -560,33 +557,4 @@ export async function updateConfigurationValue<T>(
               ? ConfigurationTarget.Workspace
               : ConfigurationTarget.Global;
     await config.update(key, value, target);
-}
-
-export async function runWithProgressNotification(
-    title: string,
-    action: (token: CancellationToken) => Promise<unknown>,
-    successMsg: string,
-    errorPrefix?: string,
-): Promise<boolean> {
-    try {
-        await window.withProgress(
-            {
-                location: ProgressLocation.Notification,
-                title,
-                cancellable: true,
-            },
-            async (_progress, token) => {
-                await action(token);
-                window.showInformationMessage(successMsg);
-            },
-        );
-        return true;
-    } catch (error) {
-        if (error instanceof CancellationError) {
-            return false;
-        }
-        const msg = error instanceof Error ? error.message : String(error);
-        window.showErrorMessage(errorPrefix ? `${errorPrefix}: ${msg}` : msg);
-        return false;
-    }
 }

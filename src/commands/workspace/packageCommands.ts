@@ -4,7 +4,7 @@ import { commands, Disposable, env as vscodeEnv, QuickPickItem, QuickPickItemKin
 import { PixiPackageSearchResult } from '../../cli/pixiCli';
 import { runPixiWithProgress } from '../../cli/workspaceCli';
 import { normalizeFolderPath, revealDefinitionInManifest } from '../../common/execUtils';
-import { sortPixiPackages } from '../../core/packageManager';
+import { extractPackageNameFromSpec, sortPixiPackages } from '../../core/packageManager';
 import { PixiProjectManager } from '../../core/projectManager';
 import { PixiPackage } from '../../core/types';
 import {
@@ -76,12 +76,6 @@ export async function pickPackageFromEnvironment(
         return undefined;
     }
     return { pkg: pick.pkg, pkgName: pick.pkgName, envLabel, targetEnv: resolvedEnv };
-}
-
-export function extractPackageNameFromSpec(spec: string): string {
-    const cleaned = spec.trim();
-    const name = cleaned.split(/[<>=~!\s\[]/)[0].trim();
-    return name || cleaned;
 }
 
 export interface DeclaredPackageItem {
