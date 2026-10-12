@@ -5,6 +5,23 @@ All notable changes to the "pixi" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.1] - 2026-10-12
+
+- **Target Platform Management (`pixi.platform`)**:
+    - Introduce interactive `Pixi: Platform ...`, `Pixi: Add Platform ...`, and `Pixi: Remove Platform ...` commands supporting both workspace-global and feature-specific (`-f <feature>`) target platforms.
+    - Support multi-select addition and removal of Conda target platforms (`linux-64`, `linux-aarch64`, `osx-arm64`, `osx-64`, `win-64`, `win-arm64`) with host OS detection and safety guards against removing all workspace platforms.
+- **Feature-Scoped Channel Management & Multi-Select Removal**:
+    - Extend `Pixi: Add Channel ...` and `Pixi: Remove Channel ...` to support feature-level channels (`pixi workspace channel add/remove -f <feature>`) and multi-select channel removal.
+    - Register channel and platform management actions directly in feature tree node context menus.
+- **Selective Package Upgrade (`pixi upgrade`)**:
+    - Add an interactive multi-select package picker (all selected by default) to `Upgrade Dependencies` in `Pixi: Update / Upgrade ...`, enabling selective manifest constraint upgrades (`pixi upgrade <pkg...>`) alongside full workspace upgrades.
+- **Manifest Hover Quick Actions**:
+    - Add clickable action links (`Update`, `Why`, `Remove`, `Open in pixi.lock`, `Run Pixi Lock`) to dependency hover cards in `pixi.toml` and `pyproject.toml` with automatic feature scope detection.
+    - Add `Run Task`, `Run in Environment...`, and `Remove` action links to task hover cards in manifest files.
+- **Codebase Simplification & Refactoring**:
+    - Extract shared workspace/feature scope resolution (`resolveWorkspaceOrFeatureScope`), scoped multi-item removal (`executeScopedWorkspaceRemove`), and environment picker helpers (`toEnvQuickPickItem`).
+    - Eliminate redundant wrapper functions, duplicate parsing logic, and over-defensive checks across workspace commands, core discovery, tree views, and language providers.
+
 ## [1.6.0] - 2026-10-12
 
 - **First-Class Feature Management & Dual-Perspective Environments View**:
