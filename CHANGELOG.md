@@ -5,6 +5,25 @@ All notable changes to the "pixi" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-10-12
+
+- **First-Class Feature Management & Dual-Perspective Environments View**:
+    - Decouple Pixi features and environments across CLI parsing, manifest manipulation, and workspace commands.
+    - Add dual-perspective grouping (`pixi.environments.viewMode`: `"environment"` vs `"feature"`) in the Environments tree view with a title-bar quick switcher.
+    - Nest packages by defining feature under each environment node, providing clear visibility into feature composition (`features: [...]`) and solve groups.
+    - Introduce interactive `Pixi: Manage Environments...` and `Pixi: Manage Features...` QuickPick command hubs for creating, editing, renaming, deleting, and jumping to manifest definitions of environments and features.
+- **Streamlined Command Hierarchy & Package Picker Overhaul**:
+    - Overhaul multi-step package search and selection with interactive `conda`/`pypi` source filters, target feature selection, and inline QuickInput action buttons.
+    - Consolidate redundant environment and feature actions in the Command Palette and context menus for a cleaner user experience.
+- **Tasks View Grouping & Prefix Enhancements**:
+    - Expand `pixi.tasks.prefixSeparators` default delimiters to `["-", "_", ":", "::"]`.
+    - Add `pixi.tasks.displayNameFormat` (`"stripped"` vs `"full"`) to control whether grouped task labels strip their prefix, updating the tree view instantaneously without re-querying the CLI.
+    - Automatically infer existing group separators and preserve parent prefixes when creating tasks directly from a prefix group folder.
+- **Architecture & Performance Optimizations**:
+    - Extract shared provider utilities (`providerUtils`), TOML manipulation services (`tomlService`), and debounced manifest file watchers (`manifestWatcher`).
+    - Parallelize workspace project discovery and refresh pipelines, and filter file watcher events strictly to Pixi-managed manifests.
+    - Scope manifest completion, hover, inlay hint, and CodeLens providers strictly to valid Pixi manifests and fix inline TOML environment snippet formatting.
+
 ## [1.4.2] - 2026-10-07
 
 - **Unified Dependency Update & Upgrade Workflows**:
