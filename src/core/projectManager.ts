@@ -60,7 +60,7 @@ export class PixiProjectManager implements Disposable {
                         if (path.basename(filePath) === 'pyproject.toml') {
                             const knownManifest = projectDir ? this.getManifestPath(projectDir) : undefined;
                             const isKnownManifest =
-                                knownManifest !== undefined && Uri.file(knownManifest).fsPath === filePath;
+                                knownManifest !== undefined && path.normalize(knownManifest) === filePath;
                             const isCurrentManifest = findManifestPath(path.dirname(filePath)) === filePath;
                             if (!isKnownManifest && !isCurrentManifest) {
                                 continue;

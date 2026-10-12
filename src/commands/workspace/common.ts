@@ -438,11 +438,11 @@ export function extractCommandContext(target?: unknown): ExtractedCommandContext
 }
 
 export function extractEnvironmentName(target?: unknown, preset?: string): string | undefined {
-    return (typeof preset === 'string' && preset.trim()) || extractCommandContext(target).envName;
+    return preset?.trim() || extractCommandContext(target).envName;
 }
 
 export function extractFeatureName(target?: unknown, preset?: string): string | undefined {
-    return (typeof preset === 'string' && preset.trim()) || extractCommandContext(target).featureName;
+    return preset?.trim() || extractCommandContext(target).featureName;
 }
 
 export async function resolveTargetEnvironment(

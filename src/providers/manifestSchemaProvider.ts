@@ -71,7 +71,7 @@ export class PixiManifestSchemaProvider implements CompletionItemProvider, Hover
         ];
 
         this.disposables.push(
-            languages.registerCompletionItemProvider(selectors, this, '[', '"', "'", '=', ',', ' '),
+            languages.registerCompletionItemProvider(selectors, this, '[', '.', '"', "'", '=', ',', ' '),
             languages.registerHoverProvider(selectors, this),
         );
     }
@@ -208,7 +208,14 @@ export class PixiManifestSchemaProvider implements CompletionItemProvider, Hover
             return buildArrayCompletions(COMMON_PLATFORMS, 'Target platform');
         }
 
-        if (textBeforeCursor.startsWith('[') || (textBeforeCursor === '' && !activeSection)) {
+        const shouldOfferSections = textBeforeCursor.startsWith('[')
+            ? !isPyproject ||
+              isInPixiSection ||
+              textBeforeCursor.startsWith('[tool') ||
+              document.getText().includes('[tool.pixi')
+            : !isPyproject && textBeforeCursor === '' && !activeSection;
+
+        if (shouldOfferSections) {
             const items: CompletionItem[] = [];
             const prefix = isPyproject ? 'tool.pixi.' : '';
 

@@ -70,7 +70,7 @@ export function untildify(p: string): string {
  * Automatically slices between the outermost JSON brackets ({...} or [...]).
  */
 export function safeJsonParse<T>(text: string, fallback?: T): T {
-    const trimmed = typeof text === 'string' ? text.trim() : '';
+    const trimmed = text.trim();
     const firstBrace = trimmed.indexOf('{');
     const firstBracket = trimmed.indexOf('[');
 

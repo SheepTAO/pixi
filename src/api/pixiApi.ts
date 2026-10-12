@@ -106,52 +106,37 @@ export class PixiExtensionApiImpl implements PixiExtensionApi, Disposable {
         const scopedProjectPath = scope ? this.projectManager.findProjectForUri(scope) : undefined;
         let projectPath = scopedProjectPath ?? this.projectManager.getProjects()[0]?.projectPath;
 
+        let targetEnv: PixiEnvironmentInfo | undefined;
+        if (envName) {
+            targetEnv = projectPath
+                ? this.projectManager.getEnvironmentsForProject(projectPath).find((e) => e.pixiEnvName === envName)
+                : undefined;
+            if (!targetEnv && !scopedProjectPath) {
+                targetEnv = this.projectManager.getAllEnvironments().find((e) => e.pixiEnvName === envName);
+                if (targetEnv) {
+                    projectPath = targetEnv.projectPath;
+                }
+            }
+            if (!targetEnv) {
+                return false;
+            }
+        }
+
         const storage = getWorkspacePersistentState();
-
-        if (!envName) {
-            const storageKey = projectPath ? `projectEnvName:${projectPath}` : 'globalEnvName';
-            const prevScoped = storage.get<string>(storageKey);
-            const prevGlobal = !scope ? storage.get<string>('globalEnvName') : undefined;
-
-            if (prevScoped === undefined && prevGlobal === undefined) {
-                return true;
-            }
-            if (prevScoped !== undefined) {
-                await storage.set(storageKey, undefined);
-            }
-            if (!scope && prevGlobal !== undefined && storageKey !== 'globalEnvName') {
-                await storage.set('globalEnvName', undefined);
-            }
-            this._onDidChangeActiveEnvironment.fire({ scope, environment: undefined });
-            return true;
-        }
-
-        let targetEnv = projectPath
-            ? this.projectManager.getEnvironmentsForProject(projectPath).find((e) => e.pixiEnvName === envName)
-            : undefined;
-        if (!targetEnv && !scopedProjectPath) {
-            targetEnv = this.projectManager.getAllEnvironments().find((e) => e.pixiEnvName === envName);
-            if (targetEnv) {
-                projectPath = targetEnv.projectPath;
-            }
-        }
-        if (!targetEnv) {
-            return false;
-        }
-
+        const targetName = targetEnv?.pixiEnvName;
         const storageKey = projectPath ? `projectEnvName:${projectPath}` : 'globalEnvName';
         const prevScoped = storage.get<string>(storageKey);
-        const prevGlobal = !scope ? storage.get<string>('globalEnvName') : envName;
+        const prevGlobal = !scope ? storage.get<string>('globalEnvName') : targetName;
 
-        if (prevScoped === envName && prevGlobal === envName) {
+        if (prevScoped === targetName && prevGlobal === targetName) {
             return true;
         }
 
-        if (prevScoped !== envName) {
-            await storage.set(storageKey, envName);
+        if (prevScoped !== targetName) {
+            await storage.set(storageKey, targetName);
         }
-        if (!scope && prevGlobal !== envName && storageKey !== 'globalEnvName') {
-            await storage.set('globalEnvName', envName);
+        if (!scope && prevGlobal !== targetName && storageKey !== 'globalEnvName') {
+            await storage.set('globalEnvName', targetName);
         }
         this._onDidChangeActiveEnvironment.fire({ scope, environment: targetEnv });
         return true;

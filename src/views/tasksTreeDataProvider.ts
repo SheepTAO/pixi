@@ -297,9 +297,8 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
         const groupMap = new Map<string, PixiTask[]>();
         const rootTasks: PixiTask[] = [];
 
-        const patterns = (prefixSeparators || [])
+        const patterns = prefixSeparators
             .filter(Boolean)
-            .slice()
             .sort((a, b) => b.length - a.length)
             .map(escapeRegex);
         const sepRegex = patterns.length > 0 ? new RegExp(patterns.join('|')) : /[-_]/;

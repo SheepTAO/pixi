@@ -61,7 +61,7 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
         const rawEnvs = targetProjectPath
             ? this.projectManager.getEnvironmentsForProject(targetProjectPath)
             : this.projectManager.getAllEnvironments();
-        if (!rawEnvs || rawEnvs.length === 0) {
+        if (rawEnvs.length === 0) {
             const choice = await window.showWarningMessage(
                 'No Pixi environments found in current workspace. Would you like to initialize a Pixi project?',
                 'Initialize Project',
