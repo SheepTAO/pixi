@@ -527,7 +527,7 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
             }
 
             const projectName = path.basename(projectPath);
-            const explicitEnv = extractEnvironmentName(undefined, envName);
+            const explicitEnv = extractEnvironmentName(targetItem, envName);
 
             if (explicitEnv) {
                 await runPixiWithProgress(
@@ -644,12 +644,9 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                 manifestPath = manager.getManifestPath(projectPath);
             }
 
-            if (!manifestPath || !fs.existsSync(manifestPath)) {
+            if (!manifestPath || !(await openDocumentIfExists(manifestPath))) {
                 window.showWarningMessage('Could not find manifest file for this project.');
-                return;
             }
-
-            await openDocumentIfExists(manifestPath);
         }),
 
         // Pixi: Refresh Projects

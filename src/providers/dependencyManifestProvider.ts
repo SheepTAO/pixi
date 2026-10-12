@@ -197,6 +197,7 @@ export class PixiDependencyManifestProvider
      * Parses all dependency entries from pixi.toml or pyproject.toml.
      */
     public parseManifestDependencies(document: TextDocument): ParsedDependency[] {
+        const isPyproject = path.basename(document.fileName) === 'pyproject.toml';
         const lineCount = document.lineCount;
         let currentSection = '';
         let inArrayBlock = false;
@@ -257,7 +258,10 @@ export class PixiDependencyManifestProvider
             }
 
             // Standard Pixi table dependencies
-            if (KV_DEP_SECTION_REGEX.test(currentSection)) {
+            if (
+                (!isPyproject || currentSection.startsWith('tool.pixi.')) &&
+                KV_DEP_SECTION_REGEX.test(currentSection)
+            ) {
                 const kvMatch = codeLine.match(KV_DEP_REGEX);
                 if (kvMatch) {
                     const pkgName = kvMatch[2] || kvMatch[3];

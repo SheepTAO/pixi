@@ -141,20 +141,22 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
         try {
             const info = await this.getSystemInfo();
             if (info.cache_dir) {
-                await this.calculateCacheSize(info.cache_dir);
+                await this.calculateCacheSize(info.cache_dir, true);
             }
         } catch {
             // ignore
         }
     }
 
-    private async calculateCacheSize(cacheDir: string): Promise<void> {
+    private async calculateCacheSize(cacheDir: string, notifyStart = false): Promise<void> {
         if (this.isCalculatingCacheSize) {
             return;
         }
         this.isCalculatingCacheSize = true;
         this.cacheMeasurementAttempted = true;
-        this._onDidChangeTreeData.fire();
+        if (notifyStart) {
+            this._onDidChangeTreeData.fire();
+        }
         const currentEpoch = this.cacheCalculationEpoch;
         try {
             const bytes = await computeDirectorySize(cacheDir);
@@ -225,6 +227,15 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
         // 3. Cache Directory
         if (info.cache_dir) {
             const autoMeasure = workspace.getConfiguration('pixi').get<boolean>('cache.autoMeasureSize', true);
+            if (
+                !this.cachedCacheSize &&
+                !this.isCalculatingCacheSize &&
+                !this.cacheMeasurementAttempted &&
+                autoMeasure
+            ) {
+                void this.calculateCacheSize(info.cache_dir, false);
+            }
+
             const cacheItem = new PixiInfoItem('Cache Directory', TreeItemCollapsibleState.None);
             const sizeStr =
                 this.cachedCacheSize ||
@@ -253,15 +264,6 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
                 arguments: [info.cache_dir],
             };
             items.push(cacheItem);
-
-            if (
-                !this.cachedCacheSize &&
-                !this.isCalculatingCacheSize &&
-                !this.cacheMeasurementAttempted &&
-                autoMeasure
-            ) {
-                void this.calculateCacheSize(info.cache_dir);
-            }
         }
 
         // 4. Auth Storage

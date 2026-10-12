@@ -339,6 +339,7 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
     private treeView?: TreeView<PixiProjectsTreeItem>;
     private currentViewMode: ProjectsViewMode = 'environment';
     private readonly featuresCache = new Map<string, Promise<WorkspaceListEntry[]>>();
+    private readonly envsCache = new Map<string, Promise<WorkspaceListEntry[]>>();
 
     constructor(private readonly projectManager: PixiProjectManager) {
         const config = workspace.getConfiguration('pixi.environments');
@@ -374,6 +375,7 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
 
     public refresh(): void {
         this.featuresCache.clear();
+        this.envsCache.clear();
         this.updateViewDescription();
         this._onDidChangeTreeData.fire();
     }
@@ -386,6 +388,7 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
 
     public dispose(): void {
         this.featuresCache.clear();
+        this.envsCache.clear();
         this._onDidChangeTreeData.dispose();
         for (const d of this.disposables) {
             d.dispose();
@@ -405,10 +408,19 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
         return promise;
     }
 
+    private getProjectWorkspaceEnvs(projectPath: string): Promise<WorkspaceListEntry[]> {
+        let promise = this.envsCache.get(projectPath);
+        if (!promise) {
+            promise = getWorkspaceEnvironments(projectPath);
+            this.envsCache.set(projectPath, promise);
+        }
+        return promise;
+    }
+
     private async getFeatureItemsForProject(project: PixiProject): Promise<PixiProjectsTreeItem[]> {
         const [features, envs] = await Promise.all([
             this.getProjectFeatures(project.projectPath),
-            getWorkspaceEnvironments(project.projectPath),
+            this.getProjectWorkspaceEnvs(project.projectPath),
         ]);
         if (features.length === 0) {
             return [new PixiEmptyTreeItem('No features declared in project', project)];
@@ -421,7 +433,7 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
 
     private async getEnvironmentItemsForProject(project: PixiProject): Promise<PixiProjectsTreeItem[]> {
         const envs = this.projectManager.getEnvironmentsForProject(project.projectPath);
-        const wsEnvs = await getWorkspaceEnvironments(project.projectPath);
+        const wsEnvs = await this.getProjectWorkspaceEnvs(project.projectPath);
         const envFeaturesMap = new Map<string, string[]>();
         for (const we of wsEnvs) {
             if (we.features) {

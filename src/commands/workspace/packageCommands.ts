@@ -334,8 +334,10 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
 
                 const directScopeName =
                     explicitScope?.name ||
-                    (typeof presetEnvOrScope === 'string' && presetEnvOrScope.trim()) ||
-                    extractEnvironmentName(targetItem);
+                    extractEnvironmentName(
+                        targetItem,
+                        typeof presetEnvOrScope === 'string' ? presetEnvOrScope : undefined,
+                    );
 
                 let promptResult: AddPackagePromptResult | undefined;
                 if (initialPkg && typeof initialPkg === 'object') {

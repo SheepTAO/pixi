@@ -538,11 +538,13 @@ export async function pickPixiProject(
     return selected?.projectPath;
 }
 
-export async function openDocumentIfExists(filePath: string): Promise<void> {
-    if (fs.existsSync(filePath)) {
-        const doc = await workspace.openTextDocument(Uri.file(filePath));
-        await window.showTextDocument(doc);
+export async function openDocumentIfExists(filePath: string): Promise<boolean> {
+    if (!fs.existsSync(filePath)) {
+        return false;
     }
+    const doc = await workspace.openTextDocument(Uri.file(filePath));
+    await window.showTextDocument(doc);
+    return true;
 }
 
 export async function updateConfigurationValue<T>(

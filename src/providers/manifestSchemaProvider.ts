@@ -197,15 +197,18 @@ export class PixiManifestSchemaProvider implements CompletionItemProvider, Hover
             });
         };
 
-        if (this.isInsideArray(document, position, 'channels')) {
+        const activeSection = this.getActiveSection(document, position.line);
+        const isInPixiSection = !isPyproject || Boolean(activeSection?.startsWith('tool.pixi'));
+
+        if (isInPixiSection && this.isInsideArray(document, position, 'channels')) {
             return buildArrayCompletions(COMMON_CHANNELS, 'Conda channel');
         }
 
-        if (this.isInsideArray(document, position, 'platforms')) {
+        if (isInPixiSection && this.isInsideArray(document, position, 'platforms')) {
             return buildArrayCompletions(COMMON_PLATFORMS, 'Target platform');
         }
 
-        if (textBeforeCursor.startsWith('[') || textBeforeCursor === '') {
+        if (textBeforeCursor.startsWith('[') || (textBeforeCursor === '' && !activeSection)) {
             const items: CompletionItem[] = [];
             const prefix = isPyproject ? 'tool.pixi.' : '';
 
@@ -287,12 +290,7 @@ export class PixiManifestSchemaProvider implements CompletionItemProvider, Hover
             return items;
         }
 
-        if (lineText.includes('=')) {
-            return undefined;
-        }
-
-        const activeSection = this.getActiveSection(document, position.line);
-        if (!activeSection) {
+        if (lineText.includes('=') || !activeSection || !isInPixiSection) {
             return undefined;
         }
 
@@ -371,7 +369,11 @@ export class PixiManifestSchemaProvider implements CompletionItemProvider, Hover
             return undefined;
         }
 
+        const isPyproject = path.basename(document.fileName) === 'pyproject.toml';
         const activeSection = this.getActiveSection(document, position.line);
+        if (isPyproject && (!activeSection || !activeSection.startsWith('tool.pixi'))) {
+            return undefined;
+        }
         const normalizedSection = (activeSection || '').replace(/^tool\.pixi\./, '');
 
         const wordRange = document.getWordRangeAtPosition(position, /[\w-]+/);
