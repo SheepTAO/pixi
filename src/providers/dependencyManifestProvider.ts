@@ -133,6 +133,26 @@ const KV_DEP_SECTION_REGEX = /(?:^|\.)(?:pypi-|build-|host-)?dependencies$/i;
 const KV_DEP_REGEX = /^\s*(?:(["'])([^"']+)\1|([a-zA-Z0-9_\-\.]+))\s*=\s*(.*)$/;
 const ARRAY_DEP_REGEX = /^\s*(["'])([a-zA-Z0-9_\-\.]+)(?:[><=~^!].*|\[.*\])?\1,?\s*(?:#.*)?$/;
 
+function resolveManifestSectionScope(section: string, pkgKind?: string): { isPypi: boolean; featureName?: string } {
+    const lowerSection = section.toLowerCase();
+    const isPypi =
+        pkgKind === 'pypi' ||
+        lowerSection.includes('pypi') ||
+        lowerSection === 'project' ||
+        lowerSection.startsWith('project.optional-dependencies');
+    const featureMatch =
+        section.match(/^(?:tool\.pixi\.)?feature\.([^.]+)\./i) ||
+        section.match(/^project\.optional-dependencies\.([^.]+)$/i);
+    const isGlobalSection =
+        /^(?:(?:tool\.pixi\.)?(?:target\.[^.]+\.)?(?:pypi-|build-|host-)?dependencies|project)$/i.test(section);
+    const featureName = featureMatch ? featureMatch[1] : isGlobalSection ? 'default' : undefined;
+    return { isPypi, featureName };
+}
+
+function encodeCommandArg(arg: unknown): string {
+    return encodeURIComponent(JSON.stringify([arg]));
+}
+
 /**
  * Unified provider for manifest dependencies:
  * - InlayHintsProvider: shows locked versions inline (e.g. ': 1.26.4')
@@ -454,6 +474,11 @@ export class PixiDependencyManifestProvider
         md.isTrusted = true;
         md.supportThemeIcons = true;
 
+        const { isPypi, featureName: sectionFeatureName } = resolveManifestSectionScope(
+            matched.section,
+            targetPkg?.kind,
+        );
+
         if (!targetPkg) {
             md.appendMarkdown(`### $(package) **${matched.name}**\n\n`);
             if (matched.requestedSpec) {
@@ -465,7 +490,18 @@ export class PixiDependencyManifestProvider
             } else {
                 md.appendMarkdown(`*Not resolved in \`pixi.lock\` yet.*\n\n`);
             }
-            md.appendMarkdown(`[$(lock) Run Pixi Lock](command:pixi.lock "Update project lockfile")`);
+            const lockArg = encodeCommandArg(projectPath);
+            const removeArg = encodeCommandArg({
+                projectPath,
+                pkg: { name: matched.name, kind: isPypi ? 'pypi' : 'conda' },
+                pixiEnvName: activeEnvName,
+                featureName: sectionFeatureName,
+            });
+            const unresolvedActions = [
+                `[$(lock) Run Pixi Lock](command:pixi.lock?${lockArg} "Update project lockfile")`,
+                `[$(trash) Remove](command:pixi.removePackage?${removeArg} "Remove '${matched.name}' from manifest")`,
+            ];
+            md.appendMarkdown(`---\n${unresolvedActions.join(' &nbsp;&nbsp;|&nbsp;&nbsp; ')}`);
         } else {
             md.appendMarkdown(`### $(package) **${targetPkg.name}** \`${targetPkg.version}\`\n\n`);
 
@@ -515,16 +551,42 @@ export class PixiDependencyManifestProvider
                 }
             }
 
+            const pkgActionArg = encodeCommandArg({
+                projectPath,
+                pkg: { name: targetPkg.name, kind: isPypi ? 'pypi' : 'conda' },
+                env: { pixiEnvName: foundEnvName },
+                featureName: sectionFeatureName,
+            });
+            const removeActionArg =
+                targetPkg.name === matched.name
+                    ? pkgActionArg
+                    : encodeCommandArg({
+                          projectPath,
+                          pkg: { name: matched.name, kind: isPypi ? 'pypi' : 'conda' },
+                          env: { pixiEnvName: foundEnvName },
+                          featureName: sectionFeatureName,
+                      });
+
+            const isLocalOrEditable = Boolean(targetPkg.is_local || targetPkg.is_editable);
             const actions: string[] = [];
+            if (!isLocalOrEditable) {
+                actions.push(
+                    `[$(arrow-up) Update](command:pixi.updatePackage?${pkgActionArg} "Update '${targetPkg.name}' in '${foundEnvName}'")`,
+                );
+            }
+            actions.push(
+                `[$(question) Why](command:pixi.whyPackage?${pkgActionArg} "Show why '${targetPkg.name}' is installed in '${foundEnvName}'")`,
+                `[$(trash) Remove](command:pixi.removePackage?${removeActionArg} "Remove '${matched.name}' from manifest")`,
+            );
             if (lockExists) {
-                const openLockArgs = encodeURIComponent(JSON.stringify([{ projectPath, packageName: matched.name }]));
+                const openLockArgs = encodeCommandArg({ projectPath, packageName: matched.name });
                 actions.push(
                     `[$(go-to-file) Open in pixi.lock](command:pixi.openLockfile?${openLockArgs} "Jump to package definition in pixi.lock")`,
                 );
             }
 
-            if (!targetPkg.is_local && !targetPkg.is_editable) {
-                if (targetPkg.kind === 'pypi' || matched.section.toLowerCase().includes('pypi')) {
+            if (!isLocalOrEditable) {
+                if (isPypi) {
                     const pypiUrl = `https://pypi.org/project/${encodeURIComponent(targetPkg.name)}/`;
                     actions.push(`[$(link-external) PyPI](${pypiUrl} "Open package on PyPI")`);
                 } else {
