@@ -649,11 +649,7 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
 
         // Pixi: Environment Management (Hub)
         commands.registerCommand('pixi.environment', async (targetItem?: unknown) => {
-            const actions: Array<{
-                label: string;
-                description: string;
-                command: string;
-            }> = [
+            const actions = [
                 {
                     label: '$(plus) Create New Environment...',
                     description: 'Create an environment composed of one or more features',
@@ -712,11 +708,7 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
 
         // Pixi: Feature Management (Hub)
         commands.registerCommand('pixi.feature', async (targetItem?: unknown) => {
-            const actions: Array<{
-                label: string;
-                description: string;
-                command: string;
-            }> = [
+            const actions = [
                 {
                     label: '$(plus) Create New Feature...',
                     description: 'Define a new reusable feature and add initial package(s)',

@@ -5,11 +5,9 @@ import { runPixiWithProgress } from '../../cli/workspaceCli';
 import { getWorkspaceChannels } from '../../core/projectDiscovery';
 import { PixiProjectManager } from '../../core/projectManager';
 import {
-    executeScopedWorkspaceRemove,
     extractFeatureName,
     pickPixiProject,
     resolveWorkspaceOrFeatureScope,
-    ScopedRemovalQuickPickItem,
 } from './common';
 
 export interface CondaChannelPreset {
@@ -221,25 +219,66 @@ export function registerChannelCommands(manager: PixiProjectManager): Disposable
                 ? existingChannels.filter((c) => c.feature === filterFeature)
                 : existingChannels;
 
-            const items: ScopedRemovalQuickPickItem[] = filteredEntries.map((c) => ({
+            if (filteredEntries.length === 0) {
+                window.showInformationMessage(
+                    filterFeature
+                        ? `No custom channels configured on feature '${filterFeature}'.`
+                        : 'No removable channels found in this Pixi project.',
+                );
+                return;
+            }
+
+            const items = filteredEntries.map((c) => ({
                 label: `$(globe) ${c.channel}`,
                 description: c.feature ? `Feature: ${c.feature}` : 'Workspace (global)',
-                itemName: c.channel,
+                channel: c.channel,
                 featureScope: c.feature,
             }));
 
-            await executeScopedWorkspaceRemove({
-                subcommand: 'channel',
-                noun: 'channel',
-                nounPlural: 'channels',
+            const selected = await window.showQuickPick(items, {
+                title: filterFeature ? `Pixi: Remove Channel (feature '${filterFeature}')` : 'Pixi: Remove Channel',
+                placeHolder: 'Select one or more channels to remove from project manifest',
+                canPickMany: true,
+            });
+            if (!selected || selected.length === 0) {
+                return;
+            }
+
+            const totalGlobalCount = existingChannels.filter((c) => !c.feature).length;
+            const removingGlobalCount = selected.filter((s) => !s.featureScope).length;
+            if (totalGlobalCount > 0 && removingGlobalCount >= totalGlobalCount) {
+                window.showWarningMessage(
+                    'Cannot remove all workspace channels. A Pixi project must have at least one channel.',
+                );
+                return;
+            }
+
+            const byScope = new Map<string | undefined, string[]>();
+            for (const item of selected) {
+                const list = byScope.get(item.featureScope) || [];
+                list.push(item.channel);
+                byScope.set(item.featureScope, list);
+            }
+
+            const commandBatch: string[][] = [];
+            for (const [feat, names] of byScope.entries()) {
+                const args = ['workspace', 'channel', 'remove'];
+                if (feat) {
+                    args.push('-f', feat);
+                }
+                args.push(...names);
+                commandBatch.push(args);
+            }
+
+            const projectName = path.basename(projectPath);
+            const removedSummary = [...new Set(selected.map((s) => s.channel))].join(', ');
+            await runPixiWithProgress(
+                `Pixi: Removing channel(s) ${removedSummary} from '${projectName}'...`,
+                commandBatch,
                 projectPath,
                 manager,
-                items,
-                totalGlobalCount: existingChannels.filter((c) => !c.feature).length,
-                filterFeature,
-                emptyGlobalWarning:
-                    'Cannot remove all workspace channels. A Pixi project must have at least one channel.',
-            });
+                `Pixi: Removed channel(s) ${removedSummary} from '${projectName}'.`,
+            );
         }),
 
         // Pixi: Channel Management (Hub)

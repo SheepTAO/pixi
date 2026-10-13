@@ -95,7 +95,7 @@ Launch any command via the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) by t
 | **Pixi: Environment ...**                       | `pixi.environment`        | Interactive hub to create/delete environments, configure environment features, install, or open shells.         |
 | **Pixi: Feature ...**                           | `pixi.feature`            | Interactive hub to create/remove features, add packages to a feature, or jump to feature definitions.           |
 | **Pixi: Channel ...**                           | `pixi.channel`            | Interactive hub to add Conda presets/mirrors (prepend/append) or remove channels at workspace or feature scope. |
-| **Pixi: Platform ...**                          | `pixi.platform`           | Interactive hub to add or remove target Conda platforms at workspace or feature scope.                          |
+| **Pixi: Platform ...**                          | `pixi.platform`           | Configure target platforms via check/uncheck picker at workspace or feature scope.                              |
 | **Pixi: Search Packages ...**                   | `pixi.searchPackages`     | Search Conda & PyPI packages to inspect platforms, licenses, metadata, and docs.                                |
 | **Pixi: Add Package ...**                       | `pixi.addPackage`         | Add packages to features, inline environments, or global scope with channel/version picking.                    |
 | **Pixi: Remove Package ...**                    | `pixi.removePackage`      | Remove packages from manifest with automatic feature/environment scope resolution.                              |

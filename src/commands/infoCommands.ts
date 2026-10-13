@@ -143,7 +143,7 @@ export function registerInfoCommands(infoProvider: PixiInfoTreeDataProvider): Di
                     infoProvider.refresh();
                 },
                 'Pixi: Global package cache cleaned.',
-                'Failed to clean cache',
+                { errorPrefix: 'Failed to clean cache' },
             );
         }),
         commands.registerCommand('pixi.openLocation', (target?: unknown) => {

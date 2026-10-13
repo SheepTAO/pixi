@@ -359,10 +359,6 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
         );
     }
 
-    public getViewMode(): ProjectsViewMode {
-        return this.currentViewMode;
-    }
-
     public bindView(treeView: TreeView<PixiProjectsTreeItem>): void {
         this.treeView = treeView;
         this.updateViewDescription();

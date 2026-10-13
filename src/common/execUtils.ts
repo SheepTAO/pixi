@@ -295,9 +295,9 @@ export async function runWithProgressNotification<T>(
     title: string,
     action: (token: CancellationToken) => Promise<T>,
     successMsg?: string | ((result: T) => string),
-    options?: string | ProgressNotificationOptions,
+    options?: ProgressNotificationOptions,
 ): Promise<boolean> {
-    const opts: ProgressNotificationOptions = typeof options === 'string' ? { errorPrefix: options } : (options ?? {});
+    const opts: ProgressNotificationOptions = options ?? {};
     try {
         await window.withProgress(
             {

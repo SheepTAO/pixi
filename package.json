@@ -102,18 +102,6 @@
                 "icon": "$(device-desktop)"
             },
             {
-                "command": "pixi.addPlatform",
-                "title": "Add Platform ...",
-                "category": "Pixi",
-                "icon": "$(device-desktop)"
-            },
-            {
-                "command": "pixi.removePlatform",
-                "title": "Remove Platform ...",
-                "category": "Pixi",
-                "icon": "$(trash)"
-            },
-            {
                 "command": "pixi.openManifest",
                 "title": "Open Manifest",
                 "category": "Pixi",
@@ -571,14 +559,6 @@
                 {
                     "command": "pixi.removeChannel",
                     "when": "false"
-                },
-                {
-                    "command": "pixi.addPlatform",
-                    "when": "false"
-                },
-                {
-                    "command": "pixi.removePlatform",
-                    "when": "false"
                 }
             ],
             "editor/title": [
@@ -757,14 +737,9 @@
                     "group": "2_channel@2"
                 },
                 {
-                    "command": "pixi.addPlatform",
+                    "command": "pixi.platform",
                     "when": "view == pixi.views.projects && viewItem == pixiProject",
                     "group": "2_channel@3"
-                },
-                {
-                    "command": "pixi.removePlatform",
-                    "when": "view == pixi.views.projects && viewItem == pixiProject",
-                    "group": "2_channel@4"
                 },
                 {
                     "command": "pixi.addPackage",
@@ -887,19 +862,14 @@
                     "group": "2_manage@2"
                 },
                 {
-                    "command": "pixi.addPlatform",
+                    "command": "pixi.platform",
                     "when": "view == pixi.views.projects && (viewItem == pixiFeatureItem || viewItem == pixiEnvFeatureGroup)",
                     "group": "2_manage@3"
                 },
                 {
-                    "command": "pixi.removePlatform",
-                    "when": "view == pixi.views.projects && (viewItem == pixiFeatureItem || viewItem == pixiEnvFeatureGroup)",
-                    "group": "2_manage@4"
-                },
-                {
                     "command": "pixi.removeFeature",
                     "when": "view == pixi.views.projects && viewItem == pixiFeatureItem",
-                    "group": "2_manage@5"
+                    "group": "2_manage@4"
                 },
                 {
                     "command": "pixi.revealPackageInManifest",
