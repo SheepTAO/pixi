@@ -5,6 +5,15 @@ All notable changes to the "pixi" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.2] - 2026-10-13
+
+- **Unified Target Platform Picker (`pixi.platform`)**:
+    - Consolidate platform addition and removal into a single interactive check/uncheck multi-select QuickPick (`Pixi: Platform ...`), displaying custom platforms and virtual packages alongside standard Conda presets.
+- **Unified Feature & Environment Tree Views**:
+    - Unify `PixiFeatureTreeItem` and `PixiPackageTreeItem` across both Environment and Feature view modes, resolving installed package metadata (versions, builds, licenses, local editable paths) and enabling full package context menu actions directly in Feature view.
+- **Async Cache Unification & Codebase Simplification**:
+    - Unify task, package, manifest schema, and Python environment caches into single in-flight `Promise` maps, reuse `PixiProjectTreeItem` across views, and remove redundant abstractions and menu guard rules.
+
 ## [1.6.1] - 2026-10-12
 
 - **Target Platform Management (`pixi.platform`)**:
