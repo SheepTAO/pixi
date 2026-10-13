@@ -1,3 +1,13 @@
+import type {
+    CppToolchainInfo,
+    EnvironmentToolchains,
+    PythonToolchainInfo,
+    RToolchainInfo,
+    RustToolchainInfo,
+} from './toolchains';
+
+export type { CppToolchainInfo, EnvironmentToolchains, PythonToolchainInfo, RToolchainInfo, RustToolchainInfo };
+
 export interface PixiEnvironmentPlatform {
     name: string;
     subdir?: string;
@@ -36,16 +46,6 @@ export interface PixiPackage {
 }
 
 export type PixiEnvironmentStatus = 'installed' | 'uninstalled' | 'incompatible';
-
-import {
-    CppToolchainInfo,
-    EnvironmentToolchains,
-    PythonToolchainInfo,
-    RToolchainInfo,
-    RustToolchainInfo,
-} from './toolchains';
-
-export { CppToolchainInfo, EnvironmentToolchains, PythonToolchainInfo, RToolchainInfo, RustToolchainInfo };
 
 export interface PixiEnvironmentInfo {
     pixiEnvName: string;

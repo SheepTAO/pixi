@@ -78,8 +78,7 @@ interface RawPixiTaskEnvironment {
 
 export class PixiTaskProvider implements TaskProvider, Disposable {
     private readonly disposables: Disposable[] = [];
-    private taskCache = new Map<string, PixiTask[]>();
-    private taskPromises = new Map<string, Promise<PixiTask[]>>();
+    private readonly taskCache = new Map<string, Promise<PixiTask[]>>();
     private readonly _onDidChangeTasks = new EventEmitter<void>();
     readonly onDidChangeTasks: Event<void> = this._onDidChangeTasks.event;
 
@@ -92,19 +91,15 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
 
     public refresh(projectPath?: string): void {
         if (projectPath) {
-            const normalized = path.normalize(projectPath);
-            this.taskCache.delete(normalized);
-            this.taskPromises.delete(normalized);
+            this.taskCache.delete(path.normalize(projectPath));
         } else {
             this.taskCache.clear();
-            this.taskPromises.clear();
         }
         this._onDidChangeTasks.fire();
     }
 
     public dispose(): void {
         this.taskCache.clear();
-        this.taskPromises.clear();
         this._onDidChangeTasks.dispose();
         Disposable.from(...this.disposables).dispose();
     }
@@ -151,28 +146,17 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
 
     async getTasksForProject(projectPath: string): Promise<PixiTask[]> {
         const normalized = path.normalize(projectPath);
-        if (this.taskCache.has(normalized)) {
-            return this.taskCache.get(normalized)!;
+        let promise = this.taskCache.get(normalized);
+        if (!promise) {
+            promise = runPixi(['task', 'list', '--json'], { cwd: normalized })
+                .then((stdout) => this.parsePixiTasksJson(stdout, normalized))
+                .catch((err) => {
+                    this.taskCache.delete(normalized);
+                    traceVerbose(`Could not load tasks for ${normalized}:`, err);
+                    return [];
+                });
+            this.taskCache.set(normalized, promise);
         }
-        if (this.taskPromises.has(normalized)) {
-            return this.taskPromises.get(normalized)!;
-        }
-
-        const promise = (async () => {
-            try {
-                const stdout = await runPixi(['task', 'list', '--json'], { cwd: normalized });
-                const tasks = this.parsePixiTasksJson(stdout, normalized);
-                this.taskCache.set(normalized, tasks);
-                return tasks;
-            } catch (err) {
-                traceVerbose(`Could not load tasks for ${normalized}:`, err);
-                return [];
-            } finally {
-                this.taskPromises.delete(normalized);
-            }
-        })();
-
-        this.taskPromises.set(normalized, promise);
         return promise;
     }
 

@@ -385,9 +385,7 @@ export interface ExtractedCommandContext {
     projectPath?: string;
     manifestPath?: string;
     envName?: string;
-    env?: PixiEnvironmentInfo;
     pkg?: PixiPackage;
-    pkgName?: string;
     featureName?: string;
 }
 
@@ -395,46 +393,26 @@ export function extractCommandContext(target?: unknown): ExtractedCommandContext
     if (!target) {
         return {};
     }
-    if (typeof target === 'string') {
-        const trimmed = target.trim();
-        if (trimmed.includes('/') || trimmed.includes('\\')) {
-            return { projectPath: trimmed };
-        }
-        return { envName: trimmed, pkgName: trimmed, featureName: trimmed };
+    const projectPath = normalizeLocationPath(target);
+    if (typeof target !== 'object' || target instanceof Uri) {
+        return { projectPath };
     }
-    if (target instanceof Uri) {
-        return { projectPath: target.fsPath };
-    }
-    if (typeof target === 'object') {
-        const item = target as {
-            pkg?: PixiPackage;
-            env?: PixiEnvironmentInfo;
-            manifestPath?: string;
-            project?: { manifestPath?: string };
-            pixiEnvName?: string;
-            name?: string;
-            featureName?: string;
-            feature?: { name?: string };
-        };
 
-        const projectPath = normalizeLocationPath(target);
-        const manifestPath = item.manifestPath || item.project?.manifestPath;
-        const envName = item.pixiEnvName || item.env?.pixiEnvName;
-        const pkg = item.pkg;
-        const pkgName = item.name || item.pkg?.name;
-        const featureName = item.featureName || item.feature?.name;
+    const item = target as {
+        pkg?: PixiPackage;
+        env?: PixiEnvironmentInfo;
+        project?: { manifestPath?: string };
+        featureName?: string;
+        feature?: { name?: string };
+    };
 
-        return {
-            projectPath,
-            manifestPath,
-            envName,
-            env: item.env,
-            pkg,
-            pkgName,
-            featureName,
-        };
-    }
-    return {};
+    return {
+        projectPath,
+        manifestPath: item.project?.manifestPath,
+        envName: item.env?.pixiEnvName,
+        pkg: item.pkg,
+        featureName: item.featureName || item.feature?.name,
+    };
 }
 
 export function extractEnvironmentName(target?: unknown, preset?: string): string | undefined {

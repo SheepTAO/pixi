@@ -24,8 +24,7 @@ import { PixiEnvironmentInfo, PixiEnvironmentStatus, PixiInfo, PixiPackage, Pixi
 export class PixiProjectManager implements Disposable {
     private projectPaths: string[] = [];
     private projectToEnvs = new Map<string, PixiEnvironmentInfo[]>();
-    private packagesCache = new Map<string, PixiPackage[]>();
-    private packagesInFlight = new Map<string, Promise<PixiPackage[]>>();
+    private readonly packagesCache = new Map<string, Promise<PixiPackage[]>>();
     private readonly disposables: Disposable[] = [];
 
     private readonly _onDidProjectsChanged = new EventEmitter<string[]>();
@@ -39,10 +38,8 @@ export class PixiProjectManager implements Disposable {
         // Watch manifest and lock files for changes (debounced by 500ms with project targeting)
         let pendingChangedUris: Uri[] = [];
 
-        const scheduleRefresh = (uri?: Uri) => {
-            if (uri) {
-                pendingChangedUris.push(uri);
-            }
+        const scheduleRefresh = (uri: Uri) => {
+            pendingChangedUris.push(uri);
             if (this.refreshTimer) {
                 clearTimeout(this.refreshTimer);
             }
@@ -50,41 +47,38 @@ export class PixiProjectManager implements Disposable {
                 const uris = pendingChangedUris;
                 pendingChangedUris = [];
 
-                let targetScope: Uri | undefined = undefined;
-                if (uris.length > 0) {
-                    const projectUris = new Set<string>();
-                    let needsFullRefresh = false;
-                    for (const u of uris) {
-                        const filePath = path.normalize(u.fsPath);
-                        const projectDir = this.findProjectForUri(u);
-                        if (path.basename(filePath) === 'pyproject.toml') {
-                            const knownManifest = projectDir ? this.getManifestPath(projectDir) : undefined;
-                            const isKnownManifest =
-                                knownManifest !== undefined && path.normalize(knownManifest) === filePath;
-                            const isCurrentManifest = findManifestPath(path.dirname(filePath)) === filePath;
-                            if (!isKnownManifest && !isCurrentManifest) {
-                                continue;
-                            }
+                const projectUris = new Set<string>();
+                let needsFullRefresh = false;
+                for (const u of uris) {
+                    const filePath = path.normalize(u.fsPath);
+                    const projectDir = this.findProjectForUri(u);
+                    if (path.basename(filePath) === 'pyproject.toml') {
+                        const knownManifest = projectDir ? this.getManifestPath(projectDir) : undefined;
+                        const isKnownManifest =
+                            knownManifest !== undefined && path.normalize(knownManifest) === filePath;
+                        const isCurrentManifest = findManifestPath(path.dirname(filePath)) === filePath;
+                        if (!isKnownManifest && !isCurrentManifest) {
+                            continue;
                         }
-                        if (projectDir) {
-                            if (isPixiProject(projectDir)) {
-                                projectUris.add(projectDir);
-                            } else {
-                                needsFullRefresh = true;
-                                break;
-                            }
-                        } else if (isPixiProject(path.dirname(filePath))) {
+                    }
+                    if (projectDir) {
+                        if (isPixiProject(projectDir)) {
+                            projectUris.add(projectDir);
+                        } else {
                             needsFullRefresh = true;
                             break;
                         }
-                    }
-                    if (!needsFullRefresh && projectUris.size === 0) {
-                        return;
-                    }
-                    if (!needsFullRefresh && projectUris.size === 1) {
-                        targetScope = Uri.file(Array.from(projectUris)[0]);
+                    } else if (isPixiProject(path.dirname(filePath))) {
+                        needsFullRefresh = true;
+                        break;
                     }
                 }
+                if (!needsFullRefresh && projectUris.size === 0) {
+                    return;
+                }
+
+                const targetScope =
+                    !needsFullRefresh && projectUris.size === 1 ? Uri.file(Array.from(projectUris)[0]) : undefined;
 
                 traceVerbose(
                     `Manifest change triggered refresh (targeted: ${targetScope ? targetScope.fsPath : 'all projects'})`,
@@ -152,47 +146,37 @@ export class PixiProjectManager implements Disposable {
             const isWindows = process.platform === 'win32';
             const targetPrefix = isWindows ? (normalized + ':').toLowerCase() : normalized + ':';
 
-            for (const map of [this.packagesCache, this.packagesInFlight]) {
-                for (const key of map.keys()) {
-                    const compKey = isWindows ? key.toLowerCase() : key;
-                    if (compKey.startsWith(targetPrefix)) {
-                        map.delete(key);
-                    }
+            for (const key of this.packagesCache.keys()) {
+                const compKey = isWindows ? key.toLowerCase() : key;
+                if (compKey.startsWith(targetPrefix)) {
+                    this.packagesCache.delete(key);
                 }
             }
         } else {
             this.packagesCache.clear();
-            this.packagesInFlight.clear();
         }
     }
 
     public async getPackagesForEnvironment(envName: string, projectPath: string): Promise<PixiPackage[]> {
         const cacheKey = `${path.normalize(projectPath)}:${envName}`;
-        if (this.packagesCache.has(cacheKey)) {
-            return this.packagesCache.get(cacheKey)!;
+        const cached = this.packagesCache.get(cacheKey);
+        if (cached) {
+            return cached;
         }
 
         const env = this.getEnvironmentsForProject(projectPath).find((e) => e.pixiEnvName === envName);
         if (env && env.pixiStatus === 'incompatible') {
-            this.packagesCache.set(cacheKey, []);
-            return [];
+            const empty = Promise.resolve([]);
+            this.packagesCache.set(cacheKey, empty);
+            return empty;
         }
 
-        let inFlight = this.packagesInFlight.get(cacheKey);
-        if (!inFlight) {
-            inFlight = listPixiPackages(envName, projectPath)
-                .then((pkgs) => {
-                    this.packagesCache.set(cacheKey, pkgs);
-                    traceVerbose(`Loaded ${pkgs.length} packages for environment '${envName}' in ${projectPath}`);
-                    return pkgs;
-                })
-                .finally(() => {
-                    this.packagesInFlight.delete(cacheKey);
-                });
-            this.packagesInFlight.set(cacheKey, inFlight);
-        }
-
-        return inFlight;
+        const promise = listPixiPackages(envName, projectPath).then((pkgs) => {
+            traceVerbose(`Loaded ${pkgs.length} packages for environment '${envName}' in ${projectPath}`);
+            return pkgs;
+        });
+        this.packagesCache.set(cacheKey, promise);
+        return promise;
     }
 
     public findProjectForUri(uri: Uri): string | undefined {
@@ -416,7 +400,6 @@ export class PixiProjectManager implements Disposable {
         this._onDidProjectsChanged.dispose();
         this._onDidChangeEnvironments.dispose();
         this.packagesCache.clear();
-        this.packagesInFlight.clear();
         this.projectToEnvs.clear();
         Disposable.from(...this.disposables).dispose();
     }

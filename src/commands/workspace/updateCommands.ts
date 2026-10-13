@@ -224,7 +224,7 @@ async function handleCheckOutdated(
             pkgChangeMap.set(c.name, {
                 ...c,
                 environments: c.environment ? [c.environment] : [],
-                platforms: Array.from(new Set(c.platforms)),
+                platforms: [...c.platforms],
             });
         } else {
             if (c.environment && !existing.environments.includes(c.environment)) {
@@ -240,8 +240,7 @@ async function handleCheckOutdated(
         }
     }
 
-    const aggregatedChanges = Array.from(pkgChangeMap.values());
-    aggregatedChanges.sort((a, b) => a.name.localeCompare(b.name));
+    const aggregatedChanges = Array.from(pkgChangeMap.values()).sort((a, b) => a.name.localeCompare(b.name));
 
     interface PackagePickItem extends QuickPickItem {
         pkgChange: DryRunPackageChange;
@@ -280,9 +279,7 @@ async function handleCheckOutdated(
         return;
     }
 
-    const selectedPkgNames = Array.from(
-        new Set(picked.filter((p) => !p.pkgChange.isRemoved).map((p) => p.pkgChange.name)),
-    );
+    const selectedPkgNames = picked.filter((p) => !p.pkgChange.isRemoved).map((p) => p.pkgChange.name);
     if (selectedPkgNames.length === 0) {
         return;
     }

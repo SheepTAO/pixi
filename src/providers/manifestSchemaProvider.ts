@@ -57,8 +57,7 @@ const COMMON_PLATFORMS = [
 
 export class PixiManifestSchemaProvider implements CompletionItemProvider, HoverProvider, Disposable {
     private readonly disposables: Disposable[] = [];
-    private schemaMeta: ManifestSchemaMetadata | null = null;
-    private schemaLoadingPromise: Promise<ManifestSchemaMetadata | null> | null = null;
+    private schemaLoadingPromise?: Promise<ManifestSchemaMetadata | null>;
 
     constructor(private readonly context: ExtensionContext) {
         const selectors = [
@@ -80,29 +79,20 @@ export class PixiManifestSchemaProvider implements CompletionItemProvider, Hover
         return workspace.getConfiguration('pixi', document.uri).get<boolean>('manifest.schemaSupport', true);
     }
 
-    private async getSchemaMetadata(): Promise<ManifestSchemaMetadata | null> {
-        if (this.schemaMeta) {
-            return this.schemaMeta;
-        }
-
-        if (!this.schemaLoadingPromise) {
-            this.schemaLoadingPromise = (async () => {
-                try {
-                    const schemaPath = this.context.asAbsolutePath(path.join('schemas', 'pixi.json'));
-                    const raw = await fs.promises.readFile(schemaPath, 'utf8');
-                    const schemaJson = JSON.parse(raw);
-                    const meta = this.parseSchema(schemaJson);
-                    this.schemaMeta = meta;
-                    traceVerbose('Loaded Pixi manifest schema definitions from schemas/pixi.json');
-                    return meta;
-                } catch (err: unknown) {
-                    traceError('Failed to load local Pixi manifest schema:', err);
-                    return null;
-                }
-            })();
-        }
-
-        return this.schemaLoadingPromise;
+    private getSchemaMetadata(): Promise<ManifestSchemaMetadata | null> {
+        return (this.schemaLoadingPromise ??= (async () => {
+            try {
+                const schemaPath = this.context.asAbsolutePath(path.join('schemas', 'pixi.json'));
+                const raw = await fs.promises.readFile(schemaPath, 'utf8');
+                const schemaJson = JSON.parse(raw);
+                const meta = this.parseSchema(schemaJson);
+                traceVerbose('Loaded Pixi manifest schema definitions from schemas/pixi.json');
+                return meta;
+            } catch (err: unknown) {
+                traceError('Failed to load local Pixi manifest schema:', err);
+                return null;
+            }
+        })());
     }
 
     private parseSchema(schemaJson: {

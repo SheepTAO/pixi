@@ -18,7 +18,6 @@ import { Disposable, EventEmitter, ThemeIcon, Uri, window, workspace } from 'vsc
 
 import { PixiExtensionApi } from '../../api';
 import { getPixi } from '../../cli/pixiCli';
-import { createDeferred, Deferred } from '../../common/deferred';
 import { traceVerbose } from '../../common/logging';
 import { getWorkspacePersistentState } from '../../common/persistentState';
 import {
@@ -50,7 +49,7 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
     private readonly _onDidChangeEnvironments = new EventEmitter<DidChangeEnvironmentsEventArgs>();
     readonly onDidChangeEnvironments = this._onDidChangeEnvironments.event;
 
-    private _initialized: Deferred<void> | undefined;
+    private initPromise?: Promise<void>;
 
     constructor(
         private readonly api: PythonEnvironmentApi,
@@ -102,17 +101,8 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
         );
     }
 
-    public async initialize(): Promise<void> {
-        if (this._initialized) {
-            return this._initialized.promise;
-        }
-
-        this._initialized = createDeferred<void>();
-        try {
-            await this.refreshFromCore();
-        } finally {
-            this._initialized.resolve();
-        }
+    public initialize(): Promise<void> {
+        return (this.initPromise ??= this.refreshFromCore());
     }
 
     public dispose(): void {
@@ -321,7 +311,8 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
 
             if (pyEnv.pixiStatus === 'incompatible') {
                 const reason =
-                    pyEnv.statusReason || 'The environment is incompatible with the current platform or missing Python.';
+                    pyEnv.statusReason ||
+                    'The environment is incompatible with the current platform or missing Python.';
                 void window.showErrorMessage(`Cannot activate environment '${pyEnv.displayName}': ${reason}`);
                 return;
             }

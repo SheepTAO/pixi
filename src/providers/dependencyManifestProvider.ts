@@ -26,7 +26,7 @@ import {
 } from 'vscode';
 
 import { PixiExtensionApi } from '../api';
-import { escapeRegex, revealRangeInEditor } from '../common/execUtils';
+import { encodeCommandArg, escapeRegex, normalizeFolderPath, revealRangeInEditor } from '../common/execUtils';
 import { normalizePkgName } from '../core/packageManager';
 import { PixiProjectManager } from '../core/projectManager';
 import { PixiPackage } from '../core/types';
@@ -147,10 +147,6 @@ function resolveManifestSectionScope(section: string, pkgKind?: string): { isPyp
         /^(?:(?:tool\.pixi\.)?(?:target\.[^.]+\.)?(?:pypi-|build-|host-)?dependencies|project)$/i.test(section);
     const featureName = featureMatch ? featureMatch[1] : isGlobalSection ? 'default' : undefined;
     return { isPypi, featureName };
-}
-
-function encodeCommandArg(arg: unknown): string {
-    return encodeURIComponent(JSON.stringify([arg]));
 }
 
 /**
@@ -484,7 +480,7 @@ export class PixiDependencyManifestProvider
             const removeArg = encodeCommandArg({
                 projectPath,
                 pkg: { name: matched.name, kind: isPypi ? 'pypi' : 'conda' },
-                pixiEnvName: activeEnvName,
+                env: { pixiEnvName: activeEnvName },
                 featureName: sectionFeatureName,
             });
             const unresolvedActions = [
@@ -629,7 +625,7 @@ export class PixiDependencyManifestProvider
         const packageName = options instanceof Uri ? undefined : options?.packageName;
         const activeUri = window.activeTextEditor?.document.uri;
         const projectPath =
-            (options instanceof Uri ? this.projectManager.findProjectForUri(options) : options?.projectPath) ||
+            normalizeFolderPath(options) ||
             (activeUri ? this.projectManager.findProjectForUri(activeUri) : undefined) ||
             this.projectManager.getProjectPaths()[0];
 

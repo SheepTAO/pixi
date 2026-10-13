@@ -6,7 +6,6 @@ import semver from 'semver';
 import { CancellationError, CancellationToken, commands, Uri, window, workspace } from 'vscode';
 import which from 'which';
 
-import { createDeferred } from '../common/deferred';
 import { quoteArgs, safeJsonParse, untildify } from '../common/execUtils';
 import { traceError, traceInfo, traceVerbose } from '../common/logging';
 
@@ -83,54 +82,44 @@ export async function runPixi(args: string[], options?: PixiRunOptions, token?: 
     const useShell = isWindows && !pixi.toLowerCase().endsWith('.exe');
     const finalArgs = useShell ? quoteArgs(args) : args;
 
-    const deferred = createDeferred<string>();
-    const proc = ch.spawn(pixi, finalArgs, {
-        shell: useShell,
-        windowsHide: true,
-        ...spawnOptions,
-    });
+    return new Promise<string>((resolve, reject) => {
+        const proc = ch.spawn(pixi, finalArgs, {
+            shell: useShell,
+            windowsHide: true,
+            ...spawnOptions,
+        });
 
-    const cancelDisposable = token?.onCancellationRequested(() => {
-        proc.kill();
-        deferred.reject(new CancellationError());
-    });
+        const cancelDisposable = token?.onCancellationRequested(() => {
+            proc.kill();
+            reject(new CancellationError());
+        });
 
-    let stdout = '';
-    let stderr = '';
-    let exitCode: number | null = null;
+        let stdout = '';
+        let stderr = '';
 
-    proc.stdout?.on('data', (data) => {
-        stdout += data.toString('utf-8');
-    });
-    proc.stderr?.on('data', (data) => {
-        const d = data.toString('utf-8');
-        stderr += d;
-        traceVerbose(`[pixi stderr] ${d.trim()}`);
-    });
-    proc.on('error', (err) => {
-        deferred.reject(err);
-    });
-    proc.on('exit', (code) => {
-        exitCode = code;
-    });
-    proc.on('close', () => {
-        cancelDisposable?.dispose();
-        const isSilentTaskRemoveFailure =
-            exitCode === 0 && args[0] === 'task' && args[1] === 'remove' && stderr.includes('does not exist');
-        if (exitCode !== 0 || isSilentTaskRemoveFailure) {
-            traceError(`Failed to run "pixi ${args.join(' ')}":\n${stderr}`);
-            deferred.reject(new Error(`Failed to run "pixi ${args.join(' ')}":\n ${stderr}`));
-        } else {
-            if (options?.includeStderr) {
-                const combined = stdout ? (stderr ? `${stdout}\n${stderr}` : stdout) : stderr;
-                deferred.resolve(combined);
+        proc.stdout?.on('data', (data) => {
+            stdout += data.toString('utf-8');
+        });
+        proc.stderr?.on('data', (data) => {
+            const d = data.toString('utf-8');
+            stderr += d;
+            traceVerbose(`[pixi stderr] ${d.trim()}`);
+        });
+        proc.on('error', reject);
+        proc.on('close', (exitCode) => {
+            cancelDisposable?.dispose();
+            const isSilentTaskRemoveFailure =
+                exitCode === 0 && args[0] === 'task' && args[1] === 'remove' && stderr.includes('does not exist');
+            if (exitCode !== 0 || isSilentTaskRemoveFailure) {
+                traceError(`Failed to run "pixi ${args.join(' ')}":\n${stderr}`);
+                reject(new Error(`Failed to run "pixi ${args.join(' ')}":\n ${stderr}`));
+            } else if (options?.includeStderr) {
+                resolve(stdout ? (stderr ? `${stdout}\n${stderr}` : stdout) : stderr);
             } else {
-                deferred.resolve(stdout);
+                resolve(stdout);
             }
-        }
+        });
     });
-
-    return deferred.promise;
 }
 
 export const MINIMUM_PIXI_VERSION = '0.53.0';

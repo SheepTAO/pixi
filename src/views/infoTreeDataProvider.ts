@@ -97,16 +97,14 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
     readonly onDidChangeTreeData: Event<PixiInfoItem | undefined | null | void> = this._onDidChangeTreeData.event;
     private cachedSystemInfo: PixiSystemInfo | null = null;
     private cachedCacheSize: string | null = null;
-    private isCalculatingCacheSize = false;
-    private cacheMeasurementAttempted = false;
+    private cacheSizeStatus: 'idle' | 'calculating' | 'done' = 'idle';
     private cacheCalculationEpoch = 0;
 
     public refresh(): void {
         this.cacheCalculationEpoch++;
         this.cachedSystemInfo = null;
         this.cachedCacheSize = null;
-        this.isCalculatingCacheSize = false;
-        this.cacheMeasurementAttempted = false;
+        this.cacheSizeStatus = 'idle';
         this._onDidChangeTreeData.fire();
     }
 
@@ -123,7 +121,10 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
     }
 
     public async measureCacheSize(): Promise<void> {
-        this.cacheMeasurementAttempted = false;
+        if (this.cacheSizeStatus === 'calculating') {
+            return;
+        }
+        this.cacheSizeStatus = 'idle';
         try {
             const info = await this.getSystemInfo();
             if (info.cache_dir) {
@@ -135,11 +136,10 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
     }
 
     private async calculateCacheSize(cacheDir: string, notifyStart = false): Promise<void> {
-        if (this.isCalculatingCacheSize) {
+        if (this.cacheSizeStatus === 'calculating') {
             return;
         }
-        this.isCalculatingCacheSize = true;
-        this.cacheMeasurementAttempted = true;
+        this.cacheSizeStatus = 'calculating';
         if (notifyStart) {
             this._onDidChangeTreeData.fire();
         }
@@ -154,7 +154,7 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
             }
         } finally {
             if (this.cacheCalculationEpoch === currentEpoch) {
-                this.isCalculatingCacheSize = false;
+                this.cacheSizeStatus = 'done';
                 this._onDidChangeTreeData.fire();
             }
         }
@@ -211,30 +211,22 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
         // 3. Cache Directory
         if (info.cache_dir) {
             const autoMeasure = workspace.getConfiguration('pixi').get<boolean>('cache.autoMeasureSize', true);
-            if (
-                !this.cachedCacheSize &&
-                !this.isCalculatingCacheSize &&
-                !this.cacheMeasurementAttempted &&
-                autoMeasure
-            ) {
+            if (!this.cachedCacheSize && this.cacheSizeStatus === 'idle' && autoMeasure) {
                 void this.calculateCacheSize(info.cache_dir, false);
             }
 
+            const isCalculating = this.cacheSizeStatus === 'calculating';
             const cacheItem = new PixiInfoItem('Cache Directory', TreeItemCollapsibleState.None);
             const sizeStr =
                 this.cachedCacheSize ||
-                (this.isCalculatingCacheSize
-                    ? 'Calculating...'
-                    : autoMeasure && info.cache_size
-                      ? String(info.cache_size)
-                      : null);
+                (isCalculating ? 'Calculating...' : autoMeasure && info.cache_size ? String(info.cache_size) : null);
             cacheItem.description = sizeStr ? `${sizeStr} (${info.cache_dir})` : info.cache_dir;
             cacheItem.iconPath = new ThemeIcon('database');
             cacheItem.contextValue = 'pixiInfoCache';
             let tooltip = `Cache Directory: ${info.cache_dir}`;
             if (this.cachedCacheSize) {
                 tooltip += `\nTotal Size: ${this.cachedCacheSize}`;
-            } else if (this.isCalculatingCacheSize) {
+            } else if (isCalculating) {
                 tooltip += '\nCalculating cache size...';
             } else if (!autoMeasure) {
                 tooltip +=

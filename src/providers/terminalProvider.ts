@@ -151,9 +151,7 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
 
     async openTerminal(target?: unknown): Promise<void> {
         try {
-            const candidate =
-                (target as { env?: PixiEnvironmentInfo })?.env ?? (target as PixiEnvironmentInfo | undefined);
-            let env = candidate?.pixiEnvName ? candidate : undefined;
+            let env = (target as { env?: PixiEnvironmentInfo })?.env;
 
             if (!env) {
                 const folder = normalizeFolderPath(target);

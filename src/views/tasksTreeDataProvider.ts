@@ -16,16 +16,7 @@ import { escapeRegex } from '../common/execUtils';
 import { PixiProjectManager } from '../core/projectManager';
 import { PixiProject } from '../core/types';
 import { DEFAULT_TASK_PREFIX_SEPARATORS, PixiTask, PixiTaskProvider } from '../providers/taskProvider';
-
-export class PixiTaskProjectTreeItem extends TreeItem {
-    constructor(public readonly project: PixiProject) {
-        super(project.name, TreeItemCollapsibleState.Expanded);
-        this.description = path.basename(project.manifestPath);
-        this.tooltip = `Project: ${project.name}\nPath: ${project.projectPath}`;
-        this.iconPath = new ThemeIcon('root-folder');
-        this.contextValue = 'pixiTaskProject';
-    }
-}
+import { PixiProjectTreeItem } from './projectsTreeDataProvider';
 
 export class PixiTaskTreeItem extends TreeItem {
     constructor(
@@ -169,11 +160,7 @@ export class PixiTaskGroupTreeItem extends TreeItem {
     }
 }
 
-export type PixiTasksTreeItem =
-    | PixiTaskProjectTreeItem
-    | PixiTaskGroupTreeItem
-    | PixiTaskTreeItem
-    | PixiTaskEmptyTreeItem;
+export type PixiTasksTreeItem = PixiProjectTreeItem | PixiTaskGroupTreeItem | PixiTaskTreeItem | PixiTaskEmptyTreeItem;
 
 export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTreeItem>, Disposable {
     private readonly _onDidChangeTreeData = new EventEmitter<PixiTasksTreeItem | undefined | null | void>();
@@ -216,10 +203,10 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
                 const singleProject = projects[0];
                 return this.getTaskItemsForProject(singleProject);
             }
-            return projects.map((p) => new PixiTaskProjectTreeItem(p));
+            return projects.map((p) => new PixiProjectTreeItem(p));
         }
 
-        if (element instanceof PixiTaskProjectTreeItem) {
+        if (element instanceof PixiProjectTreeItem) {
             return this.getTaskItemsForProject(element.project);
         }
 
@@ -344,7 +331,7 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
         return items;
     }
 
-    private async getTaskGroupChildren(groupItem: PixiTaskGroupTreeItem): Promise<PixiTasksTreeItem[]> {
+    private getTaskGroupChildren(groupItem: PixiTaskGroupTreeItem): PixiTasksTreeItem[] {
         const project = groupItem.project;
         if (groupItem.groupType === 'prefix') {
             const config = workspace.getConfiguration('pixi.tasks', Uri.file(project.projectPath));
@@ -362,9 +349,6 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
             }
         }
 
-        return groupItem.tasks
-            .slice()
-            .sort((a, b) => a.name.localeCompare(b.name))
-            .map((t) => new PixiTaskTreeItem(t, project));
+        return groupItem.tasks.map((t) => new PixiTaskTreeItem(t, project));
     }
 }

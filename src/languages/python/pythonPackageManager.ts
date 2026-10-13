@@ -48,8 +48,7 @@ export function pixiPkgsToPackages(pixiPackages: PixiPackage[], environmentId: s
 export class PixiPythonPackageManager implements PackageManager, Disposable {
     private readonly _onDidChangePackages = new EventEmitter<DidChangePackagesEventArgs>();
     onDidChangePackages: Event<DidChangePackagesEventArgs> = this._onDidChangePackages.event;
-    private packagesCache = new Map<string, Package[]>();
-    private readonly disposables: Disposable[] = [];
+    private readonly packagesCache = new Map<string, Package[]>();
 
     readonly name = 'pixi';
     readonly displayName = 'Pixi';
@@ -61,22 +60,10 @@ export class PixiPythonPackageManager implements PackageManager, Disposable {
         public readonly api: PythonEnvironmentApi,
         private readonly envManager: PixiPythonEnvManager,
         private readonly projectManager: PixiProjectManager,
-    ) {
-        this.disposables.push(
-            this.projectManager.onDidChangeEnvironments(() => {
-                this.packagesCache.clear();
-            }),
-        );
-    }
+    ) {}
 
     public dispose(): void {
         this._onDidChangePackages.dispose();
-        Disposable.from(...this.disposables).dispose();
-    }
-
-    async clearCache(): Promise<void> {
-        this.packagesCache.clear();
-        this.projectManager.clearPackagesCache();
     }
 
     async manage(environment: PythonEnvironment, options: PackageManagementOptions): Promise<void> {
@@ -183,21 +170,6 @@ export class PixiPythonPackageManager implements PackageManager, Disposable {
         return resolved ? { envName: resolved.pixiEnvName, projectPath: resolved.projectPath } : undefined;
     }
 
-    private async fetchAndCachePackages(environment: PythonEnvironment): Promise<Package[] | undefined> {
-        const envId = environment.envId.id;
-        const details = this.resolveEnvDetails(environment);
-        if (!details) {
-            traceError(`Unable to resolve Pixi environment details for: ${envId}`);
-            return undefined;
-        }
-
-        const pixiPackages = await this.projectManager.getPackagesForEnvironment(details.envName, details.projectPath);
-        const packages = pixiPkgsToPackages(pixiPackages, envId);
-        this.packagesCache.set(envId, packages);
-        traceInfo(`Loaded ${packages.length} packages for environment '${details.envName}'`);
-        return packages;
-    }
-
     async refresh(environment: PythonEnvironment): Promise<void> {
         const envId = environment.envId.id;
         traceInfo(`Called refresh for environment: ${envId}`);
@@ -213,7 +185,7 @@ export class PixiPythonPackageManager implements PackageManager, Disposable {
                 if (details) {
                     this.projectManager.clearPackagesCache(details.projectPath);
                 }
-                const after = (await this.fetchAndCachePackages(environment)) || [];
+                const after = (await this.getPackages(environment)) || [];
 
                 this.triggerOnDidChangePackages(environment, before, after);
             },
@@ -223,12 +195,16 @@ export class PixiPythonPackageManager implements PackageManager, Disposable {
     async getPackages(environment: PythonEnvironment): Promise<Package[] | undefined> {
         const envId = environment.envId.id;
         traceVerbose(`Called getPackages for environment: ${envId}`);
-
-        if (this.packagesCache.has(envId)) {
-            return this.packagesCache.get(envId);
+        const details = this.resolveEnvDetails(environment);
+        if (!details) {
+            traceError(`Unable to resolve Pixi environment details for: ${envId}`);
+            return undefined;
         }
 
-        return this.fetchAndCachePackages(environment);
+        const pixiPackages = await this.projectManager.getPackagesForEnvironment(details.envName, details.projectPath);
+        const packages = pixiPkgsToPackages(pixiPackages, envId);
+        this.packagesCache.set(envId, packages);
+        return packages;
     }
 
     private triggerOnDidChangePackages(environment: PythonEnvironment, before: Package[], after: Package[]): void {

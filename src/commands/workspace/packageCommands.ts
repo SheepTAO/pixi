@@ -257,7 +257,8 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
         pickerOptions: { title: string; placeHolder: string; emptyWarning: string },
     ): Promise<{ pkgName: string; manifestPath?: string } | undefined> {
         const ctx = extractCommandContext(targetItem);
-        let { pkgName, projectPath } = ctx;
+        let { projectPath } = ctx;
+        let pkgName = ctx.pkg?.name;
 
         if (!pkgName) {
             projectPath ||= await pickPixiProject(manager, projectPlaceHolder, targetItem);
@@ -307,12 +308,12 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
                               : { kind: 'feature', name: featureTargetName }
                           : undefined;
 
-                const directScopeName =
-                    explicitScope?.name ||
-                    extractEnvironmentName(
-                        targetItem,
-                        typeof presetEnvOrScope === 'string' ? presetEnvOrScope : undefined,
-                    );
+                const directScopeName = explicitScope
+                    ? (explicitScope.name ?? 'default')
+                    : extractEnvironmentName(
+                          targetItem,
+                          typeof presetEnvOrScope === 'string' ? presetEnvOrScope : undefined,
+                      );
 
                 let promptResult: AddPackagePromptResult | undefined;
                 if (initialPkg && typeof initialPkg === 'object') {
@@ -464,7 +465,7 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
         commands.registerCommand('pixi.updatePackage', async (targetItem?: unknown) => {
             const ctx = extractCommandContext(targetItem);
             if (ctx.pkg && ctx.projectPath) {
-                return executeUpdatePackage(manager, ctx.projectPath, ctx.pkg.name, ctx.env?.pixiEnvName);
+                return executeUpdatePackage(manager, ctx.projectPath, ctx.pkg.name, ctx.envName);
             }
 
             const projectPath = await pickPixiProject(manager, 'Select Pixi project to update package in', targetItem);

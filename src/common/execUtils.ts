@@ -154,6 +154,13 @@ export function escapeRegex(str: string): string {
 }
 
 /**
+ * Encodes a command argument for use in VS Code markdown command URIs (`command:...?...`).
+ */
+export function encodeCommandArg(arg: unknown): string {
+    return encodeURIComponent(JSON.stringify([arg]));
+}
+
+/**
  * Reveals and highlights the specified line and column range in an active text editor.
  */
 export function revealRangeInEditor(editor: TextEditor, line: number, startCol: number, endCol: number): void {

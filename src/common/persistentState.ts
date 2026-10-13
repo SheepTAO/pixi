@@ -1,30 +1,22 @@
-import { ExtensionContext } from 'vscode';
+import { ExtensionContext, Memento } from 'vscode';
 
 export interface PersistentState {
     get<T>(key: string, defaultValue?: T): T | undefined;
     set<T>(key: string, value: T): Thenable<void>;
 }
 
-const fallbackStore = new Map<string, unknown>();
+let workspaceState: Memento | undefined;
 
-let _workspace: PersistentState = {
-    get: <T>(key: string, defaultValue?: T) => (fallbackStore.has(key) ? (fallbackStore.get(key) as T) : defaultValue),
-    set: async <T>(key: string, value: T) => {
-        if (value === undefined) {
-            fallbackStore.delete(key);
-        } else {
-            fallbackStore.set(key, value);
-        }
-    },
+const persistentState: PersistentState = {
+    get: <T>(key: string, defaultValue?: T) =>
+        workspaceState ? workspaceState.get<T>(key, defaultValue as T) : defaultValue,
+    set: <T>(key: string, value: T) => (workspaceState ? workspaceState.update(key, value) : Promise.resolve()),
 };
 
 export function setPersistentState(context: ExtensionContext): void {
-    _workspace = {
-        get: <T>(key: string, defaultValue?: T) => context.workspaceState.get<T>(key, defaultValue as T),
-        set: <T>(key: string, value: T) => context.workspaceState.update(key, value),
-    };
+    workspaceState = context.workspaceState;
 }
 
 export function getWorkspacePersistentState(): PersistentState {
-    return _workspace;
+    return persistentState;
 }

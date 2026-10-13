@@ -17,6 +17,7 @@ import {
     workspace,
 } from 'vscode';
 
+import { encodeCommandArg } from '../common/execUtils';
 import { PixiProjectManager } from '../core/projectManager';
 import { PixiTask, PixiTaskProvider } from './taskProvider';
 
@@ -241,7 +242,7 @@ export class PixiTaskManifestProvider implements CodeLensProvider, HoverProvider
 
         md.appendMarkdown('---\n\n');
 
-        const runArg = encodeURIComponent(JSON.stringify([{ task: pixiTask }]));
+        const runArg = encodeCommandArg({ task: pixiTask });
         const runUri = `command:pixi.runTask?${runArg}`;
         const runInEnvUri = `command:pixi.runTaskInEnvironment?${runArg}`;
         const removeUri = `command:pixi.tasks.removeTask?${runArg}`;
@@ -255,7 +256,9 @@ export class PixiTaskManifestProvider implements CodeLensProvider, HoverProvider
     }
 
     private getManifestActionMode(document: TextDocument): ManifestActionMode {
-        return workspace.getConfiguration('pixi.tasks', document.uri).get<ManifestActionMode>('manifestActions', 'hover');
+        return workspace
+            .getConfiguration('pixi.tasks', document.uri)
+            .get<ManifestActionMode>('manifestActions', 'hover');
     }
 
     private parseManifestTasks(document: TextDocument): ParsedManifestResult {

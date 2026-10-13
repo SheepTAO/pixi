@@ -144,9 +144,9 @@ export async function showDependencyTreeCommand(manager: PixiProjectManager, tar
         return;
     }
 
-    if (ctx.env && ctx.projectPath) {
-        const args = buildTreeArgs(ctx.env.pixiEnvName);
-        await displayTreeOutput(`environment '${ctx.env.pixiEnvName}'`, args, ctx.projectPath);
+    if (ctx.envName && ctx.projectPath) {
+        const args = buildTreeArgs(ctx.envName);
+        await displayTreeOutput(`environment '${ctx.envName}'`, args, ctx.projectPath);
         return;
     }
 

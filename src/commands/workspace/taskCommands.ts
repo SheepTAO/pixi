@@ -7,34 +7,13 @@ import { PixiProjectManager } from '../../core/projectManager';
 import { DEFAULT_TASK_PREFIX_SEPARATORS, PixiTask, PixiTaskProvider } from '../../providers/taskProvider';
 import { getWorkspaceFeatures, pickPixiProject, updateConfigurationValue } from './common';
 
-export interface TaskCommandArg {
-    task?: PixiTask;
-    name?: string;
-    projectPath?: string;
-    project?: { projectPath?: string; manifestPath?: string };
-    environment?: string;
-    default_environment?: string;
-    args?: string[];
-}
-
 function extractTask(targetItem?: unknown): PixiTask | undefined {
     if (!targetItem || typeof targetItem !== 'object') {
         return undefined;
     }
-    const item = targetItem as TaskCommandArg;
+    const item = targetItem as { task?: PixiTask; args?: string[] };
     if (item.task) {
         return item.args ? { ...item.task, args: item.args } : item.task;
-    }
-    const projectPath = item.projectPath || item.project?.projectPath;
-    if (item.name && projectPath) {
-        const rawTask = targetItem as PixiTask;
-        return {
-            ...rawTask,
-            name: item.name,
-            projectPath,
-            default_environment: item.environment ?? item.default_environment ?? rawTask.default_environment,
-            args: item.args ?? rawTask.args,
-        };
     }
     return undefined;
 }
