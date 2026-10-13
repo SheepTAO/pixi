@@ -482,12 +482,17 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
 
             const envLabel = targetEnv || (envs.length > 0 ? envs[0].pixiEnvName : 'default');
             const packages = await manager.getPackagesForEnvironment(envLabel, projectPath);
-            if (packages.length === 0) {
-                window.showInformationMessage(`No packages found in environment '${envLabel}'.`);
+            const updatablePackages = packages.filter((p) => !p.is_local && !p.is_editable);
+            if (updatablePackages.length === 0) {
+                window.showInformationMessage(
+                    packages.length === 0
+                        ? `No packages found in environment '${envLabel}'.`
+                        : `No remotely updatable packages found in environment '${envLabel}'.`,
+                );
                 return;
             }
 
-            const items = sortPixiPackages(packages).map((p) => {
+            const items = sortPixiPackages(updatablePackages).map((p) => {
                 const channelBadge = p.kind === 'pypi' ? '[PyPI]' : '[Conda]';
                 const explicitBadge = p.is_explicit ? 'explicit' : 'transitive';
                 return {

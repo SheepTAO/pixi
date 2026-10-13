@@ -107,7 +107,14 @@ export class PixiPackageTreeItem extends TreeItem {
             };
         }
         this.tooltip = lines.join('\n');
-        this.contextValue = pkg.is_explicit ? 'pixiPackageExplicit' : 'pixiPackageTransitive';
+        const isLocal = Boolean(pkg.is_editable || pkg.is_local);
+        this.contextValue = isLocal
+            ? pkg.is_explicit
+                ? 'pixiPackageLocalExplicit'
+                : 'pixiPackageLocalTransitive'
+            : pkg.is_explicit
+              ? 'pixiPackageExplicit'
+              : 'pixiPackageTransitive';
     }
 }
 

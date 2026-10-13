@@ -5,6 +5,11 @@ All notable changes to the "pixi" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.3] - 2026-10-13
+
+- **Local & Editable Package Action Safeguards**:
+    - Hide inline update action and context menu item for local path and editable dependencies in the Environments tree view, and filter them out from interactive package update pickers.
+
 ## [1.6.2] - 2026-10-13
 
 - **Unified Target Platform Picker (`pixi.platform`)**:

@@ -4,7 +4,7 @@
     "description": "Pixi package manager and polyglot workspace integration for Visual Studio Code",
     "icon": "assets/icon.png",
     "license": "MIT",
-    "version": "1.6.2",
+    "version": "1.6.3",
     "galleryBanner": {
         "color": "#0F172A",
         "theme": "dark"
@@ -778,7 +778,7 @@
                 },
                 {
                     "command": "pixi.removePackage",
-                    "when": "view == pixi.views.projects && viewItem == pixiPackageExplicit",
+                    "when": "view == pixi.views.projects && (viewItem == pixiPackageExplicit || viewItem == pixiPackageLocalExplicit)",
                     "group": "inline@2"
                 },
                 {
@@ -788,17 +788,17 @@
                 },
                 {
                     "command": "pixi.removePackage",
-                    "when": "view == pixi.views.projects && viewItem == pixiPackageExplicit",
+                    "when": "view == pixi.views.projects && (viewItem == pixiPackageExplicit || viewItem == pixiPackageLocalExplicit)",
                     "group": "1_item@2"
                 },
                 {
                     "command": "pixi.revealPackageInManifest",
-                    "when": "view == pixi.views.projects && viewItem == pixiPackageExplicit",
+                    "when": "view == pixi.views.projects && (viewItem == pixiPackageExplicit || viewItem == pixiPackageLocalExplicit)",
                     "group": "1_item@3"
                 },
                 {
                     "command": "pixi.whyPackage",
-                    "when": "view == pixi.views.projects && viewItem == pixiPackageTransitive",
+                    "when": "view == pixi.views.projects && (viewItem == pixiPackageTransitive || viewItem == pixiPackageLocalTransitive)",
                     "group": "inline@1"
                 },
                 {
@@ -808,17 +808,17 @@
                 },
                 {
                     "command": "pixi.showDependencyTree",
-                    "when": "view == pixi.views.projects && (viewItem == pixiEnvInstalled || viewItem == pixiPackageExplicit || viewItem == pixiPackageTransitive || viewItem == pixiTransitiveGroup)",
+                    "when": "view == pixi.views.projects && (viewItem == pixiEnvInstalled || viewItem == pixiPackageExplicit || viewItem == pixiPackageTransitive || viewItem == pixiTransitiveGroup || viewItem == pixiPackageLocalExplicit || viewItem == pixiPackageLocalTransitive)",
                     "group": "2_tree@1"
                 },
                 {
                     "command": "pixi.whyPackage",
-                    "when": "view == pixi.views.projects && (viewItem == pixiEnvInstalled || viewItem == pixiPackageExplicit || viewItem == pixiPackageTransitive || viewItem == pixiTransitiveGroup)",
+                    "when": "view == pixi.views.projects && (viewItem == pixiEnvInstalled || viewItem == pixiPackageExplicit || viewItem == pixiPackageTransitive || viewItem == pixiTransitiveGroup || viewItem == pixiPackageLocalExplicit || viewItem == pixiPackageLocalTransitive)",
                     "group": "2_tree@2"
                 },
                 {
                     "command": "pixi.copyPackageName",
-                    "when": "view == pixi.views.projects && (viewItem == pixiPackageExplicit || viewItem == pixiPackageTransitive)",
+                    "when": "view == pixi.views.projects && (viewItem == pixiPackageExplicit || viewItem == pixiPackageTransitive || viewItem == pixiPackageLocalExplicit || viewItem == pixiPackageLocalTransitive)",
                     "group": "3_copy@1"
                 },
                 {
