@@ -44,6 +44,7 @@ A dedicated Activity Bar container providing complete visibility and control ove
 │                  │ └── Inspect, Install, Sync, Update & Uninstall      │
 ├──────────────────┼─────────────────────────────────────────────────────┤
 │ PIXI INFO        │ CLI Version, System Platform, Virtual Packages      │
+│                  │ ├── Authentication Storage & Stored Credentials     │
 │                  │ └── Cache Disk Measurement & 1-click Cleanup        │
 └────────────────────────────────────────────────────────────────────────┘
 ```
@@ -57,6 +58,7 @@ A dedicated Activity Bar container providing complete visibility and control ove
 - **Automatic Project Discovery**: Instantly detects `pixi.toml` and `pyproject.toml` manifests across single-root and multi-root workspaces.
 - **Dual Perspective Tree View**: Toggle between **Environment View** (runtime status, toolchains, installed packages) and **Feature View** (declared features, reusable dependencies, environment references) with 1-click (`$(organization)`).
 - **Environment, Feature & Platform Management Hubs**: Centralized command hubs (`Pixi: Environment ...`, `Pixi: Feature ...`, `Pixi: Channel ...`, and `Pixi: Platform ...`) to create, install, reinstall, configure environment features (`--force`), or manage target platforms and channels without writing raw TOML.
+- **Private Channel & Registry Authentication**: First-class support for `pixi auth` (login, logout, copy tokens, status). Authenticate with prefix.dev (token / OAuth), anaconda.org, or custom enterprise registries directly from the command hub or PIXI INFO panel.
 - **Locked Dependency Inlay Hints & Navigation**: Displays actual locked package versions inline in manifests (`: 1.26.4`), rich hover inspection cards (build, channel, license, multi-environment matrix diffs), and `Ctrl`/`Cmd` + Click navigation directly to package entries in `pixi.lock`.
 - **Offline Schema Validation & Manifest IntelliSense**: Bundles official Pixi JSON schema definitions locally for 100% offline autocompletion of manifest sections (`[workspace]`, `[tasks]`, `[dependencies]`, etc.), properties, channels, platforms, and rich hover documentation.
 - **Manifest Editor Actions**: 1-click title bar buttons for manifest files to Lock, Install, Update, or Reinstall dependencies.
@@ -96,6 +98,7 @@ Launch any command via the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) by t
 | **Pixi: Feature ...**                           | `pixi.feature`            | Interactive hub to create/remove features, add packages to a feature, or jump to feature definitions.           |
 | **Pixi: Channel ...**                           | `pixi.channel`            | Interactive hub to add Conda presets/mirrors (prepend/append) or remove channels at workspace or feature scope. |
 | **Pixi: Platform ...**                          | `pixi.platform`           | Configure target platforms via check/uncheck picker at workspace or feature scope.                              |
+| **Pixi: Authentication ...**                    | `pixi.auth`               | Interactive hub to login, logout, copy tokens, or inspect authentication entries (`pixi auth`).                 |
 | **Pixi: Search Packages ...**                   | `pixi.searchPackages`     | Search Conda & PyPI packages to inspect platforms, licenses, metadata, and docs.                                |
 | **Pixi: Add Package ...**                       | `pixi.addPackage`         | Add packages to features, inline environments, or global scope with channel/version picking.                    |
 | **Pixi: Remove Package ...**                    | `pixi.removePackage`      | Remove packages from manifest with automatic feature/environment scope resolution.                              |

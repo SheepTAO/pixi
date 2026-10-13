@@ -291,6 +291,11 @@ export function registerChannelCommands(manager: PixiProjectManager): Disposable
                     description: 'Remove configured channel(s) from the project manifest',
                     command: 'pixi.removeChannel',
                 },
+                {
+                    label: '$(key) Manage Authentication (pixi auth)...',
+                    description: 'Login, logout, or manage credentials for private channels and registries',
+                    command: 'pixi.auth',
+                },
             ];
 
             const pick = await window.showQuickPick(actions, {

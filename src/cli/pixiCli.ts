@@ -6,7 +6,7 @@ import semver from 'semver';
 import { CancellationError, CancellationToken, commands, Uri, window, workspace } from 'vscode';
 import which from 'which';
 
-import { quoteArgs, safeJsonParse, untildify } from '../common/execUtils';
+import { quoteArgs, safeJsonParse, sanitizeArgsForLogging, untildify } from '../common/execUtils';
 import { traceError, traceInfo, traceVerbose } from '../common/logging';
 
 let _cachedPixi: string | undefined;
@@ -111,8 +111,9 @@ export async function runPixi(args: string[], options?: PixiRunOptions, token?: 
             const isSilentTaskRemoveFailure =
                 exitCode === 0 && args[0] === 'task' && args[1] === 'remove' && stderr.includes('does not exist');
             if (exitCode !== 0 || isSilentTaskRemoveFailure) {
-                traceError(`Failed to run "pixi ${args.join(' ')}":\n${stderr}`);
-                reject(new Error(`Failed to run "pixi ${args.join(' ')}":\n ${stderr}`));
+                const safeCommand = `pixi ${sanitizeArgsForLogging(args).join(' ')}`;
+                traceError(`Failed to run "${safeCommand}":\n${stderr}`);
+                reject(new Error(`Failed to run "${safeCommand}":\n ${stderr}`));
             } else if (options?.includeStderr) {
                 resolve(stdout ? (stderr ? `${stdout}\n${stderr}` : stdout) : stderr);
             } else {

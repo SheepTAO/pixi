@@ -332,3 +332,42 @@ export async function runWithProgressNotification<T>(
         return false;
     }
 }
+
+const SENSITIVE_ARG_FLAGS = new Set([
+    '--token',
+    '--password',
+    '--conda-token',
+    '--s3-secret-access-key',
+    '--s3-session-token',
+    '--oauth-client-secret',
+]);
+
+/**
+ * Redacts sensitive credentials (tokens, passwords, secret keys) from command-line arguments for logging.
+ */
+export function sanitizeArgsForLogging(args: string[]): string[] {
+    const sanitized: string[] = [];
+    for (let i = 0; i < args.length; i++) {
+        const arg = args[i];
+        if (SENSITIVE_ARG_FLAGS.has(arg)) {
+            sanitized.push(arg);
+            if (i + 1 < args.length) {
+                sanitized.push('***');
+                i++;
+            }
+        } else {
+            let replaced = false;
+            for (const flag of SENSITIVE_ARG_FLAGS) {
+                if (arg.startsWith(`${flag}=`)) {
+                    sanitized.push(`${flag}=***`);
+                    replaced = true;
+                    break;
+                }
+            }
+            if (!replaced) {
+                sanitized.push(arg);
+            }
+        }
+    }
+    return sanitized;
+}

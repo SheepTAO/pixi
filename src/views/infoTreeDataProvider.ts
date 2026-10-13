@@ -5,6 +5,7 @@ import {
     Disposable,
     Event,
     EventEmitter,
+    ThemeColor,
     ThemeIcon,
     TreeDataProvider,
     TreeItem,
@@ -12,6 +13,7 @@ import {
     workspace,
 } from 'vscode';
 
+import { readStoredCredentials, setCachedAuthDir } from '../cli/authCli';
 import { runPixi } from '../cli/pixiCli';
 import { safeJsonParse } from '../common/execUtils';
 import { traceError } from '../common/logging';
@@ -87,6 +89,7 @@ export class PixiInfoItem extends TreeItem {
         label: string,
         collapsibleState: TreeItemCollapsibleState = TreeItemCollapsibleState.None,
         public readonly children?: PixiInfoItem[],
+        public readonly hostPattern?: string,
     ) {
         super(label, collapsibleState);
     }
@@ -170,7 +173,7 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
         }
 
         try {
-            return this.buildInfoTree(await this.getSystemInfo());
+            return await this.buildInfoTree(await this.getSystemInfo());
         } catch (err: unknown) {
             traceError('Failed to fetch Pixi info:', err);
             const errorItem = new PixiInfoItem('Pixi CLI Unavailable', TreeItemCollapsibleState.None);
@@ -189,7 +192,7 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
         }
     }
 
-    private buildInfoTree(info: PixiSystemInfo): PixiInfoItem[] {
+    private async buildInfoTree(info: PixiSystemInfo): Promise<PixiInfoItem[]> {
         const items: PixiInfoItem[] = [];
 
         // 1. Version
@@ -244,16 +247,59 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
 
         // 4. Auth Storage
         if (info.auth_dir) {
-            const authItem = new PixiInfoItem('Auth Storage', TreeItemCollapsibleState.None);
-            authItem.description = info.auth_dir;
-            authItem.iconPath = new ThemeIcon('key');
-            authItem.tooltip = `Credentials File: ${info.auth_dir}\nClick to open or copy path`;
-            authItem.command = {
-                command: 'pixi.openLocation',
-                title: 'Open Credentials Location',
-                arguments: [info.auth_dir],
-            };
-            items.push(authItem);
+            setCachedAuthDir(info.auth_dir);
+            const entries = await readStoredCredentials(info.auth_dir);
+            const authChildren: PixiInfoItem[] = [];
+
+            for (const entry of entries) {
+                const hasToken =
+                    entry.method === 'BearerToken' || entry.method === 'CondaToken' || entry.method === 'OAuth2';
+                const userDesc = entry.username ? ` (${entry.username})` : '';
+                const item = new PixiInfoItem(
+                    entry.hostPattern,
+                    TreeItemCollapsibleState.None,
+                    undefined,
+                    entry.hostPattern,
+                );
+                item.description = `[${entry.method}]${userDesc}`;
+                item.iconPath = new ThemeIcon('shield', new ThemeColor('charts.green'));
+                item.tooltip = `Host: ${entry.hostPattern}\nMethod: ${entry.method}${userDesc}\nStorage: ${info.auth_dir}\nClick to copy token or manage`;
+                item.contextValue = hasToken ? 'pixiInfoAuthHostWithToken' : 'pixiInfoAuthHost';
+                if (hasToken) {
+                    item.command = {
+                        command: 'pixi.auth.copyToken',
+                        title: 'Copy Token',
+                        arguments: [item],
+                    };
+                }
+                authChildren.push(item);
+            }
+
+            const authGroup = new PixiInfoItem(
+                'Auth Storage',
+                entries.length > 0 ? TreeItemCollapsibleState.Expanded : TreeItemCollapsibleState.None,
+                authChildren.length > 0 ? authChildren : undefined,
+            );
+            authGroup.iconPath = new ThemeIcon('key');
+            authGroup.description = entries.length > 0 ? `${entries.length} hosts` : info.auth_dir;
+            authGroup.tooltip =
+                entries.length > 0
+                    ? `Credentials File: ${info.auth_dir}\n${entries.length} authenticated host(s)\nClick to open credentials location`
+                    : `Credentials File: ${info.auth_dir}\nNo authenticated hosts yet\nClick to login or manage authentication`;
+            authGroup.contextValue = 'pixiInfoAuthStorage';
+            if (entries.length > 0) {
+                authGroup.command = {
+                    command: 'pixi.openLocation',
+                    title: 'Open Credentials Location',
+                    arguments: [info.auth_dir],
+                };
+            } else {
+                authGroup.command = {
+                    command: 'pixi.auth.login',
+                    title: 'Login to Host / Registry',
+                };
+            }
+            items.push(authGroup);
         }
 
         // 5. Global Paths

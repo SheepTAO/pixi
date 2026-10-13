@@ -2,6 +2,7 @@ import { ExtensionContext, window, workspace } from 'vscode';
 
 import { createPixiApi, PixiExtensionApi } from './api';
 import { clearPixiCache, validatePixiCli } from './cli/pixiCli';
+import { registerAuthCommands } from './commands/authCommands';
 import { registerGlobalCommands } from './commands/globalCommands';
 import { registerInfoCommands } from './commands/infoCommands';
 import { registerWorkspaceCommands } from './commands/workspace';
@@ -82,6 +83,7 @@ export async function activate(context: ExtensionContext): Promise<PixiExtension
         infoTreeDataProvider,
         window.registerTreeDataProvider('pixi.views.info', infoTreeDataProvider),
         registerInfoCommands(infoTreeDataProvider),
+        registerAuthCommands(infoTreeDataProvider),
     );
 
     traceInfo(`Pixi extension v${extensionVersion} activated.`);

@@ -5,6 +5,14 @@ All notable changes to the "pixi" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.4] - 2026-10-13
+
+- **Private Registry & Credentials Management (`pixi auth`)**:
+    - Add native interactive authentication hub (`pixi.auth`), multi-protocol login wizard (`pixi.auth.login`), host logout (`pixi.auth.logout`), copy token (`pixi.auth.copyToken`), and credential status inspection (`pixi.auth.status`).
+    - Implement native background OAuth device flow with automatic clipboard copy of device code and browser launch (0 terminal windows).
+    - Upgrade Auth Storage in Pixi Info view to a hierarchical tree showing authenticated hosts, methods, and usernames with inline actions.
+    - Sanitize sensitive credentials (tokens, passwords, secret keys) in CLI error logging.
+
 ## [1.6.3] - 2026-10-13
 
 - **Local & Editable Package Action Safeguards**:

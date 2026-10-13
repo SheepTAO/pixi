@@ -4,7 +4,7 @@
     "description": "Pixi package manager and polyglot workspace integration for Visual Studio Code",
     "icon": "assets/icon.png",
     "license": "MIT",
-    "version": "1.6.3",
+    "version": "1.6.4",
     "galleryBanner": {
         "color": "#0F172A",
         "theme": "dark"
@@ -297,6 +297,36 @@
                 "command": "pixi.openLocation",
                 "title": "Open Location ...",
                 "category": "Pixi"
+            },
+            {
+                "command": "pixi.auth",
+                "title": "Authentication ...",
+                "category": "Pixi",
+                "icon": "$(key)"
+            },
+            {
+                "command": "pixi.auth.login",
+                "title": "Login to Host / Registry ...",
+                "category": "Pixi",
+                "icon": "$(sign-in)"
+            },
+            {
+                "command": "pixi.auth.logout",
+                "title": "Logout from Host ...",
+                "category": "Pixi",
+                "icon": "$(sign-out)"
+            },
+            {
+                "command": "pixi.auth.copyToken",
+                "title": "Copy Token for Host",
+                "category": "Pixi",
+                "icon": "$(key)"
+            },
+            {
+                "command": "pixi.auth.status",
+                "title": "View Authentication Status",
+                "category": "Pixi",
+                "icon": "$(info)"
             },
             {
                 "command": "pixi.showDependencyTree",
@@ -890,6 +920,36 @@
                     "command": "pixi.measureCacheSize",
                     "when": "view == pixi.views.info && viewItem == pixiInfoCache",
                     "group": "inline@2"
+                },
+                {
+                    "command": "pixi.auth.login",
+                    "when": "view == pixi.views.info && viewItem == pixiInfoAuthStorage",
+                    "group": "inline@1"
+                },
+                {
+                    "command": "pixi.auth.copyToken",
+                    "when": "view == pixi.views.info && viewItem == pixiInfoAuthHostWithToken",
+                    "group": "inline@1"
+                },
+                {
+                    "command": "pixi.auth.logout",
+                    "when": "view == pixi.views.info && (viewItem == pixiInfoAuthHost || viewItem == pixiInfoAuthHostWithToken)",
+                    "group": "inline@2"
+                },
+                {
+                    "command": "pixi.auth.login",
+                    "when": "view == pixi.views.info && viewItem == pixiInfoAuthStorage",
+                    "group": "1_auth@1"
+                },
+                {
+                    "command": "pixi.auth.copyToken",
+                    "when": "view == pixi.views.info && viewItem == pixiInfoAuthHostWithToken",
+                    "group": "1_auth@1"
+                },
+                {
+                    "command": "pixi.auth.logout",
+                    "when": "view == pixi.views.info && (viewItem == pixiInfoAuthHost || viewItem == pixiInfoAuthHostWithToken)",
+                    "group": "1_auth@2"
                 },
                 {
                     "command": "pixi.runTask",
