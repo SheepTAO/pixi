@@ -843,48 +843,33 @@
                 },
                 {
                     "command": "pixi.addPackage",
-                    "when": "view == pixi.views.projects && (viewItem == pixiFeatureItem || viewItem == pixiFeatureDefault || viewItem == pixiEnvFeatureGroup || viewItem == pixiEnvFeatureDefault)",
+                    "when": "view == pixi.views.projects && (viewItem == pixiFeatureItem || viewItem == pixiFeatureDefault)",
                     "group": "inline@1"
                 },
                 {
                     "command": "pixi.feature.revealInManifest",
-                    "when": "view == pixi.views.projects && (viewItem == pixiFeatureItem || viewItem == pixiFeatureDefault || viewItem == pixiEnvFeatureGroup || viewItem == pixiEnvFeatureDefault)",
+                    "when": "view == pixi.views.projects && (viewItem == pixiFeatureItem || viewItem == pixiFeatureDefault)",
                     "group": "1_navigate@1"
                 },
                 {
                     "command": "pixi.addChannel",
-                    "when": "view == pixi.views.projects && (viewItem == pixiFeatureItem || viewItem == pixiEnvFeatureGroup)",
+                    "when": "view == pixi.views.projects && viewItem == pixiFeatureItem",
                     "group": "2_manage@1"
                 },
                 {
                     "command": "pixi.removeChannel",
-                    "when": "view == pixi.views.projects && (viewItem == pixiFeatureItem || viewItem == pixiEnvFeatureGroup)",
+                    "when": "view == pixi.views.projects && viewItem == pixiFeatureItem",
                     "group": "2_manage@2"
                 },
                 {
                     "command": "pixi.platform",
-                    "when": "view == pixi.views.projects && (viewItem == pixiFeatureItem || viewItem == pixiEnvFeatureGroup)",
+                    "when": "view == pixi.views.projects && viewItem == pixiFeatureItem",
                     "group": "2_manage@3"
                 },
                 {
                     "command": "pixi.removeFeature",
                     "when": "view == pixi.views.projects && viewItem == pixiFeatureItem",
                     "group": "2_manage@4"
-                },
-                {
-                    "command": "pixi.revealPackageInManifest",
-                    "when": "view == pixi.views.projects && viewItem == pixiDeclaredPackage",
-                    "group": "inline@1"
-                },
-                {
-                    "command": "pixi.revealPackageInManifest",
-                    "when": "view == pixi.views.projects && viewItem == pixiDeclaredPackage",
-                    "group": "1_item@1"
-                },
-                {
-                    "command": "pixi.removePackage",
-                    "when": "view == pixi.views.projects && viewItem == pixiDeclaredPackage",
-                    "group": "1_item@2"
                 },
                 {
                     "command": "pixi.global.updateTool",

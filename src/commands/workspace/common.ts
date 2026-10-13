@@ -407,7 +407,7 @@ export function extractCommandContext(target?: unknown): ExtractedCommandContext
     }
     if (typeof target === 'object') {
         const item = target as {
-            pkg?: PixiPackage | { name: string; kind?: string };
+            pkg?: PixiPackage;
             env?: PixiEnvironmentInfo;
             manifestPath?: string;
             project?: { manifestPath?: string };
@@ -420,7 +420,7 @@ export function extractCommandContext(target?: unknown): ExtractedCommandContext
         const projectPath = normalizeLocationPath(target);
         const manifestPath = item.manifestPath || item.project?.manifestPath;
         const envName = item.pixiEnvName || item.env?.pixiEnvName;
-        const pkg = item.pkg as PixiPackage | undefined;
+        const pkg = item.pkg;
         const pkgName = item.name || item.pkg?.name;
         const featureName = item.featureName || item.feature?.name;
 

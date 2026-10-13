@@ -302,7 +302,9 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
                     typeof presetEnvOrScope === 'object' && presetEnvOrScope !== null && 'kind' in presetEnvOrScope
                         ? presetEnvOrScope
                         : featureTargetName
-                          ? { kind: 'feature', name: featureTargetName }
+                          ? featureTargetName === 'default'
+                              ? { kind: 'global' }
+                              : { kind: 'feature', name: featureTargetName }
                           : undefined;
 
                 const directScopeName =
@@ -461,8 +463,8 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
         // Pixi: Update Package
         commands.registerCommand('pixi.updatePackage', async (targetItem?: unknown) => {
             const ctx = extractCommandContext(targetItem);
-            if (ctx.pkg && ctx.env && ctx.projectPath) {
-                return executeUpdatePackage(manager, ctx.projectPath, ctx.pkg.name, ctx.env.pixiEnvName);
+            if (ctx.pkg && ctx.projectPath) {
+                return executeUpdatePackage(manager, ctx.projectPath, ctx.pkg.name, ctx.env?.pixiEnvName);
             }
 
             const projectPath = await pickPixiProject(manager, 'Select Pixi project to update package in', targetItem);

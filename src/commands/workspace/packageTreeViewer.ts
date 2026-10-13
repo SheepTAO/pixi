@@ -127,10 +127,20 @@ export async function displayTreeOutput(
 
 export async function showDependencyTreeCommand(manager: PixiProjectManager, targetItem?: unknown): Promise<void> {
     const ctx = extractCommandContext(targetItem);
-    if (ctx.pkg && ctx.env && ctx.projectPath) {
-        const args = buildTreeArgs(ctx.env.pixiEnvName);
+    if (ctx.pkg && ctx.projectPath) {
+        const envs = manager.getEnvironmentsForProject(ctx.projectPath);
+        const envName = await resolveTargetEnvironment(
+            envs,
+            targetItem,
+            'Select environment to view dependency tree for',
+        );
+        if (envName === null) {
+            return;
+        }
+        const envLabel = envName || 'default';
+        const args = buildTreeArgs(envName);
         args.push(exactPackageRegex(ctx.pkg.name));
-        await displayTreeOutput(`package '${ctx.pkg.name}' in '${ctx.env.pixiEnvName}'`, args, ctx.projectPath);
+        await displayTreeOutput(`package '${ctx.pkg.name}' in '${envLabel}'`, args, ctx.projectPath);
         return;
     }
 
@@ -198,11 +208,21 @@ export async function showDependencyTreeCommand(manager: PixiProjectManager, tar
 
 export async function whyPackageCommand(manager: PixiProjectManager, targetItem?: unknown): Promise<void> {
     const ctx = extractCommandContext(targetItem);
-    if (ctx.pkg && ctx.env && ctx.projectPath) {
-        const args = buildTreeArgs(ctx.env.pixiEnvName, true);
+    if (ctx.pkg && ctx.projectPath) {
+        const envs = manager.getEnvironmentsForProject(ctx.projectPath);
+        const envName = await resolveTargetEnvironment(
+            envs,
+            targetItem,
+            'Select environment to inspect package dependencies',
+        );
+        if (envName === null) {
+            return;
+        }
+        const envLabel = envName || 'default';
+        const args = buildTreeArgs(envName, true);
         args.push(exactPackageRegex(ctx.pkg.name));
         await displayTreeOutput(
-            `package '${ctx.pkg.name}' in '${ctx.env.pixiEnvName}'`,
+            `package '${ctx.pkg.name}' in '${envLabel}'`,
             args,
             ctx.projectPath,
             true,
