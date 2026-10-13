@@ -162,6 +162,12 @@ export class PixiTaskManifestProvider implements CodeLensProvider, HoverProvider
                         arguments: [{ task: pixiTask }],
                     }),
                     new CodeLens(range, {
+                        title: '$(terminal) Run with Args...',
+                        command: 'pixi.runTaskWithArgs',
+                        tooltip: `Run '${pixiTask.name}' with custom arguments in terminal`,
+                        arguments: [{ task: pixiTask }],
+                    }),
+                    new CodeLens(range, {
                         title: '$(layers) Run in Environment...',
                         command: 'pixi.runTaskInEnvironment',
                         tooltip: `Select an environment to run '${pixiTask.name}'`,
@@ -244,11 +250,12 @@ export class PixiTaskManifestProvider implements CodeLensProvider, HoverProvider
 
         const runArg = encodeCommandArg({ task: pixiTask });
         const runUri = `command:pixi.runTask?${runArg}`;
+        const runWithArgsUri = `command:pixi.runTaskWithArgs?${runArg}`;
         const runInEnvUri = `command:pixi.runTaskInEnvironment?${runArg}`;
         const removeUri = `command:pixi.tasks.removeTask?${runArg}`;
 
         md.appendMarkdown(
-            `[$(play) Run Task](${runUri} "Run task in terminal") &nbsp;&nbsp;|&nbsp;&nbsp; [$(layers) Run in Environment...](${runInEnvUri} "Select environment to run task") &nbsp;&nbsp;|&nbsp;&nbsp; [$(trash) Remove](${removeUri} "Remove '${pixiTask.name}' from manifest")`,
+            `[$(play) Run Task](${runUri} "Run task in terminal") &nbsp;&nbsp;|&nbsp;&nbsp; [$(terminal) Run with Args...](${runWithArgsUri} "Run task with custom arguments") &nbsp;&nbsp;|&nbsp;&nbsp; [$(layers) Run in Environment...](${runInEnvUri} "Select environment to run task") &nbsp;&nbsp;|&nbsp;&nbsp; [$(trash) Remove](${removeUri} "Remove '${pixiTask.name}' from manifest")`,
         );
 
         const highlightRange = new Range(matched.line, matched.startCol, matched.line, matched.endCol);

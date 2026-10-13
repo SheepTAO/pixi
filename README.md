@@ -81,7 +81,7 @@ A dedicated Activity Bar container providing complete visibility and control ove
 - **Interactive Task Lifecycle**: Create new runnable tasks via guided wizards (name, shell command, environment, `--depends-on` task dependencies) and remove tasks directly from side panel actions or command palette.
 - **Manifest Task Actions (Hover & CodeLens)**: Non-intrusive hover tooltips with full command previews and instant execution links, plus customizable CodeLens modes (compact, full, header-only, or off).
 - **Intelligent Task Grouping**: Organize workspace tasks in the side panel by namespace prefix (`data-*`, `gui-*`), by target environment, or in a flat list with 1-click grouping switcher.
-- **Native VS Code Tasks**: Auto-registers Pixi tasks as native VS Code tasks (`Terminal: Run Task...`) with a dedicated QuickPick runner.
+- **Native VS Code Tasks**: Auto-registers Pixi tasks as native VS Code tasks (`Terminal: Run Task...`) with a dedicated QuickPick runner and support for custom command-line arguments.
 - **Pre-Configured Terminals**: Launch interactive terminal sessions with the target Pixi environment pre-activated.
 - **Global Tools Management**: Easily inspect, install, update, and uninstall user-level CLI packages installed in `~/.pixi/bin`.
 
@@ -109,6 +109,7 @@ Launch any command via the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) by t
 | **Pixi: Clean ...**                             | `pixi.clean`              | Interactive menu to clean project environments, a single environment, or cache.                                 |
 | **Pixi: Add Task ...**                          | `pixi.tasks.addTask`      | Guided wizard to create a new runnable task in the project manifest.                                            |
 | **Pixi: Run Task ...**                          | `pixi.runTask`            | QuickPick menu to search and run any task defined in the project.                                               |
+| **Pixi: Run Task with Arguments ...**           | `pixi.runTaskWithArgs`    | Run a task with custom command-line arguments.                                                                  |
 | **Pixi: Open Terminal in Environment ...**      | `pixi.openTerminal`       | Open an integrated terminal pre-activated in a selected environment.                                            |
 | **Pixi: Open Manifest**                         | `pixi.openManifest`       | Open the project manifest file (`pixi.toml` or `pyproject.toml`).                                               |
 | **Pixi: Open Lockfile**                         | `pixi.openLockfile`       | Open `pixi.lock` and inspect resolved package records.                                                          |

@@ -4,16 +4,23 @@ import { commands, Disposable, InputBoxValidationSeverity, QuickPickItem, Uri, w
 import { runPixiWithProgress } from '../../cli/workspaceCli';
 import { revealDefinitionInManifest } from '../../common/execUtils';
 import { PixiProjectManager } from '../../core/projectManager';
-import { DEFAULT_TASK_PREFIX_SEPARATORS, PixiTask, PixiTaskProvider } from '../../providers/taskProvider';
+import {
+    DEFAULT_TASK_PREFIX_SEPARATORS,
+    PixiTask,
+    PixiTaskProvider,
+    promptForTaskArgs,
+} from '../../providers/taskProvider';
 import { getWorkspaceFeatures, pickPixiProject, updateConfigurationValue } from './common';
 
 function extractTask(targetItem?: unknown): PixiTask | undefined {
     if (!targetItem || typeof targetItem !== 'object') {
         return undefined;
     }
-    const item = targetItem as { task?: PixiTask; args?: string[] };
-    if (item.task) {
-        return item.args ? { ...item.task, args: item.args } : item.task;
+    if ('task' in targetItem && (targetItem as { task?: unknown }).task) {
+        return (targetItem as { task: PixiTask }).task;
+    }
+    if ('name' in targetItem && 'projectPath' in targetItem) {
+        return targetItem as PixiTask;
     }
     return undefined;
 }
@@ -21,23 +28,69 @@ function extractTask(targetItem?: unknown): PixiTask | undefined {
 export function registerTaskCommands(manager: PixiProjectManager, taskProvider: PixiTaskProvider): Disposable[] {
     return [
         // Pixi: Run Task
-        commands.registerCommand('pixi.runTask', async (targetItem?: unknown, extraArgs?: string[]) => {
-            const targetTask = extractTask(targetItem);
-            if (targetTask) {
-                return taskProvider.executePixiTask(targetTask, undefined, extraArgs);
-            }
-            const projectPath = await pickPixiProject(manager, 'Select Pixi project to run task in', targetItem);
-            if (!projectPath) {
-                return;
-            }
-            const selected = await taskProvider.pickTask({
-                title: 'Pixi: Run Task',
-                placeHolder: 'Select a Pixi task to run',
-                targetProjectPath: projectPath,
-            });
-            if (selected) {
-                await taskProvider.executePixiTask(selected, undefined, extraArgs);
-            }
+        commands.registerCommand(
+            'pixi.runTask',
+            async (
+                targetItem?: unknown,
+                extraArgsOrOptions?:
+                    | string[]
+                    | string
+                    | { promptArgs?: boolean; rawArgs?: string; extraArgs?: string[] },
+            ) => {
+                let promptArgs = false;
+                let rawArgs: string | undefined;
+                let extraArgs: string[] | undefined;
+
+                if (typeof extraArgsOrOptions === 'string') {
+                    rawArgs = extraArgsOrOptions;
+                } else if (Array.isArray(extraArgsOrOptions)) {
+                    extraArgs = extraArgsOrOptions;
+                } else if (extraArgsOrOptions && typeof extraArgsOrOptions === 'object') {
+                    promptArgs = !!extraArgsOrOptions.promptArgs;
+                    rawArgs = extraArgsOrOptions.rawArgs;
+                    extraArgs = extraArgsOrOptions.extraArgs;
+                }
+
+                let targetTask = extractTask(targetItem);
+                if (!targetTask) {
+                    const projectPath = await pickPixiProject(
+                        manager,
+                        'Select Pixi project to run task in',
+                        targetItem,
+                    );
+                    if (!projectPath) {
+                        return;
+                    }
+                    targetTask = await taskProvider.pickTask({
+                        title: promptArgs ? 'Pixi: Run Task with Arguments' : 'Pixi: Run Task',
+                        placeHolder: promptArgs
+                            ? 'Select a Pixi task to run with arguments'
+                            : 'Select a Pixi task to run',
+                        targetProjectPath: projectPath,
+                    });
+                    if (!targetTask) {
+                        return;
+                    }
+                }
+
+                if (promptArgs) {
+                    const inputArgs = await promptForTaskArgs(targetTask.name, targetTask.default_environment);
+                    if (inputArgs === undefined) {
+                        return;
+                    }
+                    const trimmed = inputArgs.trim();
+                    if (trimmed) {
+                        rawArgs = rawArgs ? `${rawArgs} ${trimmed}` : trimmed;
+                    }
+                }
+
+                await taskProvider.executePixiTask(targetTask, undefined, rawArgs ?? extraArgs);
+            },
+        ),
+
+        // Pixi: Run Task with Arguments
+        commands.registerCommand('pixi.runTaskWithArgs', async (targetItem?: unknown) => {
+            return commands.executeCommand('pixi.runTask', targetItem, { promptArgs: true });
         }),
 
         // Pixi: Run Task in Environment

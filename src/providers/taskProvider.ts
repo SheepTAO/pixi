@@ -18,7 +18,7 @@ import {
 
 import { getPixi, runPixi } from '../cli/pixiCli';
 import { toEnvQuickPickItem } from '../commands/workspace/common';
-import { safeJsonParse } from '../common/execUtils';
+import { quoteStringIfNecessary, safeJsonParse } from '../common/execUtils';
 import { traceError, traceVerbose } from '../common/logging';
 import { promptToInstallEnvironment } from '../core/environmentRules';
 import { PixiProjectManager } from '../core/projectManager';
@@ -31,6 +31,7 @@ export interface PixiTaskDefinition extends TaskDefinition {
     environment?: string;
     project?: string;
     args?: string[];
+    rawArgs?: string;
 }
 
 export interface PixiTask {
@@ -46,6 +47,7 @@ export interface PixiTask {
     clean_env?: boolean;
     projectPath: string;
     args?: string[];
+    rawArgs?: string;
 }
 
 export interface PickTaskOptions {
@@ -140,6 +142,7 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
             default_environment: def.environment,
             projectPath,
             args: def.args,
+            rawArgs: def.rawArgs,
         };
         return this.createVsCodeTask(pixiTask, def);
     }
@@ -227,19 +230,24 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
             environment: t.default_environment,
             project: t.projectPath,
             args: t.args,
+            rawArgs: t.rawArgs,
         };
 
-        const args = ['run'];
+        const parts = [quoteStringIfNecessary(pixiBin), 'run'];
         if (def.environment) {
-            args.push('-e', def.environment);
+            parts.push('-e', quoteStringIfNecessary(def.environment));
         }
-        args.push(def.task);
-        if (def.args && def.args.length > 0) {
-            args.push(...def.args);
+        parts.push(quoteStringIfNecessary(def.task));
+
+        let commandLine = parts.join(' ');
+        if (def.rawArgs && def.rawArgs.trim()) {
+            commandLine += ` ${def.rawArgs.trim()}`;
+        } else if (def.args && def.args.length > 0) {
+            commandLine += ` ${def.args.map(quoteStringIfNecessary).join(' ')}`;
         }
 
         const scope = workspace.getWorkspaceFolder(Uri.file(t.projectPath)) || TaskScope.Workspace;
-        const task = new Task(def, scope, t.name, 'pixi', new ShellExecution(pixiBin, args, { cwd: t.projectPath }));
+        const task = new Task(def, scope, t.name, 'pixi', new ShellExecution(commandLine, { cwd: t.projectPath }));
 
         task.detail = t.description || t.cmd;
 
@@ -299,7 +307,11 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
         return selected?.pixiTask;
     }
 
-    public async executePixiTask(pixiTask: PixiTask, targetEnvName?: string, extraArgs?: string[]): Promise<void> {
+    public async executePixiTask(
+        pixiTask: PixiTask,
+        targetEnvName?: string,
+        extraArgsOrRawArgs?: string[] | string,
+    ): Promise<void> {
         const envName = targetEnvName || pixiTask.default_environment;
         if (envName) {
             const envs = this.projectManager.getEnvironmentsForProject(pixiTask.projectPath);
@@ -319,11 +331,23 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
             }
         }
 
-        const combinedArgs = extraArgs ? [...(pixiTask.args || []), ...extraArgs] : pixiTask.args;
+        let rawArgs = pixiTask.rawArgs;
+        let args = pixiTask.args;
+
+        if (typeof extraArgsOrRawArgs === 'string') {
+            const trimmed = extraArgsOrRawArgs.trim();
+            if (trimmed) {
+                rawArgs = rawArgs ? `${rawArgs} ${trimmed}` : trimmed;
+            }
+        } else if (Array.isArray(extraArgsOrRawArgs) && extraArgsOrRawArgs.length > 0) {
+            args = args ? [...args, ...extraArgsOrRawArgs] : extraArgsOrRawArgs;
+        }
+
         const taskToRun: PixiTask = {
             ...pixiTask,
             ...(targetEnvName ? { default_environment: targetEnvName } : {}),
-            ...(combinedArgs ? { args: combinedArgs } : {}),
+            ...(rawArgs !== undefined ? { rawArgs } : {}),
+            ...(args !== undefined ? { args } : {}),
         };
         const vsTask = await this.createVsCodeTask(taskToRun);
         await tasks.executeTask(vsTask);
@@ -364,6 +388,20 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
             return;
         }
 
-        await this.executePixiTask(selectedTask, selectedEnvItem.envName);
+        const inputArgs = await promptForTaskArgs(selectedTask.name, selectedEnvItem.envName);
+        if (inputArgs === undefined) {
+            return;
+        }
+
+        await this.executePixiTask(selectedTask, selectedEnvItem.envName, inputArgs.trim() || undefined);
     }
+}
+
+export async function promptForTaskArgs(taskName: string, envName?: string): Promise<string | undefined> {
+    const envDesc = envName ? ` in environment '${envName}'` : '';
+    return window.showInputBox({
+        title: `Pixi: Run Task '${taskName}'${envDesc}`,
+        prompt: `Additional arguments for '${taskName}' (optional, press Enter to run without arguments)`,
+        placeHolder: 'e.g. -k "test_login" --verbose',
+    });
 }

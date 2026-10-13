@@ -5,6 +5,13 @@ All notable changes to the "pixi" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- **Task Execution with Command-Line Arguments**:
+    - Support passing custom arguments directly to tasks via unified command-line execution (`ShellExecution`), preserving quotes, flags, and parameters without lossy parsing.
+    - Consolidate argument prompting into `pixi.runTask`, `pixi.runTaskWithArgs`, and `pixi.runTaskInEnvironment` with clean, optional input prompts.
+    - Add `Run Task with Arguments ...` action to Tasks tree view (inline & context menu) and manifest Hover / CodeLens actions.
+
 ## [1.6.4] - 2026-10-13
 
 - **Private Registry & Credentials Management (`pixi auth`)**:
