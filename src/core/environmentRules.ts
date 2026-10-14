@@ -118,6 +118,27 @@ export function getEnvironmentStatusBadge(status?: string): { icon: string; text
 }
 
 /**
+ * Minimal interface representing an environment with status information.
+ */
+export interface EnvironmentLike {
+    pixiEnvName: string;
+    projectPath: string;
+    pixiStatus: string;
+    statusReason?: string;
+}
+
+export interface EnsureEnvironmentOptions {
+    /** The action name/description to display in error messages, e.g. "open terminal for environment" */
+    action?: string;
+    /** The target environment name to display in messages (defaults to env.pixiEnvName) */
+    targetName?: string;
+    /** Custom installation prompt message for uninstalled environments */
+    customInstallPrompt?: string;
+    /** Custom project path or Uri (defaults to env.projectPath) */
+    projectPath?: string | Uri;
+}
+
+/**
  * Prompts the user to install an uninstalled Pixi environment and executes 'pixi.install'.
  */
 export async function promptToInstallEnvironment(
@@ -133,5 +154,43 @@ export async function promptToInstallEnvironment(
         void commands.executeCommand('pixi.install', folder, envName);
         return true;
     }
+    return false;
+}
+
+/**
+ * Unified environment readiness guard for the entire extension:
+ * - If the environment is 'installed', returns true.
+ * - If the environment is 'incompatible', displays a standardized error message and returns false.
+ * - If the environment is 'uninstalled', prompts the user to install it and returns false.
+ */
+export async function ensureEnvironmentReady(
+    env: EnvironmentLike | undefined,
+    options?: EnsureEnvironmentOptions,
+): Promise<boolean> {
+    if (!env) {
+        return false;
+    }
+
+    if (env.pixiStatus === 'installed') {
+        return true;
+    }
+
+    const name = options?.targetName || env.pixiEnvName;
+
+    if (env.pixiStatus === 'incompatible') {
+        const actionPrefix = options?.action ? `Cannot ${options.action}` : 'Cannot use environment';
+        const reason = env.statusReason || 'The environment is incompatible with the current platform.';
+        void window.showErrorMessage(`${actionPrefix} '${name}': ${reason}`);
+        return false;
+    }
+
+    if (env.pixiStatus === 'uninstalled') {
+        const prompt =
+            options?.customInstallPrompt ||
+            `Environment '${name}' is not installed yet on disk. Would you like to install it now?`;
+        await promptToInstallEnvironment(env.pixiEnvName, options?.projectPath ?? env.projectPath, prompt);
+        return false;
+    }
+
     return false;
 }

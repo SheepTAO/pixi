@@ -21,9 +21,9 @@ import { getPixi } from '../../cli/pixiCli';
 import { traceVerbose } from '../../common/logging';
 import { getWorkspacePersistentState } from '../../common/persistentState';
 import {
+    ensureEnvironmentReady,
     getDefaultEnvironment,
     matchEnvironmentForUri,
-    promptToInstallEnvironment,
     sortPixiEnvironments,
 } from '../../core/environmentRules';
 import { PixiProjectManager } from '../../core/projectManager';
@@ -303,17 +303,14 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
     async set(scope: SetEnvironmentScope, environment?: PythonEnvironment): Promise<void> {
         const pyEnv = environment as PixiPythonEnvironment | undefined;
         if (pyEnv) {
-            if (pyEnv.pixiStatus === 'uninstalled') {
-                const targetFolder = scope instanceof Uri ? scope : Array.isArray(scope) ? scope[0] : undefined;
-                void promptToInstallEnvironment(pyEnv.pixiEnvName, targetFolder ?? pyEnv.projectPath);
-                return;
-            }
-
-            if (pyEnv.pixiStatus === 'incompatible') {
-                const reason =
-                    pyEnv.statusReason ||
-                    'The environment is incompatible with the current platform or missing Python.';
-                void window.showErrorMessage(`Cannot activate environment '${pyEnv.displayName}': ${reason}`);
+            const targetFolder = scope instanceof Uri ? scope : Array.isArray(scope) ? scope[0] : undefined;
+            if (
+                !(await ensureEnvironmentReady(pyEnv, {
+                    action: 'activate environment',
+                    targetName: pyEnv.displayName,
+                    projectPath: targetFolder ?? pyEnv.projectPath,
+                }))
+            ) {
                 return;
             }
 

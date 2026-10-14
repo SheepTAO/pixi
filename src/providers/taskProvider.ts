@@ -20,7 +20,7 @@ import { getPixi, runPixi } from '../cli/pixiCli';
 import { toEnvQuickPickItem } from '../commands/workspace/common';
 import { quoteStringIfNecessary, safeJsonParse } from '../common/execUtils';
 import { traceError, traceVerbose } from '../common/logging';
-import { promptToInstallEnvironment } from '../core/environmentRules';
+import { ensureEnvironmentReady } from '../core/environmentRules';
 import { PixiProjectManager } from '../core/projectManager';
 
 export const DEFAULT_TASK_PREFIX_SEPARATORS = ['-', '_', ':', '::'];
@@ -322,17 +322,13 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
         if (envName) {
             const envs = this.projectManager.getEnvironmentsForProject(pixiTask.projectPath);
             const env = envs.find((e) => e.pixiEnvName === envName);
-            if (env?.pixiStatus === 'incompatible') {
-                const reason = env.statusReason || 'The environment is incompatible with the platform.';
-                window.showErrorMessage(`Cannot run task '${pixiTask.name}' in environment '${envName}': ${reason}`);
-                return;
-            }
-            if (env?.pixiStatus === 'uninstalled') {
-                await promptToInstallEnvironment(
-                    envName,
-                    env.projectPath,
-                    `Environment '${envName}' required by task '${pixiTask.name}' is not installed yet on disk. Would you like to install it now?`,
-                );
+            if (
+                env &&
+                !(await ensureEnvironmentReady(env, {
+                    action: `run task '${pixiTask.name}' in environment`,
+                    customInstallPrompt: `Environment '${envName}' required by task '${pixiTask.name}' is not installed yet on disk. Would you like to install it now?`,
+                }))
+            ) {
                 return;
             }
         }

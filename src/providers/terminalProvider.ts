@@ -15,7 +15,7 @@ import {
 import { getPixi } from '../cli/pixiCli';
 import { normalizeFolderPath } from '../common/execUtils';
 import { traceError, traceVerbose } from '../common/logging';
-import { getEnvironmentStatusBadge, promptToInstallEnvironment, sortPixiEnvironments } from '../core/environmentRules';
+import { ensureEnvironmentReady, getEnvironmentStatusBadge, sortPixiEnvironments } from '../core/environmentRules';
 import { PixiProjectManager } from '../core/projectManager';
 import { PixiEnvironmentInfo } from '../core/types';
 
@@ -37,19 +37,6 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
 
     public dispose(): void {
         Disposable.from(...this.disposables).dispose();
-    }
-
-    private async handleUninstalledOrError(env: PixiEnvironmentInfo): Promise<boolean> {
-        if (env.pixiStatus === 'uninstalled') {
-            await promptToInstallEnvironment(env.pixiEnvName, env.projectPath);
-            return true;
-        }
-        if (env.pixiStatus === 'incompatible') {
-            const reason = env.statusReason || 'The environment is incompatible with the current platform.';
-            window.showErrorMessage(`Cannot open terminal for environment '${env.pixiEnvName}': ${reason}`);
-            return true;
-        }
-        return false;
     }
 
     private async pickEnvironment(
@@ -137,7 +124,7 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
         traceVerbose('Terminal profile requested for Pixi');
         try {
             const env = await this.pickEnvironment(token);
-            if (!env || (await this.handleUninstalledOrError(env))) {
+            if (!env || !(await ensureEnvironmentReady(env, { action: 'open terminal for environment' }))) {
                 return undefined;
             }
 
@@ -160,7 +147,7 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
                     : undefined;
                 env = await this.pickEnvironment(undefined, targetProjectPath);
             }
-            if (!env || (await this.handleUninstalledOrError(env))) {
+            if (!env || !(await ensureEnvironmentReady(env, { action: 'open terminal for environment' }))) {
                 return;
             }
 
