@@ -219,10 +219,7 @@ export interface ValidateIdentifierOptions {
     allowDefault?: boolean;
 }
 
-export function validatePixiIdentifier(
-    value: string | undefined,
-    options?: ValidateIdentifierOptions,
-): string | null {
+export function validatePixiIdentifier(value: string | undefined, options?: ValidateIdentifierOptions): string | null {
     const trimmed = value?.trim();
     const entity = options?.entityName || 'Identifier';
     if (!trimmed) {
@@ -750,7 +747,7 @@ export async function pickPixiEnvironment(
         const { icon, text } = getEnvironmentStatusBadge(env.pixiStatus);
         return {
             label: `${icon} ${env.pixiEnvName}`,
-            description: text ? `${env.projectName} ${text}` : env.projectName,
+            description: text,
             detail: env.statusReason || env.prefix,
             env,
         };

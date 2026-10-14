@@ -17,7 +17,13 @@ import { traceError, traceVerbose } from '../common/logging';
 import { getWorkspacePersistentState } from '../common/persistentState';
 import { getDefaultEnvironment, matchEnvironmentForUri, sortPixiEnvironments } from './environmentRules';
 import { listPixiPackages } from './packageManager';
-import { findManifestPath, isPixiProject, resolvePixiProjectPaths } from './projectDiscovery';
+import {
+    findManifestPath,
+    getProjectKey,
+    isPixiProject,
+    isPyproject,
+    resolvePixiProjectPaths,
+} from './projectDiscovery';
 import { scanEnvironmentToolchains } from './toolchains';
 import { PixiEnvironmentInfo, PixiEnvironmentStatus, PixiInfo, PixiPackage, PixiProject } from './types';
 
@@ -52,7 +58,7 @@ export class PixiProjectManager implements Disposable {
                 for (const u of uris) {
                     const filePath = path.normalize(u.fsPath);
                     const projectDir = this.findProjectForUri(u);
-                    if (path.basename(filePath) === 'pyproject.toml') {
+                    if (isPyproject(filePath)) {
                         const knownManifest = projectDir ? this.getManifestPath(projectDir) : undefined;
                         const isKnownManifest =
                             knownManifest !== undefined && path.normalize(knownManifest) === filePath;
@@ -112,7 +118,7 @@ export class PixiProjectManager implements Disposable {
     }
 
     public getManifestPath(projectPath: string): string | undefined {
-        const envs = this.projectToEnvs.get(path.normalize(projectPath));
+        const envs = this.projectToEnvs.get(getProjectKey(projectPath));
         if (envs && envs.length > 0 && envs[0].manifestPath) {
             return envs[0].manifestPath;
         }
@@ -120,9 +126,8 @@ export class PixiProjectManager implements Disposable {
     }
 
     public getProjectName(projectPath: string): string {
-        const normalized = path.normalize(projectPath);
-        const envs = this.projectToEnvs.get(normalized);
-        return (envs && envs.length > 0 && envs[0].projectName) || path.basename(normalized);
+        const envs = this.projectToEnvs.get(getProjectKey(projectPath));
+        return (envs && envs.length > 0 && envs[0].projectName) || path.basename(path.normalize(projectPath));
     }
 
     public getProjects(): PixiProject[] {
@@ -137,29 +142,23 @@ export class PixiProjectManager implements Disposable {
     }
 
     public getEnvironmentsForProject(projectPath: string): PixiEnvironmentInfo[] {
-        const normalized = path.normalize(projectPath);
-        return this.projectToEnvs.get(normalized) || [];
+        return this.projectToEnvs.get(getProjectKey(projectPath)) || [];
     }
 
     public getAllEnvironments(): PixiEnvironmentInfo[] {
         return Array.from(this.projectToEnvs.values()).flat();
     }
 
-    private getProjectKey(projectPath: string): string {
-        const normalized = path.normalize(projectPath);
-        return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
-    }
-
     public clearPackagesCache(projectPath?: string): void {
         if (projectPath) {
-            this.packagesCache.delete(this.getProjectKey(projectPath));
+            this.packagesCache.delete(getProjectKey(projectPath));
         } else {
             this.packagesCache.clear();
         }
     }
 
     public async getPackagesForEnvironment(envName: string, projectPath: string): Promise<PixiPackage[]> {
-        const projectKey = this.getProjectKey(projectPath);
+        const projectKey = getProjectKey(projectPath);
         let projectMap = this.packagesCache.get(projectKey);
         if (!projectMap) {
             projectMap = new Map<string, Promise<PixiPackage[]>>();
@@ -288,7 +287,7 @@ export class PixiProjectManager implements Disposable {
 
             if (!pixiInfo.project_info) {
                 traceVerbose(`No project_info returned from pixi info for ${normalized}`);
-                this.projectToEnvs.set(normalized, []);
+                this.projectToEnvs.set(getProjectKey(normalized), []);
                 return;
             }
 
@@ -343,10 +342,10 @@ export class PixiProjectManager implements Disposable {
                 }),
             );
 
-            this.projectToEnvs.set(normalized, sortPixiEnvironments(envs));
+            this.projectToEnvs.set(getProjectKey(normalized), sortPixiEnvironments(envs));
         } catch (error) {
             traceError(`Failed to refresh Pixi project at ${normalized}:`, error);
-            this.projectToEnvs.set(normalized, []);
+            this.projectToEnvs.set(getProjectKey(normalized), []);
         }
     }
 

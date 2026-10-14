@@ -20,6 +20,7 @@ import {
 
 import { CONDA_PLATFORM_PRESETS } from '../commands/workspace/platformCommands';
 import { traceError, traceVerbose } from '../common/logging';
+import { isPyproject, MANIFEST_SELECTORS } from '../core/projectDiscovery';
 
 interface SchemaProperty {
     description?: string;
@@ -60,14 +61,9 @@ export class PixiManifestSchemaProvider implements CompletionItemProvider, Hover
     private schemaLoadingPromise?: Promise<ManifestSchemaMetadata | null>;
 
     constructor(private readonly context: ExtensionContext) {
-        const selectors = [
-            { scheme: 'file', pattern: '**/pixi.toml' },
-            { scheme: 'file', pattern: '**/pyproject.toml' },
-        ];
-
         this.disposables.push(
-            languages.registerCompletionItemProvider(selectors, this, '[', '.', '"', "'", '=', ',', ' '),
-            languages.registerHoverProvider(selectors, this),
+            languages.registerCompletionItemProvider(MANIFEST_SELECTORS, this, '[', '.', '"', "'", '=', ',', ' '),
+            languages.registerHoverProvider(MANIFEST_SELECTORS, this),
         );
     }
 
@@ -145,7 +141,7 @@ export class PixiManifestSchemaProvider implements CompletionItemProvider, Hover
         const lineText = line.text;
         const textBeforeCursor = lineText.substring(0, position.character).trimStart();
         const beforeCursor = lineText.substring(0, position.character);
-        const isPyproject = path.basename(document.fileName) === 'pyproject.toml';
+        const isPyprojectDoc = isPyproject(document);
 
         const buildArrayCompletions = (items: Array<{ label: string; detail: string }>, arrayName: string) => {
             const lastQuoteIdx = Math.max(beforeCursor.lastIndexOf('"'), beforeCursor.lastIndexOf("'"));
@@ -184,7 +180,7 @@ export class PixiManifestSchemaProvider implements CompletionItemProvider, Hover
         };
 
         const activeSection = this.getActiveSection(document, position.line);
-        const isInPixiSection = !isPyproject || Boolean(activeSection?.startsWith('tool.pixi'));
+        const isInPixiSection = !isPyprojectDoc || Boolean(activeSection?.startsWith('tool.pixi'));
 
         if (isInPixiSection && this.isInsideArray(document, position, 'channels')) {
             return buildArrayCompletions(COMMON_CHANNELS, 'Conda channel');
@@ -195,15 +191,15 @@ export class PixiManifestSchemaProvider implements CompletionItemProvider, Hover
         }
 
         const shouldOfferSections = textBeforeCursor.startsWith('[')
-            ? !isPyproject ||
+            ? !isPyprojectDoc ||
               isInPixiSection ||
               textBeforeCursor.startsWith('[tool') ||
               document.getText().includes('[tool.pixi')
-            : !isPyproject && textBeforeCursor === '' && !activeSection;
+            : !isPyprojectDoc && textBeforeCursor === '' && !activeSection;
 
         if (shouldOfferSections) {
             const items: CompletionItem[] = [];
-            const prefix = isPyproject ? 'tool.pixi.' : '';
+            const prefix = isPyprojectDoc ? 'tool.pixi.' : '';
 
             // Swallow auto-closed ']' after cursor to avoid duplicate brackets
             const hasLeadingBracket = textBeforeCursor.startsWith('[');
@@ -217,7 +213,7 @@ export class PixiManifestSchemaProvider implements CompletionItemProvider, Hover
             const sectionSnippets: Array<{ name: string; snippet: string; doc?: string }> = [
                 {
                     name: `${prefix}workspace`,
-                    snippet: isPyproject
+                    snippet: isPyprojectDoc
                         ? '[tool.pixi.workspace]\nchannels = ["conda-forge"]\nplatforms = ["linux-64"]'
                         : '[workspace]\nname = "${1:my-project}"\nchannels = ["conda-forge"]\nplatforms = ["linux-64"]',
                     doc: 'Workspace metadata and global project settings',
@@ -362,9 +358,9 @@ export class PixiManifestSchemaProvider implements CompletionItemProvider, Hover
             return undefined;
         }
 
-        const isPyproject = path.basename(document.fileName) === 'pyproject.toml';
+        const isPyprojectDoc = isPyproject(document);
         const activeSection = this.getActiveSection(document, position.line);
-        if (isPyproject && (!activeSection || !activeSection.startsWith('tool.pixi'))) {
+        if (isPyprojectDoc && (!activeSection || !activeSection.startsWith('tool.pixi'))) {
             return undefined;
         }
         const normalizedSection = (activeSection || '').replace(/^tool\.pixi\./, '');

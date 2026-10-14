@@ -80,9 +80,7 @@ export function registerTaskCommands(manager: PixiProjectManager, taskProvider: 
 
                 const targetTask = await resolveTargetTask(manager, taskProvider, targetItem, {
                     title: promptArgs ? 'Pixi: Run Task with Arguments' : 'Pixi: Run Task',
-                    placeHolder: promptArgs
-                        ? 'Select a Pixi task to run with arguments'
-                        : 'Select a Pixi task to run',
+                    placeHolder: promptArgs ? 'Select a Pixi task to run with arguments' : 'Select a Pixi task to run',
                     projectPlaceHolder: 'Select Pixi project to run task in',
                 });
                 if (!targetTask) {

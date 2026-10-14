@@ -1,6 +1,33 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { workspace } from 'vscode';
+import { DocumentFilter, TextDocument, Uri, workspace } from 'vscode';
+
+/**
+ * Standard document filter selectors for Pixi and pyproject manifests.
+ */
+export const MANIFEST_SELECTORS: readonly DocumentFilter[] = [
+    { scheme: 'file', pattern: '**/pixi.toml' },
+    { scheme: 'file', pattern: '**/pyproject.toml' },
+];
+
+/**
+ * Checks if a document, Uri, or file path corresponds to a pyproject.toml manifest.
+ */
+export function isPyproject(target?: TextDocument | Uri | string | null): boolean {
+    if (!target) {
+        return false;
+    }
+    const p = typeof target === 'string' ? target : 'uri' in target ? target.uri.fsPath : target.fsPath;
+    return path.basename(p) === 'pyproject.toml';
+}
+
+/**
+ * Generates a normalized project key for map caching, taking into account OS path casing.
+ */
+export function getProjectKey(projectPath: string): string {
+    const normalized = path.normalize(projectPath).replace(/[/\\]+$/, '');
+    return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
+}
 
 /**
  * Checks if a directory is a Pixi project.

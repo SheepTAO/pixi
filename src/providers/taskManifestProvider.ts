@@ -1,10 +1,8 @@
-import * as path from 'path';
 import {
     CancellationToken,
     CodeLens,
     CodeLensProvider,
     Disposable,
-    DocumentFilter,
     Event,
     EventEmitter,
     Hover,
@@ -18,6 +16,7 @@ import {
 } from 'vscode';
 
 import { encodeCommandArg } from '../common/execUtils';
+import { isPyproject, MANIFEST_SELECTORS } from '../core/projectDiscovery';
 import { PixiProjectManager } from '../core/projectManager';
 import { PixiTask, PixiTaskProvider } from './taskProvider';
 
@@ -51,13 +50,9 @@ export class PixiTaskManifestProvider implements CodeLensProvider, HoverProvider
         private readonly projectManager: PixiProjectManager,
         private readonly taskProvider: PixiTaskProvider,
     ) {
-        const selectors: DocumentFilter[] = [
-            { scheme: 'file', pattern: '**/pixi.toml' },
-            { scheme: 'file', pattern: '**/pyproject.toml' },
-        ];
         this.disposables.push(
-            languages.registerCodeLensProvider(selectors, this),
-            languages.registerHoverProvider(selectors, this),
+            languages.registerCodeLensProvider(MANIFEST_SELECTORS, this),
+            languages.registerHoverProvider(MANIFEST_SELECTORS, this),
             this.taskProvider.onDidChangeTasks(() => this.refresh()),
             workspace.onDidChangeConfiguration((e) => {
                 if (e.affectsConfiguration('pixi.tasks.manifestActions')) {
@@ -269,7 +264,7 @@ export class PixiTaskManifestProvider implements CodeLensProvider, HoverProvider
     }
 
     private parseManifestTasks(document: TextDocument): ParsedManifestResult {
-        const isPyproject = path.basename(document.uri.fsPath) === 'pyproject.toml';
+        const isPyprojectDoc = isPyproject(document);
         const tasks: ParsedTaskLine[] = [];
         const sections: ParsedTaskSection[] = [];
         const lineCount = document.lineCount;
@@ -298,7 +293,7 @@ export class PixiTaskManifestProvider implements CodeLensProvider, HoverProvider
                 isTasksContainer = false;
                 currentEnv = undefined;
 
-                if (isPyproject && !currentSection.startsWith('tool.pixi.')) {
+                if (isPyprojectDoc && !currentSection.startsWith('tool.pixi.')) {
                     continue;
                 }
 

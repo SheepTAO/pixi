@@ -6,7 +6,6 @@ import {
     Definition,
     DefinitionProvider,
     Disposable,
-    DocumentFilter,
     Event,
     EventEmitter,
     Hover,
@@ -28,6 +27,7 @@ import {
 import { PixiExtensionApi } from '../api';
 import { encodeCommandArg, escapeRegex, normalizeFolderPath, revealRangeInEditor } from '../common/execUtils';
 import { normalizePkgName } from '../core/packageManager';
+import { isPyproject, MANIFEST_SELECTORS } from '../core/projectDiscovery';
 import { PixiProjectManager } from '../core/projectManager';
 import { PixiPackage } from '../core/types';
 
@@ -166,15 +166,10 @@ export class PixiDependencyManifestProvider
         private readonly projectManager: PixiProjectManager,
         pixiApi: PixiExtensionApi,
     ) {
-        const selectors: DocumentFilter[] = [
-            { scheme: 'file', pattern: '**/pixi.toml' },
-            { scheme: 'file', pattern: '**/pyproject.toml' },
-        ];
-
         this.disposables.push(
-            languages.registerInlayHintsProvider(selectors, this),
-            languages.registerHoverProvider(selectors, this),
-            languages.registerDefinitionProvider(selectors, this),
+            languages.registerInlayHintsProvider(MANIFEST_SELECTORS, this),
+            languages.registerHoverProvider(MANIFEST_SELECTORS, this),
+            languages.registerDefinitionProvider(MANIFEST_SELECTORS, this),
             this.projectManager.onDidChangeEnvironments(() => this.refresh()),
             pixiApi.onDidChangeActiveEnvironment(() => this.refresh()),
             workspace.onDidChangeConfiguration((e) => {
@@ -210,7 +205,7 @@ export class PixiDependencyManifestProvider
      * Parses all dependency entries from pixi.toml or pyproject.toml.
      */
     public parseManifestDependencies(document: TextDocument): ParsedDependency[] {
-        const isPyproject = path.basename(document.fileName) === 'pyproject.toml';
+        const isPyprojectDoc = isPyproject(document);
         const lineCount = document.lineCount;
         let currentSection = '';
         let inArrayBlock = false;
@@ -272,7 +267,7 @@ export class PixiDependencyManifestProvider
 
             // Standard Pixi table dependencies
             if (
-                (!isPyproject || currentSection.startsWith('tool.pixi.')) &&
+                (!isPyprojectDoc || currentSection.startsWith('tool.pixi.')) &&
                 KV_DEP_SECTION_REGEX.test(currentSection)
             ) {
                 const kvMatch = codeLine.match(KV_DEP_REGEX);

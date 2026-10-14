@@ -20,6 +20,7 @@ import {
     normalizePkgName,
     sortPixiPackages,
 } from '../core/packageManager';
+import { getProjectKey } from '../core/projectDiscovery';
 import { PixiProjectManager } from '../core/projectManager';
 import { PixiEnvironmentInfo, PixiPackage, PixiProject } from '../core/types';
 
@@ -375,19 +376,21 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
     }
 
     private getProjectFeatures(projectPath: string): Promise<WorkspaceListEntry[]> {
-        let promise = this.featuresCache.get(projectPath);
+        const key = getProjectKey(projectPath);
+        let promise = this.featuresCache.get(key);
         if (!promise) {
             promise = getWorkspaceFeatures(projectPath);
-            this.featuresCache.set(projectPath, promise);
+            this.featuresCache.set(key, promise);
         }
         return promise;
     }
 
     private getProjectWorkspaceEnvs(projectPath: string): Promise<WorkspaceListEntry[]> {
-        let promise = this.envsCache.get(projectPath);
+        const key = getProjectKey(projectPath);
+        let promise = this.envsCache.get(key);
         if (!promise) {
             promise = getWorkspaceEnvironments(projectPath);
-            this.envsCache.set(projectPath, promise);
+            this.envsCache.set(key, promise);
         }
         return promise;
     }

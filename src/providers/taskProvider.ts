@@ -21,6 +21,7 @@ import { resolveReadyEnvironment } from '../commands/workspace/common';
 import { quoteStringIfNecessary, safeJsonParse } from '../common/execUtils';
 import { traceError, traceVerbose } from '../common/logging';
 import { ensureEnvironmentReady } from '../core/environmentRules';
+import { getProjectKey } from '../core/projectDiscovery';
 import { PixiProjectManager } from '../core/projectManager';
 
 export const DEFAULT_TASK_PREFIX_SEPARATORS = ['-', '_', ':', '::'];
@@ -91,14 +92,9 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
         );
     }
 
-    private getProjectKey(projectPath: string): string {
-        const normalized = path.normalize(projectPath);
-        return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
-    }
-
     public refresh(projectPath?: string): void {
         if (projectPath) {
-            this.taskCache.delete(this.getProjectKey(projectPath));
+            this.taskCache.delete(getProjectKey(projectPath));
         } else {
             this.taskCache.clear();
         }
@@ -153,7 +149,7 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
     }
 
     async getTasksForProject(projectPath: string): Promise<PixiTask[]> {
-        const projectKey = this.getProjectKey(projectPath);
+        const projectKey = getProjectKey(projectPath);
         let promise = this.taskCache.get(projectKey);
         if (!promise) {
             const normalized = path.normalize(projectPath);
