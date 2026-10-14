@@ -46,13 +46,6 @@ export function setCachedAuthDir(dir?: string): void {
 }
 
 /**
- * Returns the currently cached credentials directory or file path.
- */
-export function getCachedAuthDir(): string | undefined {
-    return _cachedAuthDir;
-}
-
-/**
  * Resolves the credentials.json path from an optional authDir, cached dir, or system default (~/.rattler/credentials.json).
  */
 export function resolveCredentialsPath(authDir?: string): string {

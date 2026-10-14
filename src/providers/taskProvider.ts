@@ -91,9 +91,14 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
         );
     }
 
+    private getProjectKey(projectPath: string): string {
+        const normalized = path.normalize(projectPath);
+        return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
+    }
+
     public refresh(projectPath?: string): void {
         if (projectPath) {
-            this.taskCache.delete(path.normalize(projectPath));
+            this.taskCache.delete(this.getProjectKey(projectPath));
         } else {
             this.taskCache.clear();
         }
@@ -148,17 +153,18 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
     }
 
     async getTasksForProject(projectPath: string): Promise<PixiTask[]> {
-        const normalized = path.normalize(projectPath);
-        let promise = this.taskCache.get(normalized);
+        const projectKey = this.getProjectKey(projectPath);
+        let promise = this.taskCache.get(projectKey);
         if (!promise) {
+            const normalized = path.normalize(projectPath);
             promise = runPixi(['task', 'list', '--json'], { cwd: normalized })
                 .then((stdout) => this.parsePixiTasksJson(stdout, normalized))
                 .catch((err) => {
-                    this.taskCache.delete(normalized);
+                    this.taskCache.delete(projectKey);
                     traceVerbose(`Could not load tasks for ${normalized}:`, err);
                     return [];
                 });
-            this.taskCache.set(normalized, promise);
+            this.taskCache.set(projectKey, promise);
         }
         return promise;
     }
