@@ -103,8 +103,6 @@ export function safeJsonParse<T>(text: string, fallback?: T): T {
 interface PathContextCandidate {
     projectPath?: string;
     project?: { projectPath?: string };
-    env?: { projectPath?: string };
-    task?: { projectPath?: string };
     fsPath?: string;
 }
 
@@ -123,7 +121,7 @@ export function normalizeLocationPath(target?: unknown): string | undefined {
     }
     if (typeof target === 'object') {
         const t = target as PathContextCandidate;
-        return t.projectPath || t.project?.projectPath || t.env?.projectPath || t.task?.projectPath || t.fsPath;
+        return t.projectPath || t.project?.projectPath || t.fsPath;
     }
     return undefined;
 }

@@ -24,7 +24,7 @@ import { PixiEnvironmentInfo, PixiEnvironmentStatus, PixiInfo, PixiPackage, Pixi
 export class PixiProjectManager implements Disposable {
     private projectPaths: string[] = [];
     private projectToEnvs = new Map<string, PixiEnvironmentInfo[]>();
-    private readonly packagesCache = new Map<string, Promise<PixiPackage[]>>();
+    private readonly packagesCache = new Map<string, Map<string, Promise<PixiPackage[]>>>();
     private readonly disposables: Disposable[] = [];
 
     private readonly _onDidProjectsChanged = new EventEmitter<string[]>();
@@ -140,26 +140,28 @@ export class PixiProjectManager implements Disposable {
         return Array.from(this.projectToEnvs.values()).flat();
     }
 
+    private getProjectKey(projectPath: string): string {
+        const normalized = path.normalize(projectPath);
+        return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
+    }
+
     public clearPackagesCache(projectPath?: string): void {
         if (projectPath) {
-            const normalized = path.normalize(projectPath);
-            const isWindows = process.platform === 'win32';
-            const targetPrefix = isWindows ? (normalized + ':').toLowerCase() : normalized + ':';
-
-            for (const key of this.packagesCache.keys()) {
-                const compKey = isWindows ? key.toLowerCase() : key;
-                if (compKey.startsWith(targetPrefix)) {
-                    this.packagesCache.delete(key);
-                }
-            }
+            this.packagesCache.delete(this.getProjectKey(projectPath));
         } else {
             this.packagesCache.clear();
         }
     }
 
     public async getPackagesForEnvironment(envName: string, projectPath: string): Promise<PixiPackage[]> {
-        const cacheKey = `${path.normalize(projectPath)}:${envName}`;
-        const cached = this.packagesCache.get(cacheKey);
+        const projectKey = this.getProjectKey(projectPath);
+        let projectMap = this.packagesCache.get(projectKey);
+        if (!projectMap) {
+            projectMap = new Map<string, Promise<PixiPackage[]>>();
+            this.packagesCache.set(projectKey, projectMap);
+        }
+
+        const cached = projectMap.get(envName);
         if (cached) {
             return cached;
         }
@@ -167,7 +169,7 @@ export class PixiProjectManager implements Disposable {
         const env = this.getEnvironmentsForProject(projectPath).find((e) => e.pixiEnvName === envName);
         if (env && env.pixiStatus === 'incompatible') {
             const empty = Promise.resolve([]);
-            this.packagesCache.set(cacheKey, empty);
+            projectMap.set(envName, empty);
             return empty;
         }
 
@@ -175,7 +177,7 @@ export class PixiProjectManager implements Disposable {
             traceVerbose(`Loaded ${pkgs.length} packages for environment '${envName}' in ${projectPath}`);
             return pkgs;
         });
-        this.packagesCache.set(cacheKey, promise);
+        projectMap.set(envName, promise);
         return promise;
     }
 
@@ -291,15 +293,16 @@ export class PixiProjectManager implements Disposable {
 
             const envs: PixiEnvironmentInfo[] = await Promise.all(
                 (pixiInfo.environments_info || []).map(async (rawEnv) => {
-                    const platformNames = (rawEnv.platforms || []).map((p) => (typeof p === 'string' ? p : p.name));
+                    const platforms = rawEnv.platforms || [];
+                    const platformNames = platforms.map((p) => (typeof p === 'string' ? p : p.name));
                     const isDeclaredForHost =
                         !currentPlatform ||
-                        (rawEnv.platforms || []).length === 0 ||
+                        platforms.length === 0 ||
                         Boolean(rawEnv.resolved_platform) ||
-                        (rawEnv.platforms || []).some((p) =>
+                        platforms.some((p) =>
                             typeof p === 'string'
                                 ? p === currentPlatform
-                                : p.subdir === currentPlatform || p.name === currentPlatform,
+                                : p.name === currentPlatform || p.subdir === currentPlatform,
                         );
 
                     let status: PixiEnvironmentStatus;
