@@ -1,6 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import {
+    CancellationToken,
+    commands,
     ConfigurationTarget,
     QuickPickItem,
     QuickPickItemKind,
@@ -12,7 +14,7 @@ import {
 
 import { runPixi } from '../../cli/pixiCli';
 import { normalizeFolderPath, normalizeLocationPath } from '../../common/execUtils';
-import { getEnvironmentStatusBadge } from '../../core/environmentRules';
+import { ensureEnvironmentReady, getEnvironmentStatusBadge, sortPixiEnvironments } from '../../core/environmentRules';
 import { normalizePkgName } from '../../core/packageManager';
 import { PixiProjectManager } from '../../core/projectManager';
 import { PixiEnvironmentInfo, PixiPackage } from '../../core/types';
@@ -384,6 +386,7 @@ export async function promptNewFeatureName(existingFeatures: WorkspaceListEntry[
 export interface ExtractedCommandContext {
     projectPath?: string;
     manifestPath?: string;
+    env?: PixiEnvironmentInfo;
     envName?: string;
     pkg?: PixiPackage;
     featureName?: string;
@@ -409,6 +412,7 @@ export function extractCommandContext(target?: unknown): ExtractedCommandContext
     return {
         projectPath,
         manifestPath: item.project?.manifestPath,
+        env: item.env,
         envName: item.env?.pixiEnvName,
         pkg: item.pkg,
         featureName: item.featureName || item.feature?.name,
@@ -596,4 +600,118 @@ export async function resolveWorkspaceOrFeatureScope(
         return null;
     }
     return selected.featureName;
+}
+
+export interface PickEnvironmentOptions {
+    title?: string;
+    placeHolder?: string;
+    /** If true, returns immediately if there is only 1 environment (default: true) */
+    autoSelectSingle?: boolean;
+    /** Setting key to check for default environment (e.g. 'terminal.defaultEnvironment') */
+    defaultEnvConfigKey?: string;
+    token?: CancellationToken;
+}
+
+export async function pickPixiEnvironment(
+    manager: PixiProjectManager,
+    targetProjectPath?: string,
+    options?: PickEnvironmentOptions,
+): Promise<PixiEnvironmentInfo | undefined> {
+    const rawEnvs = targetProjectPath
+        ? manager.getEnvironmentsForProject(targetProjectPath)
+        : manager.getAllEnvironments();
+
+    if (rawEnvs.length === 0) {
+        const choice = await window.showWarningMessage(
+            'No Pixi environments found in current workspace. Would you like to initialize a Pixi project?',
+            'Initialize Project',
+        );
+        if (choice === 'Initialize Project') {
+            await commands.executeCommand('pixi.init');
+        }
+        return undefined;
+    }
+
+    const envs = sortPixiEnvironments(rawEnvs);
+
+    if (options?.autoSelectSingle !== false && envs.length === 1) {
+        return envs[0];
+    }
+
+    const activeUri = window.activeTextEditor?.document?.uri;
+    const configScope = targetProjectPath ? Uri.file(targetProjectPath) : activeUri;
+    const config = workspace.getConfiguration('pixi', configScope);
+    const defaultEnvSetting = options?.defaultEnvConfigKey
+        ? config.get<string>(options.defaultEnvConfigKey)?.trim()
+        : undefined;
+
+    if (defaultEnvSetting) {
+        const activeProjectPath = !targetProjectPath && activeUri ? manager.findProjectForUri(activeUri) : undefined;
+        const matching = envs.filter((e) => e.pixiEnvName === defaultEnvSetting);
+        const matchedEnv =
+            (activeProjectPath ? matching.find((e) => e.projectPath === activeProjectPath) : undefined) ??
+            (matching.length === 1 ? matching[0] : undefined);
+        if (matchedEnv) {
+            return matchedEnv;
+        }
+    }
+
+    interface FullEnvQuickPickItem extends QuickPickItem {
+        env: PixiEnvironmentInfo;
+    }
+
+    const items: FullEnvQuickPickItem[] = envs.map((env) => {
+        const { icon, text } = getEnvironmentStatusBadge(env.pixiStatus);
+        return {
+            label: `${icon} ${env.pixiEnvName}`,
+            description: text ? `${env.projectName} ${text}` : env.projectName,
+            detail: env.statusReason || env.prefix,
+            env,
+        };
+    });
+
+    const selected = await window.showQuickPick(
+        items,
+        {
+            placeHolder: options?.placeHolder || 'Select a Pixi environment',
+            title: options?.title || 'Pixi: Select Environment',
+        },
+        options?.token,
+    );
+
+    return selected?.env;
+}
+
+export interface ResolveEnvironmentOptions extends PickEnvironmentOptions {
+    /** Action description for error reporting in ensureEnvironmentReady, e.g. 'open terminal for environment' */
+    action: string;
+}
+
+/**
+ * All-in-one helper to resolve and guard a ready Pixi environment:
+ * 1. Extracts environment directly from targetItem (e.g. tree item context menu) if present.
+ * 2. If no environment context is provided, prompts the user via pickPixiEnvironment.
+ * 3. Enforces ensureEnvironmentReady on the resolved environment.
+ * 4. Returns the verified PixiEnvironmentInfo, or undefined if cancelled or not ready.
+ */
+export async function resolveReadyEnvironment(
+    manager: PixiProjectManager,
+    targetItem?: unknown,
+    options?: ResolveEnvironmentOptions,
+): Promise<PixiEnvironmentInfo | undefined> {
+    const ctx = extractCommandContext(targetItem);
+    let env = ctx.env;
+
+    if (!env) {
+        const folder = ctx.projectPath || normalizeFolderPath(targetItem);
+        const targetProjectPath = folder ? manager.findProjectForUri(Uri.file(folder)) || folder : undefined;
+        env = await pickPixiEnvironment(manager, targetProjectPath, options);
+    }
+
+    if (!env) {
+        return undefined;
+    }
+
+    const isReady = await ensureEnvironmentReady(env, { action: options?.action });
+    return isReady ? env : undefined;
 }

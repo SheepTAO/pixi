@@ -2,26 +2,18 @@ import {
     CancellationToken,
     commands,
     Disposable,
-    QuickPickItem,
     TerminalOptions,
     TerminalProfile,
     TerminalProfileProvider,
     ThemeIcon,
-    Uri,
     window,
-    workspace,
 } from 'vscode';
 
 import { getPixi } from '../cli/pixiCli';
-import { normalizeFolderPath } from '../common/execUtils';
+import { resolveReadyEnvironment } from '../commands/workspace/common';
 import { traceError, traceVerbose } from '../common/logging';
-import { ensureEnvironmentReady, getEnvironmentStatusBadge, sortPixiEnvironments } from '../core/environmentRules';
 import { PixiProjectManager } from '../core/projectManager';
 import { PixiEnvironmentInfo } from '../core/types';
-
-interface EnvQuickPickItem extends QuickPickItem {
-    env: PixiEnvironmentInfo;
-}
 
 export class PixiTerminalProvider implements TerminalProfileProvider, Disposable {
     private readonly disposables: Disposable[] = [];
@@ -37,69 +29,6 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
 
     public dispose(): void {
         Disposable.from(...this.disposables).dispose();
-    }
-
-    private async pickEnvironment(
-        token?: CancellationToken,
-        targetProjectPath?: string,
-    ): Promise<PixiEnvironmentInfo | undefined> {
-        const rawEnvs = targetProjectPath
-            ? this.projectManager.getEnvironmentsForProject(targetProjectPath)
-            : this.projectManager.getAllEnvironments();
-        if (rawEnvs.length === 0) {
-            const choice = await window.showWarningMessage(
-                'No Pixi environments found in current workspace. Would you like to initialize a Pixi project?',
-                'Initialize Project',
-            );
-            if (choice === 'Initialize Project') {
-                await commands.executeCommand('pixi.init');
-            }
-            return undefined;
-        }
-
-        const envs = sortPixiEnvironments(rawEnvs);
-
-        if (envs.length === 1) {
-            return envs[0];
-        }
-
-        const activeUri = window.activeTextEditor?.document?.uri;
-        const configScope = targetProjectPath ? Uri.file(targetProjectPath) : activeUri;
-        const config = workspace.getConfiguration('pixi', configScope);
-        const defaultEnvSetting = config.get<string>('terminal.defaultEnvironment')?.trim();
-
-        if (defaultEnvSetting) {
-            const activeProjectPath =
-                !targetProjectPath && activeUri ? this.projectManager.findProjectForUri(activeUri) : undefined;
-            const matching = envs.filter((e) => e.pixiEnvName === defaultEnvSetting);
-            const matchedEnv =
-                (activeProjectPath ? matching.find((e) => e.projectPath === activeProjectPath) : undefined) ??
-                (matching.length === 1 ? matching[0] : undefined);
-            if (matchedEnv) {
-                return matchedEnv;
-            }
-        }
-
-        const items: EnvQuickPickItem[] = envs.map((env) => {
-            const { icon, text } = getEnvironmentStatusBadge(env.pixiStatus);
-            return {
-                label: `${icon} ${env.pixiEnvName}`,
-                description: text ? `${env.projectName} ${text}` : env.projectName,
-                detail: env.statusReason || env.prefix,
-                env,
-            };
-        });
-
-        const selected = await window.showQuickPick(
-            items,
-            {
-                placeHolder: 'Select a Pixi environment for the terminal',
-                title: 'Pixi: Open Terminal',
-            },
-            token,
-        );
-
-        return selected?.env;
     }
 
     private async createTerminalOptions(env: PixiEnvironmentInfo): Promise<TerminalOptions> {
@@ -123,8 +52,14 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
     async provideTerminalProfile(token: CancellationToken): Promise<TerminalProfile | undefined> {
         traceVerbose('Terminal profile requested for Pixi');
         try {
-            const env = await this.pickEnvironment(token);
-            if (!env || !(await ensureEnvironmentReady(env, { action: 'open terminal for environment' }))) {
+            const env = await resolveReadyEnvironment(this.projectManager, undefined, {
+                action: 'open terminal for environment',
+                title: 'Pixi: Open Terminal',
+                placeHolder: 'Select a Pixi environment for the terminal',
+                defaultEnvConfigKey: 'terminal.defaultEnvironment',
+                token,
+            });
+            if (!env) {
                 return undefined;
             }
 
@@ -138,16 +73,13 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
 
     async openTerminal(target?: unknown): Promise<void> {
         try {
-            let env = (target as { env?: PixiEnvironmentInfo })?.env;
-
+            const env = await resolveReadyEnvironment(this.projectManager, target, {
+                action: 'open terminal for environment',
+                title: 'Pixi: Open Terminal',
+                placeHolder: 'Select a Pixi environment for the terminal',
+                defaultEnvConfigKey: 'terminal.defaultEnvironment',
+            });
             if (!env) {
-                const folder = normalizeFolderPath(target);
-                const targetProjectPath = folder
-                    ? this.projectManager.findProjectForUri(Uri.file(folder)) || folder
-                    : undefined;
-                env = await this.pickEnvironment(undefined, targetProjectPath);
-            }
-            if (!env || !(await ensureEnvironmentReady(env, { action: 'open terminal for environment' }))) {
                 return;
             }
 
