@@ -4,7 +4,7 @@ import { getHostCondaPlatform, runPixi } from '../../cli/pixiCli';
 import { runPixiWithProgress } from '../../cli/workspaceCli';
 import { safeJsonParse } from '../../common/execUtils';
 import { PixiProjectManager } from '../../core/projectManager';
-import { pickPixiProject, resolveWorkspaceOrFeatureScope } from './common';
+import { formatScope, pickPixiProject, resolveWorkspaceOrFeatureScope } from './common';
 
 export interface CondaPlatformPreset {
     name: string;
@@ -138,7 +138,7 @@ export function registerPlatformCommands(manager: PixiProjectManager): Disposabl
                 });
             }
 
-            const scopeLabel = targetFeature ? `feature '${targetFeature}'` : 'workspace';
+            const scopeLabel = formatScope(targetFeature);
             const selected = await window.showQuickPick(items, {
                 title: `Pixi: Configure Target Platforms (${scopeLabel})`,
                 placeHolder: 'Select target platforms to enable in this scope (Check/Uncheck)',

@@ -86,7 +86,14 @@ export function getScopeArgs(scope?: TargetScope): string[] {
     return [];
 }
 
-export function formatScopeLabel(scope: TargetScope): string {
+export function formatScope(scope?: TargetScope | string): string {
+    if (!scope) {
+        return 'workspace';
+    }
+    if (typeof scope === 'string') {
+        const trimmed = scope.trim();
+        return !trimmed || trimmed === 'default' ? 'workspace' : `feature '${trimmed}'`;
+    }
     if (scope.kind === 'feature' && scope.name) {
         return `feature '${scope.name}'`;
     }

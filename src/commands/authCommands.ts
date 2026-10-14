@@ -65,15 +65,12 @@ function extractHostFromTarget(target?: unknown): string | undefined {
         return undefined;
     }
     if (typeof target === 'string') {
-        return target;
+        return target.trim();
     }
     if (typeof target === 'object' && target !== null) {
-        const obj = target as { hostPattern?: string; label?: string };
-        if (typeof obj.hostPattern === 'string') {
-            return obj.hostPattern;
-        }
-        if (typeof obj.label === 'string') {
-            return obj.label;
+        const obj = target as { hostPattern?: string };
+        if (typeof obj.hostPattern === 'string' && obj.hostPattern.trim()) {
+            return obj.hostPattern.trim();
         }
     }
     return undefined;

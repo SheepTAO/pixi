@@ -10,7 +10,7 @@ import {
     extractEnvironmentName,
     extractFeatureName,
     findPackageScope,
-    formatScopeLabel,
+    formatScope,
     getScopeArgs,
     getWorkspaceEnvironments,
     getWorkspaceFeatures,
@@ -86,7 +86,7 @@ export async function buildDeclaredPackageQuickPickItems(
         const isPypi = kind === 'pypi';
         const icon = isPypi ? '$(symbol-keyword)' : '$(package)';
         const badge = isPypi ? '[PyPI]' : '[Conda]';
-        const scopeLabel = formatScopeLabel(scope);
+        const scopeLabel = formatScope(scope);
 
         return specs.map((rawSpec) => {
             const pkgName = extractPackageNameFromSpec(rawSpec);
@@ -216,7 +216,7 @@ export async function executeRemovePackage(
     args.push(...getScopeArgs(scope), pkgName);
 
     const projectName = manager.getProjectName(projectPath);
-    const scopeLabel = formatScopeLabel(scope);
+    const scopeLabel = formatScope(scope);
     const sourceLabel = scope.isPypi ? 'PyPI' : 'Conda';
     await runPixiWithProgress(
         `Pixi: Removing '${pkgName}' (${sourceLabel}) from ${scopeLabel} in '${projectName}'...`,
@@ -339,7 +339,7 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
                 }
 
                 const scopeArgs = getScopeArgs(targetScope);
-                const scopeLabel = formatScopeLabel(targetScope);
+                const scopeLabel = formatScope(targetScope);
 
                 if (promptResult.kind === 'selected') {
                     const pkg = promptResult.pkg;
@@ -400,7 +400,7 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
                     return;
                 }
 
-                const scopeDesc = formatScopeLabel(scope);
+                const scopeDesc = formatScope(scope);
 
                 const confirmed = await window.showWarningMessage(
                     `Are you sure you want to remove package '${pkg.name}' from ${scopeDesc}?`,

@@ -3,7 +3,7 @@ import { commands, Disposable, QuickPickItem, window } from 'vscode';
 import { runPixiWithProgress } from '../../cli/workspaceCli';
 import { getWorkspaceChannels } from '../../core/projectDiscovery';
 import { PixiProjectManager } from '../../core/projectManager';
-import { extractFeatureName, pickPixiProject, resolveWorkspaceOrFeatureScope } from './common';
+import { extractFeatureName, formatScope, pickPixiProject, resolveWorkspaceOrFeatureScope } from './common';
 
 export interface CondaChannelPreset {
     label: string;
@@ -138,7 +138,7 @@ export function registerChannelCommands(manager: PixiProjectManager): Disposable
             const existingInScope = new Set(
                 existingChannels.filter((c) => c.feature === targetFeature).map((c) => c.channel),
             );
-            const scopeLabel = targetFeature ? `feature '${targetFeature}'` : 'workspace';
+            const scopeLabel = formatScope(targetFeature);
 
             const targetChannel = await promptCondaChannel({
                 title: `Pixi: Add Channel (${scopeLabel})`,

@@ -111,15 +111,16 @@ export function registerTaskCommands(manager: PixiProjectManager, taskProvider: 
 
         // Pixi: Run Task in Environment
         commands.registerCommand('pixi.runTaskInEnvironment', async (targetItem?: unknown) => {
-            const targetTask = extractTask(targetItem);
-            if (targetTask) {
-                return taskProvider.promptAndRunTaskInEnvironment(targetTask);
-            }
-            const projectPath = await pickPixiProject(manager, 'Select Pixi project to run task in', targetItem);
-            if (!projectPath) {
+            const targetTask = await resolveTargetTask(manager, taskProvider, targetItem, {
+                title: 'Pixi: Run Task in Environment',
+                placeHolder: 'Select a Pixi task to run in a specific environment',
+                projectPlaceHolder: 'Select Pixi project to run task in',
+                formatEnvTag: (env) => (env ? `[default: ${env}]` : ''),
+            });
+            if (!targetTask) {
                 return;
             }
-            return taskProvider.promptAndRunTaskInEnvironment(undefined, projectPath);
+            return taskProvider.promptAndRunTaskInEnvironment(targetTask);
         }),
 
         // Pixi: Refresh Tasks

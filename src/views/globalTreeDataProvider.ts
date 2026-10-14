@@ -8,14 +8,19 @@ import {
     TreeItemCollapsibleState,
 } from 'vscode';
 
-import { listGlobalEnvironments, onDidChangeGlobalEnvironments, PixiGlobalEnvironment } from '../cli/globalCli';
+import {
+    getToolVersion,
+    listGlobalEnvironments,
+    onDidChangeGlobalEnvironments,
+    PixiGlobalEnvironment,
+} from '../cli/globalCli';
 
 export class PixiGlobalToolTreeItem extends TreeItem {
     constructor(public readonly tool: PixiGlobalEnvironment) {
         super(tool.name, TreeItemCollapsibleState.None);
 
-        const version = tool.dependencies?.[0]?.version;
-        this.description = version ? `v${version}` : '';
+        const version = getToolVersion(tool);
+        this.description = version;
         this.iconPath = new ThemeIcon('tools');
         this.contextValue = 'pixiGlobalTool';
 

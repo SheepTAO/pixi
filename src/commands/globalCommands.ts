@@ -2,9 +2,12 @@ import * as path from 'path';
 import { commands, Disposable, QuickPickItem, Uri, window, workspace } from 'vscode';
 
 import {
+    extractToolName,
     getGlobalManifestPath,
+    getToolVersion,
     installGlobalTools,
     listGlobalEnvironments,
+    PixiGlobalEnvironment,
     refreshGlobalEnvironments,
     syncGlobalEnvironments,
     uninstallGlobalTool,
@@ -87,6 +90,16 @@ export async function handleGlobalInstall(initialTool?: string): Promise<void> {
     );
 }
 
+export function toGlobalToolItem(t: PixiGlobalEnvironment): QuickPickItem & { tool: PixiGlobalEnvironment } {
+    const exposedStr = t.exposed?.map((e) => e.exposed_name).join(', ') || t.name;
+    return {
+        label: `$(tools) ${t.name}`,
+        description: getToolVersion(t),
+        detail: `Exposed commands: ${exposedStr}`,
+        tool: t,
+    };
+}
+
 export async function handleGlobalList(): Promise<void> {
     const tools = await listGlobalEnvironments();
     if (!tools) {
@@ -101,17 +114,7 @@ export async function handleGlobalList(): Promise<void> {
         return;
     }
 
-    const items = tools.map((t) => {
-        const mainDep = t.dependencies?.[0];
-        const versionStr = mainDep?.version ? `v${mainDep.version}` : '';
-        const exposedStr = t.exposed?.map((e) => e.exposed_name).join(', ') || t.name;
-        return {
-            label: `$(tools) ${t.name}`,
-            description: versionStr,
-            detail: `Exposed commands: ${exposedStr}`,
-            tool: t,
-        };
-    });
+    const items = tools.map(toGlobalToolItem);
 
     const picked = await window.showQuickPick(items, {
         title: 'Pixi Global: Installed Tools',
@@ -164,7 +167,7 @@ export async function handleGlobalUpdate(): Promise<void> {
         },
         ...tools.map((t) => ({
             label: `$(tools) ${t.name}`,
-            description: t.dependencies?.[0]?.version ? `v${t.dependencies[0].version}` : '',
+            description: getToolVersion(t),
             target: t.name,
         })),
     ];
@@ -192,7 +195,7 @@ export async function handleGlobalUninstall(): Promise<void> {
 
     const items = tools.map((t) => ({
         label: `$(trash) ${t.name}`,
-        description: t.dependencies?.[0]?.version ? `v${t.dependencies[0].version}` : '',
+        description: getToolVersion(t),
         toolName: t.name,
     }));
 
@@ -222,10 +225,6 @@ export async function handleOpenGlobalManifest(): Promise<void> {
     await window.showTextDocument(doc);
 }
 
-interface GlobalToolCommandArg {
-    tool?: { name?: string };
-}
-
 export function registerGlobalCommands(): Disposable {
     return Disposable.from(
         commands.registerCommand('pixi.refreshGlobal', () => {
@@ -239,11 +238,10 @@ export function registerGlobalCommands(): Disposable {
             await executeGlobalSync();
         }),
         commands.registerCommand('pixi.global.updateTool', async (item?: unknown) => {
-            const toolName = typeof item === 'string' ? item : (item as GlobalToolCommandArg | undefined)?.tool?.name;
-            await executeGlobalUpdate(toolName);
+            await executeGlobalUpdate(extractToolName(item));
         }),
         commands.registerCommand('pixi.global.uninstallTool', async (item?: unknown) => {
-            const toolName = typeof item === 'string' ? item : (item as GlobalToolCommandArg | undefined)?.tool?.name;
+            const toolName = extractToolName(item);
             if (toolName) {
                 await executeGlobalUninstall(toolName);
             } else {

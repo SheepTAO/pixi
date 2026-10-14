@@ -22,6 +22,25 @@ export interface PixiGlobalEnvironment {
     exposed?: PixiGlobalExposed[];
 }
 
+export function getToolVersion(tool: PixiGlobalEnvironment): string {
+    const v = tool.dependencies?.[0]?.version;
+    return v ? `v${v}` : '';
+}
+
+export function extractToolName(target?: unknown): string | undefined {
+    if (!target) {
+        return undefined;
+    }
+    if (typeof target === 'string') {
+        return target;
+    }
+    if (typeof target === 'object') {
+        const item = target as { name?: string; tool?: { name?: string } };
+        return item.tool?.name || item.name;
+    }
+    return undefined;
+}
+
 const _onDidChangeGlobalEnvironments = new EventEmitter<void>();
 export const onDidChangeGlobalEnvironments = _onDidChangeGlobalEnvironments.event;
 
