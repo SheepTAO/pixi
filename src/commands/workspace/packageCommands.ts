@@ -1,4 +1,3 @@
-import * as path from 'path';
 import { commands, Disposable, env as vscodeEnv, QuickPickItem, QuickPickItemKind, window } from 'vscode';
 
 import { PixiPackageSearchResult } from '../../cli/pixiCli';
@@ -192,7 +191,7 @@ export async function executeAddPackage(
     sourceLabel: string,
     targetScopeLabel?: string,
 ): Promise<boolean> {
-    const projectName = path.basename(projectPath);
+    const projectName = manager.getProjectName(projectPath);
     const displayScope = targetScopeLabel || 'default';
     const progressTitle = `Pixi: Adding '${specsLabel}' (${sourceLabel}) to ${displayScope} in '${projectName}'...`;
 
@@ -216,7 +215,7 @@ export async function executeRemovePackage(
     }
     args.push(...getScopeArgs(scope), pkgName);
 
-    const projectName = path.basename(projectPath);
+    const projectName = manager.getProjectName(projectPath);
     const scopeLabel = formatScopeLabel(scope);
     const sourceLabel = scope.isPypi ? 'PyPI' : 'Conda';
     await runPixiWithProgress(
@@ -234,7 +233,7 @@ export async function executeUpdatePackage(
     pkgName: string,
     targetEnv?: string,
 ): Promise<void> {
-    const projectName = path.basename(projectPath);
+    const projectName = manager.getProjectName(projectPath);
     const args = ['update'];
     if (targetEnv && targetEnv !== 'default') {
         args.push('-e', targetEnv);

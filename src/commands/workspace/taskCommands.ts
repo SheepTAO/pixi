@@ -1,4 +1,3 @@
-import * as path from 'path';
 import { commands, Disposable, InputBoxValidationSeverity, QuickPickItem, Uri, window, workspace } from 'vscode';
 
 import { runPixiWithProgress } from '../../cli/workspaceCli';
@@ -10,19 +9,47 @@ import {
     PixiTaskProvider,
     promptForTaskArgs,
 } from '../../providers/taskProvider';
-import { getWorkspaceFeatures, pickPixiProject, updateConfigurationValue } from './common';
+import {
+    extractTask,
+    filterNamedFeatures,
+    getWorkspaceFeatures,
+    pickPixiProject,
+    updateConfigurationValue,
+} from './common';
 
-function extractTask(targetItem?: unknown): PixiTask | undefined {
-    if (!targetItem || typeof targetItem !== 'object') {
+export interface ResolveTaskOptions {
+    title?: string;
+    placeHolder?: string;
+    projectPlaceHolder?: string;
+    formatEnvTag?: (env?: string) => string;
+}
+
+export async function resolveTargetTask(
+    manager: PixiProjectManager,
+    taskProvider: PixiTaskProvider,
+    targetItem?: unknown,
+    options?: ResolveTaskOptions,
+): Promise<PixiTask | undefined> {
+    const directTask = extractTask(targetItem);
+    if (directTask) {
+        return directTask;
+    }
+
+    const projectPath = await pickPixiProject(
+        manager,
+        options?.projectPlaceHolder || 'Select Pixi project for task',
+        targetItem,
+    );
+    if (!projectPath) {
         return undefined;
     }
-    if ('task' in targetItem && (targetItem as { task?: unknown }).task) {
-        return (targetItem as { task: PixiTask }).task;
-    }
-    if ('name' in targetItem && 'projectPath' in targetItem) {
-        return targetItem as PixiTask;
-    }
-    return undefined;
+
+    return taskProvider.pickTask({
+        title: options?.title || 'Pixi: Select Task',
+        placeHolder: options?.placeHolder || 'Select a Pixi task',
+        targetProjectPath: projectPath,
+        formatEnvTag: options?.formatEnvTag,
+    });
 }
 
 export function registerTaskCommands(manager: PixiProjectManager, taskProvider: PixiTaskProvider): Disposable[] {
@@ -51,26 +78,15 @@ export function registerTaskCommands(manager: PixiProjectManager, taskProvider: 
                     extraArgs = extraArgsOrOptions.extraArgs;
                 }
 
-                let targetTask = extractTask(targetItem);
+                const targetTask = await resolveTargetTask(manager, taskProvider, targetItem, {
+                    title: promptArgs ? 'Pixi: Run Task with Arguments' : 'Pixi: Run Task',
+                    placeHolder: promptArgs
+                        ? 'Select a Pixi task to run with arguments'
+                        : 'Select a Pixi task to run',
+                    projectPlaceHolder: 'Select Pixi project to run task in',
+                });
                 if (!targetTask) {
-                    const projectPath = await pickPixiProject(
-                        manager,
-                        'Select Pixi project to run task in',
-                        targetItem,
-                    );
-                    if (!projectPath) {
-                        return;
-                    }
-                    targetTask = await taskProvider.pickTask({
-                        title: promptArgs ? 'Pixi: Run Task with Arguments' : 'Pixi: Run Task',
-                        placeHolder: promptArgs
-                            ? 'Select a Pixi task to run with arguments'
-                            : 'Select a Pixi task to run',
-                        targetProjectPath: projectPath,
-                    });
-                    if (!targetTask) {
-                        return;
-                    }
+                    return;
                 }
 
                 if (promptArgs) {
@@ -153,21 +169,13 @@ export function registerTaskCommands(manager: PixiProjectManager, taskProvider: 
 
         // Pixi: Reveal Task in Manifest
         commands.registerCommand('pixi.tasks.revealInManifest', async (targetItem?: unknown) => {
-            let task = extractTask(targetItem);
-
+            const task = await resolveTargetTask(manager, taskProvider, targetItem, {
+                title: 'Select Task to Reveal in Manifest',
+                placeHolder: 'Select a task to jump to its definition in manifest',
+                projectPlaceHolder: 'Select Pixi project',
+            });
             if (!task) {
-                const projectPath = await pickPixiProject(manager, 'Select Pixi project', targetItem);
-                if (!projectPath) {
-                    return;
-                }
-                task = await taskProvider.pickTask({
-                    title: 'Select Task to Reveal in Manifest',
-                    placeHolder: 'Select a task to jump to its definition in manifest',
-                    targetProjectPath: projectPath,
-                });
-                if (!task) {
-                    return;
-                }
+                return;
             }
 
             await revealDefinitionInManifest({
@@ -184,7 +192,7 @@ export function registerTaskCommands(manager: PixiProjectManager, taskProvider: 
                 return;
             }
 
-            const projectName = path.basename(projectPath);
+            const projectName = manager.getProjectName(projectPath);
             const existingTasks = await taskProvider.getTasksForProject(projectPath);
 
             // Detect if invoked from a task group (e.g. prefix group or environment group)
@@ -270,7 +278,7 @@ export function registerTaskCommands(manager: PixiProjectManager, taskProvider: 
             let taskScope: { kind: 'standalone' | 'default-env' | 'feature'; name?: string } = { kind: 'standalone' };
             const envs = manager.getEnvironmentsForProject(projectPath);
             const namedEnvs = envs.filter((e) => e.pixiEnvName !== 'default');
-            const features = (await getWorkspaceFeatures(projectPath)).filter((f) => f.name !== 'default');
+            const features = filterNamedFeatures(await getWorkspaceFeatures(projectPath));
 
             if (namedEnvs.length > 0 || features.length > 0) {
                 interface TaskScopeQuickPickItem extends QuickPickItem {
@@ -375,29 +383,17 @@ export function registerTaskCommands(manager: PixiProjectManager, taskProvider: 
 
         // Pixi: Remove Task
         commands.registerCommand('pixi.tasks.removeTask', async (targetItem?: unknown) => {
-            let targetTask = extractTask(targetItem);
-
+            const targetTask = await resolveTargetTask(manager, taskProvider, targetItem, {
+                title: 'Pixi: Remove Task',
+                placeHolder: 'Select a Pixi task to remove from manifest',
+                projectPlaceHolder: 'Select Pixi project to remove task from',
+            });
             if (!targetTask) {
-                const projectPath = await pickPixiProject(
-                    manager,
-                    'Select Pixi project to remove task from',
-                    targetItem,
-                );
-                if (!projectPath) {
-                    return;
-                }
-                targetTask = await taskProvider.pickTask({
-                    title: 'Pixi: Remove Task',
-                    placeHolder: 'Select a Pixi task to remove from manifest',
-                    targetProjectPath: projectPath,
-                });
-                if (!targetTask) {
-                    return;
-                }
+                return;
             }
 
             const projectPath = targetTask.projectPath;
-            const projectName = path.basename(projectPath);
+            const projectName = manager.getProjectName(projectPath);
 
             const confirmation = await window.showWarningMessage(
                 `Are you sure you want to remove task '${targetTask.name}' from ${projectName}?`,

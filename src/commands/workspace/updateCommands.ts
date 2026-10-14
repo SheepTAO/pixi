@@ -1,4 +1,3 @@
-import * as path from 'path';
 import { CancellationError, commands, Disposable, ProgressLocation, QuickPickItem, window } from 'vscode';
 
 import { runPixi } from '../../cli/pixiCli';
@@ -6,7 +5,7 @@ import { runPixiWithProgress } from '../../cli/workspaceCli';
 import { escapeRegex, safeJsonParse } from '../../common/execUtils';
 import { normalizePkgName } from '../../core/packageManager';
 import { PixiProjectManager } from '../../core/projectManager';
-import { extractEnvironmentName, pickPixiProject, toEnvQuickPickItem } from './common';
+import { extractEnvironmentName, pickPixiProject, pickProjectEnvironmentName } from './common';
 import { buildDeclaredPackageQuickPickItems } from './packageCommands';
 
 export interface DryRunPackageChange {
@@ -383,7 +382,7 @@ export async function executeUnifiedUpdate(
         return;
     }
 
-    const projectName = path.basename(projectPath);
+    const projectName = manager.getProjectName(projectPath);
     const directEnv = extractEnvironmentName(targetItem, envName);
 
     interface UpdateActionItem extends QuickPickItem {
@@ -426,27 +425,16 @@ export async function executeUnifiedUpdate(
     if (!selectedEnv) {
         const envs = manager.getEnvironmentsForProject(projectPath);
         if (envs.length > 1) {
-            interface ScopeItem extends QuickPickItem {
-                envName?: string;
-            }
-            const scopeItems: ScopeItem[] = [
-                {
-                    label: '$(globe) All Environments',
-                    description: `All ${envs.length} environments in ${projectName}`,
-                    envName: undefined,
-                },
-                ...envs.map(toEnvQuickPickItem),
-            ];
-
-            const chosenScope = await window.showQuickPick(scopeItems, {
+            const pick = await pickProjectEnvironmentName(manager, projectPath, {
                 title: `Pixi: Select Target Environment (${projectName})`,
                 placeHolder: `Select environment scope for ${chosenAction.label}`,
+                includeAllOption: true,
             });
 
-            if (!chosenScope) {
+            if (pick === undefined) {
                 return;
             }
-            selectedEnv = chosenScope.envName;
+            selectedEnv = pick ?? undefined;
         }
     }
 

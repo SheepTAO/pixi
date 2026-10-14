@@ -1,4 +1,3 @@
-import * as path from 'path';
 import { commands, Disposable, QuickPickItem, window } from 'vscode';
 
 import { getHostCondaPlatform, runPixi } from '../../cli/pixiCli';
@@ -173,7 +172,7 @@ export function registerPlatformCommands(manager: PixiProjectManager): Disposabl
                 commandBatch.push(['workspace', 'platform', 'remove', ...scopeArgs, ...toRemove]);
             }
 
-            const projectName = path.basename(projectPath);
+            const projectName = manager.getProjectName(projectPath);
             const summary = selectedSet.size > 0 ? [...selectedSet].join(', ') : 'inherited from workspace';
             await runPixiWithProgress(
                 `Pixi: Updating target platforms for ${scopeLabel} in '${projectName}'...`,

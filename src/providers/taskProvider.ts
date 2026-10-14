@@ -17,7 +17,7 @@ import {
 } from 'vscode';
 
 import { getPixi, runPixi } from '../cli/pixiCli';
-import { pickPixiEnvironment } from '../commands/workspace/common';
+import { resolveReadyEnvironment } from '../commands/workspace/common';
 import { quoteStringIfNecessary, safeJsonParse } from '../common/execUtils';
 import { traceError, traceVerbose } from '../common/logging';
 import { ensureEnvironmentReady } from '../core/environmentRules';
@@ -369,19 +369,14 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
             return;
         }
 
-        const env = await pickPixiEnvironment(this.projectManager, selectedTask.projectPath, {
+        const env = await resolveReadyEnvironment(this.projectManager, selectedTask.projectPath, {
             title: `Pixi: Run Task '${selectedTask.name}'`,
             placeHolder: `Select environment to run '${selectedTask.name}' in`,
             autoSelectSingle: false,
+            action: `run task '${selectedTask.name}' in environment`,
         });
 
-        if (
-            !env ||
-            !(await ensureEnvironmentReady(env, {
-                action: `run task '${selectedTask.name}' in environment`,
-                customInstallPrompt: `Environment '${env.pixiEnvName}' required by task '${selectedTask.name}' is not installed yet on disk. Would you like to install it now?`,
-            }))
-        ) {
+        if (!env) {
             return;
         }
 

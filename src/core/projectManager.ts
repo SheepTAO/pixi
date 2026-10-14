@@ -119,11 +119,16 @@ export class PixiProjectManager implements Disposable {
         return findManifestPath(projectPath);
     }
 
+    public getProjectName(projectPath: string): string {
+        const normalized = path.normalize(projectPath);
+        const envs = this.projectToEnvs.get(normalized);
+        return (envs && envs.length > 0 && envs[0].projectName) || path.basename(normalized);
+    }
+
     public getProjects(): PixiProject[] {
         const projects = this.projectPaths.map((p) => {
-            const envs = this.projectToEnvs.get(p);
             return {
-                name: envs && envs.length > 0 ? envs[0].projectName : path.basename(p),
+                name: this.getProjectName(p),
                 projectPath: p,
                 manifestPath: this.getManifestPath(p) || path.join(p, 'pixi.toml'),
             };

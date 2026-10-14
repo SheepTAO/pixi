@@ -10,16 +10,20 @@ import {
     extractCommandContext,
     extractEnvironmentName,
     extractFeatureName,
+    filterNamedFeatures,
     getManifestPathForFormat,
     getWorkspaceEnvironments,
     getWorkspaceFeatures,
     openDocumentIfExists,
     pickManifestFormat,
+    pickPixiFeature,
     pickPixiProject,
+    pickProjectEnvironmentName,
     promptNewFeatureName,
     resolveTargetFolder,
-    toEnvQuickPickItem,
+    toFeatureQuickPickItem,
     updateConfigurationValue,
+    validatePixiIdentifier,
 } from './common';
 
 async function pickInstallableEnvironment(
@@ -28,17 +32,14 @@ async function pickInstallableEnvironment(
     title: string,
     placeHolder: string,
 ): Promise<string | undefined> {
-    const projectName = path.basename(projectPath);
-    const envs = manager.getEnvironmentsForProject(projectPath);
-    const candidateEnvs = envs.filter((e) => e.pixiStatus !== 'incompatible');
-    if (candidateEnvs.length === 0) {
-        const noun = title.toLowerCase().includes('reinstall') ? 'reinstallable' : 'installable';
-        window.showInformationMessage(`No ${noun} environments found in ${projectName}.`);
-        return undefined;
-    }
-
-    const pick = await window.showQuickPick(candidateEnvs.map(toEnvQuickPickItem), { title, placeHolder });
-    return pick?.envName;
+    const projectName = manager.getProjectName(projectPath);
+    const noun = title.toLowerCase().includes('reinstall') ? 'reinstallable' : 'installable';
+    return pickProjectEnvironmentName(manager, projectPath, {
+        title,
+        placeHolder,
+        filter: (e) => e.pixiStatus !== 'incompatible',
+        emptyMessage: `No ${noun} environments found in ${projectName}.`,
+    });
 }
 
 async function runSingleEnvironmentInstallCommand(
@@ -139,26 +140,18 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                 title: 'Pixi: Create Environment',
                 prompt: 'Enter a name for the new environment',
                 placeHolder: 'e.g. dev, test, native',
-                validateInput: (value) => {
-                    const trimmed = value?.trim();
-                    if (!trimmed) {
-                        return 'Environment name cannot be empty.';
-                    }
-                    if (!/^[a-zA-Z0-9_\-]+$/.test(trimmed)) {
-                        return 'Environment name must only contain alphanumeric characters, underscores, and hyphens.';
-                    }
-                    if (trimmed === 'default' || existingEnvs.some((e) => e.pixiEnvName === trimmed)) {
-                        return `Environment '${trimmed}' already exists in this project.`;
-                    }
-                    return null;
-                },
+                validateInput: (value) =>
+                    validatePixiIdentifier(value, {
+                        entityName: 'Environment',
+                        existingNames: existingEnvs.map((e) => e.pixiEnvName),
+                    }),
             });
             if (!envName) {
                 return;
             }
 
             const trimmedName = envName.trim();
-            const existingFeatures = (await getWorkspaceFeatures(projectPath)).filter((f) => f.name !== 'default');
+            const existingFeatures = filterNamedFeatures(await getWorkspaceFeatures(projectPath));
             const companionFeatureExists = existingFeatures.some((f) => f.name === trimmedName);
 
             interface EnvModeQuickPickItem {
@@ -255,18 +248,11 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
             }
 
             if (selectedMode.action === 'select') {
-                const pickedFeatures = await window.showQuickPick(
-                    existingFeatures.map((f) => ({
-                        label: `$(symbol-namespace) ${f.name}`,
-                        description: `${f.dependencies.length + f.pypiDependencies.length} dependencies`,
-                        featureName: f.name,
-                    })),
-                    {
-                        title: `Pixi: Select Features for '${trimmedName}'`,
-                        placeHolder: 'Select features to include in this environment',
-                        canPickMany: true,
-                    },
-                );
+                const pickedFeatures = await window.showQuickPick(existingFeatures.map(toFeatureQuickPickItem), {
+                    title: `Pixi: Select Features for '${trimmedName}'`,
+                    placeHolder: 'Select features to include in this environment',
+                    canPickMany: true,
+                });
                 if (!pickedFeatures || pickedFeatures.length === 0) {
                     return;
                 }
@@ -319,12 +305,10 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
 
             const envName =
                 extractEnvironmentName(targetItem) ??
-                (
-                    await window.showQuickPick(envs.map(toEnvQuickPickItem), {
-                        title: 'Pixi: Delete Environment',
-                        placeHolder: 'Select an environment to delete or clean',
-                    })
-                )?.envName;
+                (await pickProjectEnvironmentName(manager, projectPath, {
+                    title: 'Pixi: Delete Environment',
+                    placeHolder: 'Select an environment to delete or clean',
+                }));
 
             if (!envName) {
                 return;
@@ -433,25 +417,21 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                 return;
             }
 
-            const projectName = path.basename(projectPath);
+            const projectName = manager.getProjectName(projectPath);
 
             if (choice.action === 'environment') {
-                const envs = manager.getEnvironmentsForProject(projectPath);
-                const installedEnvs = envs.filter((e) => e.pixiStatus === 'installed');
-                if (installedEnvs.length === 0) {
-                    window.showInformationMessage(`No installed environments found to clean in ${projectName}.`);
-                    return;
-                }
-                const targetEnv = await window.showQuickPick(installedEnvs.map(toEnvQuickPickItem), {
+                const targetEnvName = await pickProjectEnvironmentName(manager, projectPath, {
                     title: `Pixi: Clean Specific Environment (${projectName})`,
                     placeHolder: 'Select an installed environment to clean from disk',
+                    filter: (e) => e.pixiStatus === 'installed',
+                    emptyMessage: `No installed environments found to clean in ${projectName}.`,
                 });
-                if (!targetEnv) {
+                if (!targetEnvName) {
                     return;
                 }
 
                 const confirmed = await window.showWarningMessage(
-                    `Clean the installed '${targetEnv.envName}' environment on disk for ${projectName}?`,
+                    `Clean the installed '${targetEnvName}' environment on disk for ${projectName}?`,
                     'Clean Environment',
                 );
                 if (confirmed !== 'Clean Environment') {
@@ -459,11 +439,11 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                 }
 
                 await runPixiWithProgress(
-                    `Pixi: Cleaning environment '${targetEnv.envName}' for ${projectName}...`,
-                    ['clean', '-e', targetEnv.envName],
+                    `Pixi: Cleaning environment '${targetEnvName}' for ${projectName}...`,
+                    ['clean', '-e', targetEnvName],
                     projectPath,
                     manager,
-                    `Pixi: Environment '${targetEnv.envName}' cleaned from disk.`,
+                    `Pixi: Environment '${targetEnvName}' cleaned from disk.`,
                 );
                 return;
             }
@@ -500,7 +480,7 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                 return;
             }
 
-            const projectName = path.basename(projectPath);
+            const projectName = manager.getProjectName(projectPath);
             await runPixiWithProgress(
                 `Pixi: Solving and locking dependencies for ${projectName}...`,
                 ['lock'],
@@ -526,7 +506,7 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                 return;
             }
 
-            const projectName = path.basename(projectPath);
+            const projectName = manager.getProjectName(projectPath);
             const explicitEnv = extractEnvironmentName(targetItem, envName);
 
             if (explicitEnv) {
@@ -565,7 +545,7 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                 return;
             }
 
-            const projectName = path.basename(projectPath);
+            const projectName = manager.getProjectName(projectPath);
             let targetEnv = extractEnvironmentName(targetItem, envName);
 
             if (!targetEnv) {
@@ -753,25 +733,18 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                     return;
                 }
 
-                const projectName = path.basename(projectPath);
+                const projectName = manager.getProjectName(projectPath);
                 let envName = extractEnvironmentName(targetItem, presetEnv);
                 if (!envName) {
-                    const envs = manager.getEnvironmentsForProject(projectPath);
-                    const namedEnvs = envs.filter((e) => e.pixiEnvName !== 'default');
-                    if (namedEnvs.length === 0) {
-                        window.showInformationMessage(
-                            `No custom environments found in ${projectName} to configure features.`,
-                        );
-                        return;
-                    }
-                    const pick = await window.showQuickPick(namedEnvs.map(toEnvQuickPickItem), {
+                    envName = await pickProjectEnvironmentName(manager, projectPath, {
                         title: 'Pixi: Select Environment to Configure Features',
                         placeHolder: 'Select environment',
+                        filter: (e) => e.pixiEnvName !== 'default',
+                        emptyMessage: `No custom environments found in ${projectName} to configure features.`,
                     });
-                    if (!pick) {
+                    if (!envName) {
                         return;
                     }
-                    envName = pick.envName;
                 }
 
                 const [allFeatures, allEnvs] = await Promise.all([
@@ -852,31 +825,19 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                 return;
             }
 
-            const projectName = path.basename(projectPath);
-            const allFeatures = (await getWorkspaceFeatures(projectPath)).filter((f) => f.name !== 'default');
-            if (allFeatures.length === 0) {
-                window.showInformationMessage(`No custom features found in ${projectName} to remove.`);
-                return;
-            }
-
+            const projectName = manager.getProjectName(projectPath);
             let featureName = extractFeatureName(targetItem, presetFeature);
 
             if (!featureName) {
-                const pick = await window.showQuickPick(
-                    allFeatures.map((f) => ({
-                        label: `$(symbol-namespace) ${f.name}`,
-                        description: `${f.dependencies.length + f.pypiDependencies.length} dependencies`,
-                        featureName: f.name,
-                    })),
-                    {
-                        title: 'Pixi: Remove Feature',
-                        placeHolder: 'Select feature to remove from project manifest',
-                    },
-                );
+                const pick = await pickPixiFeature(projectPath, {
+                    title: 'Pixi: Remove Feature',
+                    placeHolder: 'Select feature to remove from project manifest',
+                    emptyMessage: `No custom features found in ${projectName} to remove.`,
+                });
                 if (!pick) {
                     return;
                 }
-                featureName = pick.featureName;
+                featureName = pick.name;
             }
 
             if (featureName === 'default') {
@@ -915,15 +876,14 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                 }
                 let featureName = extractFeatureName(targetItem, presetFeature);
                 if (!featureName) {
-                    const allFeatures = await getWorkspaceFeatures(projectPath);
-                    const pick = await window.showQuickPick(
-                        allFeatures.map((f) => ({ label: f.name, featureName: f.name })),
-                        { title: 'Select Feature to Reveal' },
-                    );
+                    const pick = await pickPixiFeature(projectPath, {
+                        title: 'Select Feature to Reveal',
+                        includeDefault: true,
+                    });
                     if (!pick) {
                         return;
                     }
-                    featureName = pick.featureName;
+                    featureName = pick.name;
                 }
 
                 await revealDefinitionInManifest({

@@ -141,7 +141,7 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
         for (const projectPath of projectPaths) {
             if (!projectMap.has(projectPath)) {
                 const proj: PythonProject = {
-                    name: path.basename(projectPath),
+                    name: this.projectManager.getProjectName(projectPath),
                     uri: Uri.file(projectPath),
                 };
                 newProjects.push(proj);

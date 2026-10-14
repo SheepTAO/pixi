@@ -18,6 +18,7 @@ import { ensureEnvironmentReady, getEnvironmentStatusBadge, sortPixiEnvironments
 import { normalizePkgName } from '../../core/packageManager';
 import { PixiProjectManager } from '../../core/projectManager';
 import { PixiEnvironmentInfo, PixiPackage } from '../../core/types';
+import type { PixiTask } from '../../providers/taskProvider';
 
 export interface ProjectQuickPickItem extends QuickPickItem {
     projectPath: string;
@@ -157,6 +158,81 @@ export async function getWorkspaceFeatures(projectPath: string): Promise<Workspa
     }
 }
 
+export function filterNamedFeatures(features: WorkspaceListEntry[]): WorkspaceListEntry[] {
+    return features.filter((f) => f.name !== 'default');
+}
+
+export interface FeatureQuickPickItem extends QuickPickItem {
+    feature: WorkspaceListEntry;
+    featureName: string;
+}
+
+export function toFeatureQuickPickItem(feature: WorkspaceListEntry): FeatureQuickPickItem {
+    const depCount = feature.dependencies.length + feature.pypiDependencies.length;
+    const isDefault = feature.name === 'default';
+    return {
+        label: `$(symbol-namespace) ${feature.name}`,
+        description: isDefault ? 'Default global feature' : `${depCount} dependencies`,
+        feature,
+        featureName: feature.name,
+    };
+}
+
+export interface PickFeatureOptions {
+    title?: string;
+    placeHolder?: string;
+    includeDefault?: boolean;
+    emptyMessage?: string;
+}
+
+export async function pickPixiFeature(
+    projectPath: string,
+    options?: PickFeatureOptions,
+): Promise<WorkspaceListEntry | undefined> {
+    const features = await getWorkspaceFeatures(projectPath);
+    const candidates = options?.includeDefault ? features : filterNamedFeatures(features);
+    if (candidates.length === 0) {
+        if (options?.emptyMessage) {
+            window.showInformationMessage(options.emptyMessage);
+        }
+        return undefined;
+    }
+
+    const items = candidates.map(toFeatureQuickPickItem);
+    const selected = await window.showQuickPick(items, {
+        title: options?.title || 'Pixi: Select Feature',
+        placeHolder: options?.placeHolder || 'Select a feature from project manifest',
+    });
+    return selected?.feature;
+}
+
+export interface ValidateIdentifierOptions {
+    entityName?: string;
+    existingNames?: string[];
+    allowDefault?: boolean;
+}
+
+export function validatePixiIdentifier(
+    value: string | undefined,
+    options?: ValidateIdentifierOptions,
+): string | null {
+    const trimmed = value?.trim();
+    const entity = options?.entityName || 'Identifier';
+    if (!trimmed) {
+        return `${entity} name cannot be empty.`;
+    }
+    if (!/^[a-zA-Z0-9_\-]+$/.test(trimmed)) {
+        return `${entity} name must only contain alphanumeric characters, underscores, and hyphens.`;
+    }
+    if (options?.allowDefault !== true && trimmed === 'default') {
+        return `${entity} cannot be named 'default' (reserved keyword).`;
+    }
+    if (options?.existingNames && options.existingNames.includes(trimmed)) {
+        return `${entity} '${trimmed}' already exists in this project.`;
+    }
+    return null;
+}
+
 export async function getWorkspaceEnvironments(projectPath: string): Promise<WorkspaceListEntry[]> {
     try {
         const out = await runPixi(['workspace', 'environment', 'list'], { cwd: projectPath });
@@ -280,7 +356,7 @@ export async function pickTargetScope(
     }
 
     const features = await getWorkspaceFeatures(projectPath);
-    const namedFeatures = features.filter((f) => f.name !== 'default');
+    const namedFeatures = filterNamedFeatures(features);
     const namedEnvs = envs.filter((e) => e.pixiEnvName !== 'default');
 
     if (namedFeatures.length === 0 && namedEnvs.length === 0) {
@@ -362,23 +438,12 @@ export async function pickTargetScope(
 }
 
 export async function promptNewFeatureName(existingFeatures: WorkspaceListEntry[]): Promise<string | undefined> {
+    const existingNames = existingFeatures.map((f) => f.name);
     const featureName = await window.showInputBox({
         title: 'Pixi: Create Feature',
         prompt: 'Enter a name for the new feature',
         placeHolder: 'e.g. test, dev, cuda, docs',
-        validateInput: (value) => {
-            const trimmed = value?.trim();
-            if (!trimmed) {
-                return 'Feature name cannot be empty.';
-            }
-            if (!/^[a-zA-Z0-9_\-]+$/.test(trimmed)) {
-                return 'Feature name must only contain alphanumeric characters, underscores, and hyphens.';
-            }
-            if (trimmed === 'default' || existingFeatures.some((f) => f.name === trimmed)) {
-                return `Feature '${trimmed}' already exists in this project.`;
-            }
-            return null;
-        },
+        validateInput: (value) => validatePixiIdentifier(value, { entityName: 'Feature', existingNames }),
     });
     return featureName?.trim() || undefined;
 }
@@ -390,6 +455,7 @@ export interface ExtractedCommandContext {
     envName?: string;
     pkg?: PixiPackage;
     featureName?: string;
+    task?: PixiTask;
 }
 
 export function extractCommandContext(target?: unknown): ExtractedCommandContext {
@@ -407,7 +473,15 @@ export function extractCommandContext(target?: unknown): ExtractedCommandContext
         project?: { manifestPath?: string };
         featureName?: string;
         feature?: { name?: string };
+        task?: PixiTask;
+        name?: string;
     };
+
+    const task =
+        item.task ||
+        (!('manifestPath' in item) && 'name' in item && 'projectPath' in item && typeof item.name === 'string'
+            ? (item as PixiTask)
+            : undefined);
 
     return {
         projectPath,
@@ -416,7 +490,12 @@ export function extractCommandContext(target?: unknown): ExtractedCommandContext
         envName: item.env?.pixiEnvName,
         pkg: item.pkg,
         featureName: item.featureName || item.feature?.name,
+        task,
     };
+}
+
+export function extractTask(target?: unknown): PixiTask | undefined {
+    return extractCommandContext(target).task;
 }
 
 export function extractEnvironmentName(target?: unknown, preset?: string): string | undefined {
@@ -561,7 +640,7 @@ export async function resolveWorkspaceOrFeatureScope(
     }
 
     const features = await getWorkspaceFeatures(projectPath);
-    const namedFeatures = features.filter((f) => f.name !== 'default');
+    const namedFeatures = filterNamedFeatures(features);
     if (namedFeatures.length === 0) {
         return undefined;
     }
@@ -682,9 +761,73 @@ export async function pickPixiEnvironment(
     return selected?.env;
 }
 
+export interface PickProjectEnvironmentOptions {
+    title?: string;
+    placeHolder?: string;
+    filter?: (env: PixiEnvironmentInfo) => boolean;
+    includeAllOption?: boolean;
+    allOptionLabel?: string;
+    allOptionDescription?: string;
+    emptyMessage?: string;
+}
+
+export async function pickProjectEnvironmentName(
+    manager: PixiProjectManager,
+    projectPath: string,
+    options: PickProjectEnvironmentOptions & { includeAllOption: true },
+): Promise<string | null | undefined>;
+export async function pickProjectEnvironmentName(
+    manager: PixiProjectManager,
+    projectPath: string,
+    options?: PickProjectEnvironmentOptions,
+): Promise<string | undefined>;
+export async function pickProjectEnvironmentName(
+    manager: PixiProjectManager,
+    projectPath: string,
+    options?: PickProjectEnvironmentOptions,
+): Promise<string | null | undefined> {
+    const projectName = manager.getProjectName(projectPath);
+    const envs = manager.getEnvironmentsForProject(projectPath);
+    const filteredEnvs = options?.filter ? envs.filter(options.filter) : envs;
+
+    if (filteredEnvs.length === 0) {
+        if (options?.emptyMessage) {
+            window.showInformationMessage(options.emptyMessage);
+        }
+        return undefined;
+    }
+
+    interface EnvPickItem extends QuickPickItem {
+        envName?: string | null;
+    }
+
+    const items: EnvPickItem[] = [];
+    if (options?.includeAllOption) {
+        items.push({
+            label: options.allOptionLabel || '$(globe) All Environments',
+            description: options.allOptionDescription || `All ${filteredEnvs.length} environments in ${projectName}`,
+            envName: null,
+        });
+    }
+
+    items.push(...filteredEnvs.map(toEnvQuickPickItem));
+
+    const selected = await window.showQuickPick(items, {
+        title: options?.title || `Pixi: Select Environment (${projectName})`,
+        placeHolder: options?.placeHolder || 'Select environment',
+    });
+
+    if (!selected) {
+        return undefined;
+    }
+    return selected.envName ?? null;
+}
+
 export interface ResolveEnvironmentOptions extends PickEnvironmentOptions {
     /** Action description for error reporting in ensureEnvironmentReady, e.g. 'open terminal for environment' */
     action: string;
+    /** Custom installation prompt message for uninstalled environments */
+    customInstallPrompt?: string;
 }
 
 /**
@@ -712,6 +855,9 @@ export async function resolveReadyEnvironment(
         return undefined;
     }
 
-    const isReady = await ensureEnvironmentReady(env, { action: options?.action });
+    const isReady = await ensureEnvironmentReady(env, {
+        action: options?.action,
+        customInstallPrompt: options?.customInstallPrompt,
+    });
     return isReady ? env : undefined;
 }

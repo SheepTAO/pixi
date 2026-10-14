@@ -1,4 +1,3 @@
-import * as path from 'path';
 import { commands, Disposable, QuickPickItem, window } from 'vscode';
 
 import { runPixiWithProgress } from '../../cli/workspaceCli';
@@ -181,7 +180,7 @@ export function registerChannelCommands(manager: PixiProjectManager): Disposable
             }
             args.push(targetChannel);
 
-            const projectName = path.basename(projectPath);
+            const projectName = manager.getProjectName(projectPath);
             await runPixiWithProgress(
                 `Pixi: Adding channel '${targetChannel}' to ${scopeLabel} in '${projectName}'...`,
                 args,
@@ -266,7 +265,7 @@ export function registerChannelCommands(manager: PixiProjectManager): Disposable
                 commandBatch.push(args);
             }
 
-            const projectName = path.basename(projectPath);
+            const projectName = manager.getProjectName(projectPath);
             const removedSummary = [...new Set(selected.map((s) => s.channel))].join(', ');
             await runPixiWithProgress(
                 `Pixi: Removing channel(s) ${removedSummary} from '${projectName}'...`,
