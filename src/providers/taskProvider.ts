@@ -17,7 +17,7 @@ import {
 } from 'vscode';
 
 import { getPixi, runPixi } from '../cli/pixiCli';
-import { toEnvQuickPickItem } from '../commands/workspace/common';
+import { pickPixiEnvironment } from '../commands/workspace/common';
 import { quoteStringIfNecessary, safeJsonParse } from '../common/execUtils';
 import { traceError, traceVerbose } from '../common/logging';
 import { ensureEnvironmentReady } from '../core/environmentRules';
@@ -369,33 +369,28 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
             return;
         }
 
-        const envs = this.projectManager.getEnvironmentsForProject(selectedTask.projectPath);
-        const envItems =
-            envs.length > 0
-                ? envs.map(toEnvQuickPickItem)
-                : [
-                      {
-                          label: '$(globe) default',
-                          description: 'Default environment',
-                          envName: 'default',
-                      },
-                  ];
-
-        const selectedEnvItem = await window.showQuickPick(envItems, {
+        const env = await pickPixiEnvironment(this.projectManager, selectedTask.projectPath, {
             title: `Pixi: Run Task '${selectedTask.name}'`,
             placeHolder: `Select environment to run '${selectedTask.name}' in`,
+            autoSelectSingle: false,
         });
 
-        if (!selectedEnvItem) {
+        if (
+            !env ||
+            !(await ensureEnvironmentReady(env, {
+                action: `run task '${selectedTask.name}' in environment`,
+                customInstallPrompt: `Environment '${env.pixiEnvName}' required by task '${selectedTask.name}' is not installed yet on disk. Would you like to install it now?`,
+            }))
+        ) {
             return;
         }
 
-        const inputArgs = await promptForTaskArgs(selectedTask.name, selectedEnvItem.envName);
+        const inputArgs = await promptForTaskArgs(selectedTask.name, env.pixiEnvName);
         if (inputArgs === undefined) {
             return;
         }
 
-        await this.executePixiTask(selectedTask, selectedEnvItem.envName, inputArgs.trim() || undefined);
+        await this.executePixiTask(selectedTask, env.pixiEnvName, inputArgs.trim() || undefined);
     }
 }
 
