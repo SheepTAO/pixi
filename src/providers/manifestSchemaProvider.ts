@@ -18,6 +18,7 @@ import {
     workspace,
 } from 'vscode';
 
+import { COMMON_CHANNELS } from '../commands/workspace/channelCommands';
 import { CONDA_PLATFORM_PRESETS } from '../commands/workspace/platformCommands';
 import { traceError, traceVerbose } from '../common/logging';
 import { isPyproject, MANIFEST_SELECTORS } from '../core/projectDiscovery';
@@ -41,15 +42,6 @@ interface ManifestSchemaMetadata {
     environmentProperties: Map<string, string>;
     allPropertiesDoc: Map<string, string>;
 }
-
-const COMMON_CHANNELS = [
-    { label: 'conda-forge', detail: 'Primary community-led Conda channel (recommended)' },
-    { label: 'bioconda', detail: 'Bioinformatics packages channel' },
-    { label: 'pytorch', detail: 'Official PyTorch Conda channel' },
-    { label: 'nvidia', detail: 'Official NVIDIA CUDA packages channel' },
-    { label: 'robostack', detail: 'ROS and robotics packages channel' },
-    { label: 'node-forge', detail: 'NodeJS ecosystem Conda channel' },
-];
 
 const COMMON_PLATFORMS = [
     ...CONDA_PLATFORM_PRESETS.map((p) => ({ label: p.name, detail: p.description })),
@@ -143,7 +135,7 @@ export class PixiManifestSchemaProvider implements CompletionItemProvider, Hover
         const beforeCursor = lineText.substring(0, position.character);
         const isPyprojectDoc = isPyproject(document);
 
-        const buildArrayCompletions = (items: Array<{ label: string; detail: string }>, arrayName: string) => {
+        const buildArrayCompletions = (items: readonly { label: string; detail: string }[], arrayName: string) => {
             const lastQuoteIdx = Math.max(beforeCursor.lastIndexOf('"'), beforeCursor.lastIndexOf("'"));
             const hasOpenQuote = lastQuoteIdx !== -1 && !beforeCursor.substring(lastQuoteIdx + 1).includes(',');
             const afterCursor = lineText.substring(position.character);

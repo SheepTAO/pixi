@@ -15,7 +15,12 @@ import {
 import { escapeRegex } from '../common/execUtils';
 import { PixiProjectManager } from '../core/projectManager';
 import { PixiProject } from '../core/types';
-import { DEFAULT_TASK_PREFIX_SEPARATORS, PixiTask, PixiTaskProvider } from '../providers/taskProvider';
+import {
+    DEFAULT_TASK_PREFIX_SEPARATORS,
+    formatTaskDetail,
+    PixiTask,
+    PixiTaskProvider,
+} from '../providers/taskProvider';
 import { PixiProjectTreeItem } from './projectsTreeDataProvider';
 
 export class PixiTaskTreeItem extends TreeItem {
@@ -26,10 +31,7 @@ export class PixiTaskTreeItem extends TreeItem {
         super(task.name, TreeItemCollapsibleState.None);
 
         const envTag = task.default_environment ? `[${task.default_environment}]` : '';
-        let descText = task.description || task.cmd;
-        if (!descText && task.depends_on && task.depends_on.length > 0) {
-            descText = `depends: ${task.depends_on.map((d) => d.task_name).join(', ')}`;
-        }
+        const descText = formatTaskDetail(task);
         this.description = [envTag, descText].filter(Boolean).join(' ');
 
         // Intelligent Codicon matching based on task name semantics

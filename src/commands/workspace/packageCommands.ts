@@ -18,6 +18,7 @@ import {
     pickPixiProject,
     pickTargetScope,
     resolveTargetEnvironment,
+    sortPixiFeatures,
     TargetScope,
 } from './common';
 import {
@@ -66,17 +67,7 @@ export async function buildDeclaredPackageQuickPickItems(
           : features;
 
     const items: DeclaredQuickPickItem[] = [];
-
-    // Sort features so 'default' comes first, followed by others alphabetically
-    const sortedFeatures = [...targetFeatures].sort((a, b) => {
-        if (a.name === 'default') {
-            return -1;
-        }
-        if (b.name === 'default') {
-            return 1;
-        }
-        return a.name.localeCompare(b.name);
-    });
+    const sortedFeatures = sortPixiFeatures(targetFeatures);
 
     const toQuickPickItems = (
         specs: string[],

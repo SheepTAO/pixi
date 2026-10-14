@@ -47,7 +47,21 @@ export const CONDA_CHANNEL_PRESETS: readonly CondaChannelPreset[] = [
         description: 'Bioinformatics and biology package channel',
         channel: 'bioconda',
     },
+    {
+        label: '$(server) robostack',
+        description: 'ROS and robotics packages channel',
+        channel: 'robostack',
+    },
+    {
+        label: '$(server) node-forge',
+        description: 'NodeJS ecosystem Conda channel',
+        channel: 'node-forge',
+    },
 ];
+
+export const COMMON_CHANNELS: readonly { label: string; detail: string }[] = CONDA_CHANNEL_PRESETS.filter(
+    (p) => p.channel && !p.channel.startsWith('http'),
+).map((p) => ({ label: p.channel!, detail: p.description }));
 
 export interface PromptCondaChannelOptions {
     title?: string;

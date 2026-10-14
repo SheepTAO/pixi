@@ -287,10 +287,7 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
         const items: TaskQuickPickItem[] = allTasks.map((t) => {
             const envTag = formatEnv(t.default_environment);
             const projTag = isMultiProject ? `(${path.basename(t.projectPath)})` : '';
-            let detail = t.description || t.cmd;
-            if (!detail && t.depends_on && t.depends_on.length > 0) {
-                detail = `depends: ${t.depends_on.map((d) => d.task_name).join(', ')}`;
-            }
+            const detail = formatTaskDetail(t);
             return {
                 label: t.name,
                 description: [envTag, projTag].filter(Boolean).join(' '),
@@ -383,6 +380,16 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
 
         await this.executePixiTask(selectedTask, env.pixiEnvName, inputArgs.trim() || undefined);
     }
+}
+
+export function formatTaskDetail(task: PixiTask): string | undefined {
+    if (task.description || task.cmd) {
+        return task.description || task.cmd;
+    }
+    if (task.depends_on && task.depends_on.length > 0) {
+        return `depends: ${task.depends_on.map((d) => d.task_name).join(', ')}`;
+    }
+    return undefined;
 }
 
 export async function promptForTaskArgs(taskName: string, envName?: string): Promise<string | undefined> {

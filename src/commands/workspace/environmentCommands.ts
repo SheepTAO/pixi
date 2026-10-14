@@ -12,6 +12,7 @@ import {
     extractFeatureName,
     filterNamedFeatures,
     getManifestPathForFormat,
+    getReferencingEnvs,
     getWorkspaceEnvironments,
     getWorkspaceFeatures,
     openDocumentIfExists,
@@ -846,7 +847,7 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
             }
 
             const allEnvs = await getWorkspaceEnvironments(projectPath);
-            const referencingEnvs = allEnvs.filter((e) => e.features?.includes(featureName!)).map((e) => e.name);
+            const referencingEnvs = getReferencingEnvs(allEnvs, featureName!);
             if (referencingEnvs.length > 0) {
                 const choice = await window.showWarningMessage(
                     `Feature '${featureName}' is referenced by environment(s): ${referencingEnvs.join(', ')}. Removing it will remove it from the project manifest. Do you want to proceed?`,

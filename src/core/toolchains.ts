@@ -248,3 +248,101 @@ export async function scanEnvironmentToolchains(envPath: string): Promise<Enviro
         rust: scanRustToolchain(envPath, metaFiles),
     };
 }
+
+/**
+ * Formats a short summary description for the environment's detected toolchains.
+ */
+export function formatToolchainSummary(toolchains?: EnvironmentToolchains): string | undefined {
+    if (!toolchains) {
+        return undefined;
+    }
+    const items: { label: string; shortName: string }[] = [];
+
+    if (toolchains.python) {
+        items.push({
+            label: toolchains.python.version ? `Python ${toolchains.python.version}` : 'Python',
+            shortName: 'Python',
+        });
+    }
+    if (toolchains.cpp?.compiler) {
+        const cpp = toolchains.cpp;
+        const label =
+            cpp.compilerType === 'gcc'
+                ? 'GCC'
+                : cpp.compilerType === 'clang'
+                  ? 'Clang'
+                  : cpp.compilerType === 'msvc'
+                    ? 'MSVC'
+                    : 'C++';
+        items.push({
+            label: cpp.version ? `${label} ${cpp.version}` : label,
+            shortName: 'C++',
+        });
+    }
+    if (toolchains.rust?.rustc) {
+        items.push({
+            label: toolchains.rust.version ? `Rust ${toolchains.rust.version}` : 'Rust',
+            shortName: 'Rust',
+        });
+    }
+    if (toolchains.r?.executable) {
+        items.push({
+            label: toolchains.r.version ? `R ${toolchains.r.version}` : 'R',
+            shortName: 'R',
+        });
+    }
+
+    if (items.length === 0) {
+        return undefined;
+    }
+    return items.length <= 2 ? items.map((t) => t.label).join(', ') : items.map((t) => t.shortName).join(', ');
+}
+
+/**
+ * Formats multi-line details for the environment's detected toolchains.
+ */
+export function formatToolchainDetails(toolchains?: EnvironmentToolchains): string[] {
+    if (!toolchains) {
+        return [];
+    }
+    const lines: string[] = [];
+
+    if (toolchains.python) {
+        const py = toolchains.python;
+        lines.push(py.version ? `Python: ${py.version} (${py.executable})` : `Python: ${py.executable}`);
+    }
+    if (toolchains.cpp?.compiler) {
+        const cpp = toolchains.cpp;
+        const label =
+            cpp.compilerType === 'gcc'
+                ? 'GCC'
+                : cpp.compilerType === 'clang'
+                  ? 'Clang'
+                  : cpp.compilerType === 'msvc'
+                    ? 'MSVC'
+                    : 'C++';
+        lines.push(cpp.version ? `C/C++ (${label}): ${cpp.version} (${cpp.compiler})` : `C/C++: ${cpp.compiler}`);
+    }
+    if (toolchains.cpp?.cmake) {
+        lines.push(`CMake: ${toolchains.cpp.cmake}`);
+    }
+    if (toolchains.cpp?.ninja) {
+        lines.push(`Ninja: ${toolchains.cpp.ninja}`);
+    }
+    if (toolchains.rust?.rustc) {
+        const rust = toolchains.rust;
+        lines.push(rust.version ? `Rust: ${rust.version} (${rust.rustc})` : `Rust: ${rust.rustc}`);
+    }
+    if (toolchains.rust?.cargo) {
+        lines.push(`Cargo: ${toolchains.rust.cargo}`);
+    }
+    if (toolchains.r?.executable) {
+        const r = toolchains.r;
+        lines.push(r.version ? `R: ${r.version} (${r.executable})` : `R: ${r.executable}`);
+    }
+    if (toolchains.r?.rscript) {
+        lines.push(`Rscript: ${toolchains.r.rscript}`);
+    }
+
+    return lines;
+}

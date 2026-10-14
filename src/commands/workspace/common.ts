@@ -169,6 +169,22 @@ export function filterNamedFeatures(features: WorkspaceListEntry[]): WorkspaceLi
     return features.filter((f) => f.name !== 'default');
 }
 
+export function sortPixiFeatures<T extends { name: string }>(features: T[]): T[] {
+    return [...features].sort((a, b) => {
+        if (a.name === 'default') {
+            return -1;
+        }
+        if (b.name === 'default') {
+            return 1;
+        }
+        return a.name.localeCompare(b.name);
+    });
+}
+
+export function getReferencingEnvs(envs: WorkspaceListEntry[], featureName: string): string[] {
+    return envs.filter((e) => e.features?.includes(featureName)).map((e) => e.name);
+}
+
 export interface FeatureQuickPickItem extends QuickPickItem {
     feature: WorkspaceListEntry;
     featureName: string;

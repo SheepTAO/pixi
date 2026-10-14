@@ -60,6 +60,10 @@ function normalizeHost(input: string): string {
     return cleaned.trim();
 }
 
+function validateRequired(fieldName: string): (value: string) => string | null {
+    return (v) => (!v.trim() ? `${fieldName} cannot be empty` : null);
+}
+
 function extractHostFromTarget(target?: unknown): string | undefined {
     if (!target) {
         return undefined;
@@ -266,7 +270,7 @@ export async function promptLogin(infoProvider: PixiInfoTreeDataProvider, defaul
             prompt: `Enter authentication token for '${targetHost}'`,
             password: true,
             ignoreFocusOut: true,
-            validateInput: (v) => (v.trim().length === 0 ? 'Token cannot be empty' : null),
+            validateInput: validateRequired('Token'),
         });
         if (!token) {
             return;
@@ -277,7 +281,7 @@ export async function promptLogin(infoProvider: PixiInfoTreeDataProvider, defaul
             prompt: `Enter Conda token for '${targetHost}'`,
             password: true,
             ignoreFocusOut: true,
-            validateInput: (v) => (v.trim().length === 0 ? 'Token cannot be empty' : null),
+            validateInput: validateRequired('Token'),
         });
         if (!condaToken) {
             return;
@@ -287,7 +291,7 @@ export async function promptLogin(infoProvider: PixiInfoTreeDataProvider, defaul
             title: `Pixi Auth: Username (${targetHost})`,
             prompt: `Enter username for '${targetHost}'`,
             ignoreFocusOut: true,
-            validateInput: (v) => (v.trim().length === 0 ? 'Username cannot be empty' : null),
+            validateInput: validateRequired('Username'),
         });
         if (!username) {
             return;
@@ -298,7 +302,7 @@ export async function promptLogin(infoProvider: PixiInfoTreeDataProvider, defaul
             prompt: `Enter password for user '${username}' on '${targetHost}'`,
             password: true,
             ignoreFocusOut: true,
-            validateInput: (v) => (v.trim().length === 0 ? 'Password cannot be empty' : null),
+            validateInput: validateRequired('Password'),
         });
         if (!password) {
             return;
@@ -308,7 +312,7 @@ export async function promptLogin(infoProvider: PixiInfoTreeDataProvider, defaul
             title: `Pixi Auth: S3 Access Key ID (${targetHost})`,
             prompt: 'Enter S3 Access Key ID',
             ignoreFocusOut: true,
-            validateInput: (v) => (v.trim().length === 0 ? 'Access Key ID cannot be empty' : null),
+            validateInput: validateRequired('Access Key ID'),
         });
         if (!s3AccessKeyId) {
             return;
@@ -319,7 +323,7 @@ export async function promptLogin(infoProvider: PixiInfoTreeDataProvider, defaul
             prompt: 'Enter S3 Secret Access Key',
             password: true,
             ignoreFocusOut: true,
-            validateInput: (v) => (v.trim().length === 0 ? 'Secret Access Key cannot be empty' : null),
+            validateInput: validateRequired('Secret Access Key'),
         });
         if (!s3SecretAccessKey) {
             return;

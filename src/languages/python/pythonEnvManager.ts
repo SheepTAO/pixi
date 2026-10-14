@@ -26,6 +26,7 @@ import {
     matchEnvironmentForUri,
     sortPixiEnvironments,
 } from '../../core/environmentRules';
+import { getProjectKey } from '../../core/projectDiscovery';
 import { PixiProjectManager } from '../../core/projectManager';
 import { PIXI_MANAGER_ID } from './constants';
 import { createPythonEnvironment, promptToInstallIpykernel } from './pythonDiscovery';
@@ -65,7 +66,7 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
                 if (e.environment) {
                     const project = e.scope ? this.api.getPythonProject(e.scope) : undefined;
                     const projectPath = project?.uri.fsPath || e.environment.projectPath;
-                    const envs = this.projectToEnvs.get(projectPath) || [];
+                    const envs = this.projectToEnvs.get(getProjectKey(projectPath)) || [];
                     const pyEnv = envs.find((p) => p.pixiEnvName === e.environment?.pixiEnvName);
                     if (pyEnv) {
                         this.updateProjectActiveEnv(projectPath, pyEnv);
@@ -170,16 +171,17 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
             const pyEnvs = coreEnvs.map((core) => createPythonEnvironment(core, pixiBin, template));
 
             const sorted = sortPixiEnvironments(pyEnvs);
-            this.projectToEnvs.set(projectPath, sorted);
+            const key = getProjectKey(projectPath);
+            this.projectToEnvs.set(key, sorted);
 
-            const oldEnvs = oldProjectToEnvs.get(projectPath) || [];
+            const oldEnvs = oldProjectToEnvs.get(key) || [];
             changes.push(...this.diffEnvironments(oldEnvs, sorted));
         }
 
         // Handle deleted projects
-        for (const [oldPath, oldEnvs] of oldProjectToEnvs) {
-            if (!this.projectToEnvs.has(oldPath)) {
-                this.activeEnv.delete(oldPath);
+        for (const [oldKey, oldEnvs] of oldProjectToEnvs) {
+            if (!this.projectToEnvs.has(oldKey)) {
+                this.activeEnv.delete(oldKey);
                 if (oldEnvs.length > 0) {
                     changes.push(...this.diffEnvironments(oldEnvs, []));
                 }
@@ -188,14 +190,16 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
 
         // Restore active environments from persistent state or re-link existing instances
         const storage = getWorkspacePersistentState();
-        for (const [projectPath, envs] of this.projectToEnvs) {
+        for (const [key, envs] of this.projectToEnvs) {
+            const projectPath = envs[0]?.projectPath;
             const targetName =
-                this.activeEnv.get(projectPath)?.pixiEnvName || storage.get<string>(`projectEnvName:${projectPath}`);
+                this.activeEnv.get(key)?.pixiEnvName ||
+                (projectPath ? storage.get<string>(`projectEnvName:${projectPath}`) : undefined);
             const found = targetName ? envs.find((e) => e.pixiEnvName === targetName) : undefined;
             if (found) {
-                this.activeEnv.set(projectPath, found);
+                this.activeEnv.set(key, found);
             } else {
-                this.activeEnv.delete(projectPath);
+                this.activeEnv.delete(key);
             }
         }
 
@@ -267,7 +271,7 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
 
         if (scope instanceof Uri) {
             const projectPath = this.resolveProjectPath(scope);
-            const envs = projectPath ? this.projectToEnvs.get(projectPath) || [] : [];
+            const envs = projectPath ? this.projectToEnvs.get(getProjectKey(projectPath)) || [] : [];
             return [...envs];
         }
 
@@ -286,13 +290,14 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
             return this.globalEnv;
         }
 
-        const projectEnvs = this.projectToEnvs.get(projectPath) || [];
+        const key = getProjectKey(projectPath);
+        const projectEnvs = this.projectToEnvs.get(key) || [];
         const matched = matchEnvironmentForUri(scope, projectPath, projectEnvs);
         if (matched) {
             return matched;
         }
 
-        const active = this.activeEnv.get(projectPath);
+        const active = this.activeEnv.get(key);
         if (active) {
             return active;
         }
@@ -322,7 +327,7 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
 
             if (isNotebook && !pyEnv.hasIpykernel) {
                 const projectPath = pyEnv.projectPath;
-                const altEnvs = this.projectToEnvs.get(projectPath) || [];
+                const altEnvs = this.projectToEnvs.get(getProjectKey(projectPath)) || [];
                 void promptToInstallIpykernel(pyEnv, this.projectManager, altEnvs, async (target) => {
                     await this.set(scope, target);
                 });
@@ -353,14 +358,15 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
     }
 
     private updateProjectActiveEnv(projectPath: string, pyEnv: PixiPythonEnvironment | undefined): void {
-        const oldEnv = this.activeEnv.get(projectPath);
+        const key = getProjectKey(projectPath);
+        const oldEnv = this.activeEnv.get(key);
         if (oldEnv?.envId.id === pyEnv?.envId.id) {
             return;
         }
         if (pyEnv) {
-            this.activeEnv.set(projectPath, pyEnv);
+            this.activeEnv.set(key, pyEnv);
         } else {
-            this.activeEnv.delete(projectPath);
+            this.activeEnv.delete(key);
         }
         this._onDidChangeEnvironment.fire({ uri: Uri.file(projectPath), old: oldEnv, new: pyEnv });
     }

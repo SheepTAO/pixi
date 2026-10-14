@@ -1,5 +1,4 @@
 import * as fs from 'fs';
-import * as path from 'path';
 import {
     CancellationToken,
     commands,
@@ -27,7 +26,7 @@ import {
 import { PixiExtensionApi } from '../api';
 import { encodeCommandArg, escapeRegex, normalizeFolderPath, revealRangeInEditor } from '../common/execUtils';
 import { normalizePkgName } from '../core/packageManager';
-import { isPyproject, MANIFEST_SELECTORS } from '../core/projectDiscovery';
+import { getLockfilePath, isPyproject, MANIFEST_SELECTORS } from '../core/projectDiscovery';
 import { PixiProjectManager } from '../core/projectManager';
 import { PixiPackage } from '../core/types';
 
@@ -369,7 +368,7 @@ export class PixiDependencyManifestProvider
         // Fallback for dependencies not present in active environment (e.g. feature-specific dependencies)
         if (missingDeps.length > 0 && !token.isCancellationRequested) {
             // Fast in-memory path: check pixi.lock directly without spawning child processes
-            const lockPath = path.join(projectPath, 'pixi.lock');
+            const lockPath = getLockfilePath(projectPath);
             const lockLines = await getLockfileLines(lockPath);
 
             if (lockLines) {
@@ -449,7 +448,7 @@ export class PixiDependencyManifestProvider
             }
         }
 
-        const lockPath = path.join(projectPath, 'pixi.lock');
+        const lockPath = getLockfilePath(projectPath);
         const lockExists = fs.existsSync(lockPath);
         const md = new MarkdownString();
         md.isTrusted = true;
@@ -603,7 +602,7 @@ export class PixiDependencyManifestProvider
             return undefined;
         }
 
-        const lockPath = path.join(projectPath, 'pixi.lock');
+        const lockPath = getLockfilePath(projectPath);
         const lines = await getLockfileLines(lockPath);
         const targetLine = lines ? findPackageLineInLines(lines, matched.name) : -1;
         if (targetLine < 0 || token.isCancellationRequested) {
@@ -629,7 +628,7 @@ export class PixiDependencyManifestProvider
             return;
         }
 
-        const lockPath = path.join(projectPath, 'pixi.lock');
+        const lockPath = getLockfilePath(projectPath);
         if (!fs.existsSync(lockPath)) {
             window.showWarningMessage(`No pixi.lock found in ${projectPath}`);
             return;

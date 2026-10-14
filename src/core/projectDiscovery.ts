@@ -10,6 +10,15 @@ export const MANIFEST_SELECTORS: readonly DocumentFilter[] = [
     { scheme: 'file', pattern: '**/pyproject.toml' },
 ];
 
+export const LOCKFILE_NAME = 'pixi.lock';
+
+/**
+ * Resolves the lockfile path ('pixi.lock') for a given project directory.
+ */
+export function getLockfilePath(projectPath: string): string {
+    return path.join(projectPath, LOCKFILE_NAME);
+}
+
 /**
  * Checks if a document, Uri, or file path corresponds to a pyproject.toml manifest.
  */
