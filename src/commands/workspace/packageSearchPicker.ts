@@ -10,6 +10,7 @@ import {
 } from 'vscode';
 
 import { PixiPackageSearchResult, searchPixiPackages } from '../../cli/pixiCli';
+import { getPrefixDevPackageUrl, getPypiPackageUrl } from '../../core/packageManager';
 import { DEFAULT_CONDA_CHANNEL, getProjectConfiguredChannels } from '../../core/projectDiscovery';
 import { handleGlobalInstall } from '../globalCommands';
 
@@ -244,9 +245,7 @@ export async function handlePackageSearchSelection(
 ): Promise<void> {
     const isPypi = pkg.sourceType === 'pypi';
     const primaryChan = pkg.channel ? pkg.channel.split(',')[0].trim() : DEFAULT_CONDA_CHANNEL;
-    const webUrl = isPypi
-        ? `https://pypi.org/project/${encodeURIComponent(pkg.name)}/`
-        : `https://prefix.dev/channels/${encodeURIComponent(primaryChan)}/packages/${encodeURIComponent(pkg.name)}`;
+    const webUrl = isPypi ? getPypiPackageUrl(pkg.name) : getPrefixDevPackageUrl(primaryChan, pkg.name);
 
     interface PackageInspectionItem extends QuickPickItem {
         action?: 'add' | 'global-install' | 'open-browser' | 'copy-spec' | 'copy-name';

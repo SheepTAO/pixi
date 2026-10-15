@@ -170,3 +170,17 @@ export function splitPackageSpec(spec: string): SplitPackageSpecResult {
 export function getPackageKindBadge(kind?: string): string {
     return kind === 'pypi' ? '[PyPI]' : '[Conda]';
 }
+
+/**
+ * Constructs a package overview URL on prefix.dev for a given Conda channel and package name.
+ */
+export function getPrefixDevPackageUrl(channel: string, packageName: string): string {
+    return `https://prefix.dev/channels/${encodeURIComponent(channel)}/packages/${encodeURIComponent(packageName)}`;
+}
+
+/**
+ * Constructs a package overview URL on PyPI for a given package name.
+ */
+export function getPypiPackageUrl(packageName: string): string {
+    return `https://pypi.org/project/${encodeURIComponent(packageName)}/`;
+}

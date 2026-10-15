@@ -26,7 +26,7 @@ import {
 import { PixiExtensionApi } from '../api';
 import { pickPixiProject } from '../commands/workspace/common';
 import { encodeCommandArg, escapeRegex, revealRangeInEditor } from '../common/execUtils';
-import { normalizePkgName } from '../core/packageManager';
+import { getPrefixDevPackageUrl, getPypiPackageUrl, normalizePkgName } from '../core/packageManager';
 import {
     DEFAULT_CONDA_CHANNEL,
     getLockfilePath,
@@ -574,12 +574,12 @@ export class PixiDependencyManifestProvider
 
             if (!isLocalOrEditable) {
                 if (isPypi) {
-                    const pypiUrl = `https://pypi.org/project/${encodeURIComponent(targetPkg.name)}/`;
+                    const pypiUrl = getPypiPackageUrl(targetPkg.name);
                     actions.push(`[$(link-external) PyPI](${pypiUrl} "Open package on PyPI")`);
                 } else {
                     const chMatch = targetPkg.source?.match(/conda\.anaconda\.org\/([^/]+)/);
                     const channel = chMatch ? chMatch[1] : DEFAULT_CONDA_CHANNEL;
-                    const prefixUrl = `https://prefix.dev/channels/${channel}/packages/${encodeURIComponent(targetPkg.name)}`;
+                    const prefixUrl = getPrefixDevPackageUrl(channel, targetPkg.name);
                     actions.push(`[$(link-external) prefix.dev](${prefixUrl} "Open package on prefix.dev")`);
                 }
             }
