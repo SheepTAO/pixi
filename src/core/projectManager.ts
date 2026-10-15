@@ -24,8 +24,8 @@ import {
     isPyproject,
     LOCKFILE_NAME,
     PIXI_MANIFEST_NAME,
-    PYPROJECT_MANIFEST_NAME,
     resolvePixiProjectPaths,
+    SUPPORTED_MANIFEST_NAMES,
 } from './projectDiscovery';
 import { scanEnvironmentToolchains } from './toolchains';
 import { PixiEnvironmentInfo, PixiEnvironmentStatus, PixiInfo, PixiPackage, PixiProject } from './types';
@@ -96,9 +96,7 @@ export class PixiProjectManager implements Disposable {
             }, 500);
         };
 
-        const watcher = workspace.createFileSystemWatcher(
-            `{${PIXI_MANIFEST_NAME},${PYPROJECT_MANIFEST_NAME},${LOCKFILE_NAME}}`,
-        );
+        const watcher = workspace.createFileSystemWatcher(`{${SUPPORTED_MANIFEST_NAMES.join(',')},${LOCKFILE_NAME}}`);
 
         this.disposables.push(
             watcher,

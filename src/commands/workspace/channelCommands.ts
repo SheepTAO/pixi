@@ -1,69 +1,10 @@
 import { commands, Disposable, QuickPickItem, window } from 'vscode';
 
 import { runPixiWithProgress } from '../../cli/workspaceCli';
+import { CONDA_CHANNEL_PRESETS } from '../../core/presets';
 import { DEFAULT_CONDA_CHANNEL, getWorkspaceChannels } from '../../core/projectDiscovery';
 import { PixiProjectManager } from '../../core/projectManager';
 import { extractFeatureName, formatScope, pickPixiProject, resolveWorkspaceOrFeatureScope } from './common';
-
-export { DEFAULT_CONDA_CHANNEL } from '../../core/projectDiscovery';
-
-export interface CondaChannelPreset {
-    label: string;
-    description: string;
-    channel?: string;
-}
-
-export const CONDA_CHANNEL_PRESETS: readonly CondaChannelPreset[] = [
-    {
-        label: `$(server) ${DEFAULT_CONDA_CHANNEL} (default)`,
-        description: 'Community-driven Conda repository (default)',
-        channel: DEFAULT_CONDA_CHANNEL,
-    },
-    {
-        label: `$(rocket) Tsinghua Mirror (${DEFAULT_CONDA_CHANNEL})`,
-        description: `https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/${DEFAULT_CONDA_CHANNEL}`,
-        channel: `https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/${DEFAULT_CONDA_CHANNEL}`,
-    },
-    {
-        label: `$(rocket) BFSU Mirror (${DEFAULT_CONDA_CHANNEL})`,
-        description: `https://mirrors.bfsu.edu.cn/anaconda/cloud/${DEFAULT_CONDA_CHANNEL}`,
-        channel: `https://mirrors.bfsu.edu.cn/anaconda/cloud/${DEFAULT_CONDA_CHANNEL}`,
-    },
-    {
-        label: `$(rocket) Aliyun Mirror (${DEFAULT_CONDA_CHANNEL})`,
-        description: `https://mirrors.aliyun.com/anaconda/cloud/${DEFAULT_CONDA_CHANNEL}`,
-        channel: `https://mirrors.aliyun.com/anaconda/cloud/${DEFAULT_CONDA_CHANNEL}`,
-    },
-    {
-        label: '$(server) pytorch',
-        description: 'Official PyTorch Conda channel',
-        channel: 'pytorch',
-    },
-    {
-        label: '$(server) nvidia',
-        description: 'Official NVIDIA CUDA packages channel',
-        channel: 'nvidia',
-    },
-    {
-        label: '$(beaker) bioconda',
-        description: 'Bioinformatics and biology package channel',
-        channel: 'bioconda',
-    },
-    {
-        label: '$(server) robostack',
-        description: 'ROS and robotics packages channel',
-        channel: 'robostack',
-    },
-    {
-        label: '$(server) node-forge',
-        description: 'NodeJS ecosystem Conda channel',
-        channel: 'node-forge',
-    },
-];
-
-export const COMMON_CHANNELS: readonly { label: string; detail: string }[] = CONDA_CHANNEL_PRESETS.filter(
-    (p) => p.channel && !p.channel.startsWith('http'),
-).map((p) => ({ label: p.channel!, detail: p.description }));
 
 export interface PromptCondaChannelOptions {
     title?: string;

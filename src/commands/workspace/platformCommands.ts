@@ -3,27 +3,9 @@ import { commands, Disposable, QuickPickItem, window } from 'vscode';
 import { getHostCondaPlatform, runPixi } from '../../cli/pixiCli';
 import { runPixiWithProgress } from '../../cli/workspaceCli';
 import { safeJsonParse } from '../../common/execUtils';
+import { CONDA_PLATFORM_PRESETS } from '../../core/presets';
 import { PixiProjectManager } from '../../core/projectManager';
 import { formatScope, pickPixiProject, resolveWorkspaceOrFeatureScope } from './common';
-
-export interface CondaPlatformPreset {
-    name: string;
-    description: string;
-}
-
-export const CONDA_PLATFORM_PRESETS: readonly CondaPlatformPreset[] = [
-    { name: 'linux-64', description: 'Linux x86_64 architecture' },
-    { name: 'linux-aarch64', description: 'Linux ARM64 / aarch64 architecture' },
-    { name: 'osx-arm64', description: 'macOS Apple Silicon (M1/M2/M3/M4)' },
-    { name: 'osx-64', description: 'macOS Intel x86_64 architecture' },
-    { name: 'win-64', description: 'Windows x86_64 architecture' },
-    { name: 'win-arm64', description: 'Windows ARM64 architecture' },
-];
-
-export const COMMON_PLATFORMS: readonly { label: string; detail: string }[] = [
-    ...CONDA_PLATFORM_PRESETS.map((p) => ({ label: p.name, detail: p.description })),
-    { label: 'noarch', detail: 'Platform-independent Conda packages' },
-];
 
 interface RawPlatformListJson {
     platforms?: Array<{

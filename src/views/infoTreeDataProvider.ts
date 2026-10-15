@@ -20,7 +20,7 @@ import { traceError } from '../common/logging';
 
 const BYTE_UNITS = ['KB', 'MB', 'GB', 'TB'] as const;
 
-export function formatBytes(bytes: number): string {
+function formatBytes(bytes: number): string {
     if (bytes < 1024) {
         return `${bytes} B`;
     }

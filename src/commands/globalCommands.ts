@@ -14,7 +14,8 @@ import {
     updateGlobalTool,
 } from '../cli/globalCli';
 import { runWithProgressNotification } from '../common/execUtils';
-import { DEFAULT_CONDA_CHANNEL, promptCondaChannel } from './workspace/channelCommands';
+import { DEFAULT_CONDA_CHANNEL } from '../core/projectDiscovery';
+import { promptCondaChannel } from './workspace/channelCommands';
 
 interface GlobalActionQuickPickItem extends QuickPickItem {
     action: 'install' | 'list' | 'sync' | 'update' | 'uninstall' | 'edit';

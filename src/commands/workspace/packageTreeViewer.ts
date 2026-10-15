@@ -16,11 +16,11 @@ import { extractCommandContext, pickPixiProject, resolveTargetEnvironment } from
 
 let treeOutputChannel: OutputChannel | undefined;
 
-export function exactPackageRegex(name: string): string {
+function exactPackageRegex(name: string): string {
     return `^${escapeRegex(name)}$`;
 }
 
-export function buildTreeArgs(envName?: string, isReverse?: boolean): string[] {
+function buildTreeArgs(envName?: string, isReverse?: boolean): string[] {
     const args = ['tree', '--color', 'never'];
     if (isReverse) {
         args.push('-i');
@@ -31,7 +31,7 @@ export function buildTreeArgs(envName?: string, isReverse?: boolean): string[] {
     return args;
 }
 
-export function getTreeOutputChannel(): OutputChannel {
+function getTreeOutputChannel(): OutputChannel {
     if (!treeOutputChannel) {
         treeOutputChannel = window.createOutputChannel('Pixi Tree');
     }

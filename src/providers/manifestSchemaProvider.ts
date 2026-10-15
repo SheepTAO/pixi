@@ -18,10 +18,9 @@ import {
     workspace,
 } from 'vscode';
 
-import { COMMON_CHANNELS } from '../commands/workspace/channelCommands';
-import { COMMON_PLATFORMS } from '../commands/workspace/platformCommands';
 import { traceError, traceVerbose } from '../common/logging';
-import { isPyproject, MANIFEST_SELECTORS } from '../core/projectDiscovery';
+import { COMMON_CHANNELS, COMMON_PLATFORMS, ManifestPresetCompletionItem } from '../core/presets';
+import { isPixiManifestSection, isPyproject, MANIFEST_SELECTORS } from '../core/projectDiscovery';
 
 interface SchemaProperty {
     description?: string;
@@ -130,7 +129,7 @@ export class PixiManifestSchemaProvider implements CompletionItemProvider, Hover
         const beforeCursor = lineText.substring(0, position.character);
         const isPyprojectDoc = isPyproject(document);
 
-        const buildArrayCompletions = (items: readonly { label: string; detail: string }[], arrayName: string) => {
+        const buildArrayCompletions = (items: readonly ManifestPresetCompletionItem[], arrayName: string) => {
             const lastQuoteIdx = Math.max(beforeCursor.lastIndexOf('"'), beforeCursor.lastIndexOf("'"));
             const hasOpenQuote = lastQuoteIdx !== -1 && !beforeCursor.substring(lastQuoteIdx + 1).includes(',');
             const afterCursor = lineText.substring(position.character);
@@ -167,7 +166,7 @@ export class PixiManifestSchemaProvider implements CompletionItemProvider, Hover
         };
 
         const activeSection = this.getActiveSection(document, position.line);
-        const isInPixiSection = !isPyprojectDoc || Boolean(activeSection?.startsWith('tool.pixi'));
+        const isInPixiSection = isPixiManifestSection(activeSection, isPyprojectDoc);
 
         if (isInPixiSection && this.isInsideArray(document, position, 'channels')) {
             return buildArrayCompletions(COMMON_CHANNELS, 'Conda channel');
@@ -347,7 +346,7 @@ export class PixiManifestSchemaProvider implements CompletionItemProvider, Hover
 
         const isPyprojectDoc = isPyproject(document);
         const activeSection = this.getActiveSection(document, position.line);
-        if (isPyprojectDoc && (!activeSection || !activeSection.startsWith('tool.pixi'))) {
+        if (!isPixiManifestSection(activeSection, isPyprojectDoc)) {
             return undefined;
         }
         const normalizedSection = (activeSection || '').replace(/^tool\.pixi\./, '');

@@ -168,7 +168,7 @@ export async function pickDeclaredPackage(
     return pick?.declaredPkg;
 }
 
-export function parseAddedSpecsFromOutput(output: string, fallback: string): string {
+function parseAddedSpecsFromOutput(output: string, fallback: string): string {
     const cleanOutput = output.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
     const addedMatches = Array.from(cleanOutput.matchAll(/(?:✔|✓)\s*Added\s+([^\r\n]+)/g)).map((m) => m[1].trim());
     return addedMatches.length > 0 ? addedMatches.join(', ') : fallback;

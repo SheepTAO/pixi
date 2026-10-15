@@ -16,7 +16,7 @@ import {
 } from 'vscode';
 
 import { encodeCommandArg } from '../common/execUtils';
-import { isPyproject, MANIFEST_SELECTORS } from '../core/projectDiscovery';
+import { isPixiManifestSection, isPyproject, MANIFEST_SELECTORS } from '../core/projectDiscovery';
 import { PixiProjectManager } from '../core/projectManager';
 import { PixiTask, PixiTaskProvider } from './taskProvider';
 
@@ -293,7 +293,7 @@ export class PixiTaskManifestProvider implements CodeLensProvider, HoverProvider
                 isTasksContainer = false;
                 currentEnv = undefined;
 
-                if (isPyprojectDoc && !currentSection.startsWith('tool.pixi.')) {
+                if (!isPixiManifestSection(currentSection, isPyprojectDoc)) {
                     continue;
                 }
 

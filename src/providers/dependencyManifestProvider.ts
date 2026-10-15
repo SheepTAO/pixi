@@ -30,6 +30,7 @@ import { getPrefixDevPackageUrl, getPypiPackageUrl, normalizePkgName } from '../
 import {
     DEFAULT_CONDA_CHANNEL,
     getLockfilePath,
+    isPixiManifestSection,
     isPyproject,
     LOCKFILE_NAME,
     MANIFEST_SELECTORS,
@@ -272,10 +273,7 @@ export class PixiDependencyManifestProvider
             }
 
             // Standard Pixi table dependencies
-            if (
-                (!isPyprojectDoc || currentSection.startsWith('tool.pixi.')) &&
-                KV_DEP_SECTION_REGEX.test(currentSection)
-            ) {
+            if (isPixiManifestSection(currentSection, isPyprojectDoc) && KV_DEP_SECTION_REGEX.test(currentSection)) {
                 const kvMatch = codeLine.match(KV_DEP_REGEX);
                 if (kvMatch) {
                     const pkgName = kvMatch[2] || kvMatch[3];

@@ -4,7 +4,7 @@ import * as path from 'path';
 import { runPixi } from '../cli/pixiCli';
 import { safeJsonParse } from '../common/execUtils';
 import { traceError, traceVerbose } from '../common/logging';
-import { PIXI_MANIFEST_NAME, PYPROJECT_MANIFEST_NAME } from './projectDiscovery';
+import { SUPPORTED_MANIFEST_NAMES } from './projectDiscovery';
 import { PixiPackage } from './types';
 
 interface ManifestCandidate {
@@ -15,14 +15,10 @@ interface ManifestCandidate {
 const TOML_VERSION_REGEX = /(?:^|\n)\s*version\s*=\s*["']([^"']+)["']/;
 
 const MANIFEST_CANDIDATES: readonly ManifestCandidate[] = [
-    {
-        filename: PIXI_MANIFEST_NAME,
+    ...SUPPORTED_MANIFEST_NAMES.map((filename) => ({
+        filename,
         versionRegex: TOML_VERSION_REGEX,
-    },
-    {
-        filename: PYPROJECT_MANIFEST_NAME,
-        versionRegex: TOML_VERSION_REGEX,
-    },
+    })),
     {
         filename: 'setup.cfg',
         versionRegex: /(?:^|\n)\s*version\s*=\s*([^\s\r\n]+)/,

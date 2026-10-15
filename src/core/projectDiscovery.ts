@@ -4,16 +4,19 @@ import { DocumentFilter, TextDocument, Uri, workspace } from 'vscode';
 
 export const PIXI_MANIFEST_NAME = 'pixi.toml';
 export const PYPROJECT_MANIFEST_NAME = 'pyproject.toml';
+export const SUPPORTED_MANIFEST_NAMES = [PIXI_MANIFEST_NAME, PYPROJECT_MANIFEST_NAME] as const;
+export type SupportedManifestName = (typeof SUPPORTED_MANIFEST_NAMES)[number];
+
 export const LOCKFILE_NAME = 'pixi.lock';
 export const DEFAULT_CONDA_CHANNEL = 'conda-forge';
 
 /**
  * Standard document filter selectors for Pixi and pyproject manifests.
  */
-export const MANIFEST_SELECTORS: readonly DocumentFilter[] = [
-    { scheme: 'file', pattern: `**/${PIXI_MANIFEST_NAME}` },
-    { scheme: 'file', pattern: `**/${PYPROJECT_MANIFEST_NAME}` },
-];
+export const MANIFEST_SELECTORS: readonly DocumentFilter[] = SUPPORTED_MANIFEST_NAMES.map((name) => ({
+    scheme: 'file',
+    pattern: `**/${name}`,
+}));
 
 /**
  * Resolves the lockfile path ('pixi.lock') for a given project directory.
@@ -31,6 +34,18 @@ export function isPyproject(target?: TextDocument | Uri | string | null): boolea
     }
     const p = typeof target === 'string' ? target : 'uri' in target ? target.uri.fsPath : target.fsPath;
     return path.basename(p) === PYPROJECT_MANIFEST_NAME;
+}
+
+/**
+ * Checks whether a TOML section header belongs to Pixi configuration.
+ * In pyproject.toml, Pixi sections must start with 'tool.pixi.'.
+ * In pixi.toml, all declared sections are Pixi-managed.
+ */
+export function isPixiManifestSection(section?: string | null, isPyprojectDoc?: boolean): boolean {
+    if (!section) {
+        return false;
+    }
+    return !isPyprojectDoc || section === 'tool.pixi' || section.startsWith('tool.pixi.');
 }
 
 /**
@@ -52,19 +67,22 @@ export function isPixiProject(folderPath: string): boolean {
  * Resolves the path to the manifest file ('pixi.toml' or 'pyproject.toml') for a given folder if it exists.
  */
 export function findManifestPath(folderPath: string): string | undefined {
-    const pixiToml = path.join(folderPath, PIXI_MANIFEST_NAME);
-    if (fs.existsSync(pixiToml)) {
-        return pixiToml;
-    }
-    const pyprojectToml = path.join(folderPath, PYPROJECT_MANIFEST_NAME);
-    if (fs.existsSync(pyprojectToml)) {
-        try {
-            const content = fs.readFileSync(pyprojectToml, 'utf8');
-            if (/(?:^|\n)\s*\[tool\.pixi/.test(content)) {
-                return pyprojectToml;
+    for (const name of SUPPORTED_MANIFEST_NAMES) {
+        const fullPath = path.join(folderPath, name);
+        if (!fs.existsSync(fullPath)) {
+            continue;
+        }
+        if (name === PYPROJECT_MANIFEST_NAME) {
+            try {
+                const content = fs.readFileSync(fullPath, 'utf8');
+                if (/(?:^|\n)\s*\[tool\.pixi/.test(content)) {
+                    return fullPath;
+                }
+            } catch {
+                continue;
             }
-        } catch {
-            return undefined;
+        } else {
+            return fullPath;
         }
     }
     return undefined;
@@ -83,7 +101,7 @@ const CHANNEL_ITEM_RE = /\{[^}]*?\bchannel\s*=\s*(?:"([^"]+)"|'([^']+)')[^}]*\}|
 /**
  * Parses configured Conda channels (both global workspace and feature-scoped) from TOML manifest text.
  */
-export function parseManifestChannels(text: string): WorkspaceChannelEntry[] {
+function parseManifestChannels(text: string): WorkspaceChannelEntry[] {
     const uncommented = text.replace(
         /("(?:\\.|[^"\\])*"|'[^']*')|#.*$/gm,
         (_, quoted: string | undefined) => quoted ?? '',

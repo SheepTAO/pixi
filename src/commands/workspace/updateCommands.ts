@@ -45,7 +45,7 @@ interface RawDryRunResult {
  * Extracts version and build strings from a Conda package URL or filename.
  * e.g., '.../bzip2-1.0.8-hda65f42_9.conda' -> { version: '1.0.8', build: 'hda65f42_9' }
  */
-export function parseCondaInfo(url?: string, pkgName?: string): { version?: string; build?: string } {
+function parseCondaInfo(url?: string, pkgName?: string): { version?: string; build?: string } {
     if (!url) {
         return {};
     }
@@ -71,7 +71,7 @@ export function parseCondaInfo(url?: string, pkgName?: string): { version?: stri
 /**
  * Formats a human-readable version diff for a package change.
  */
-export function formatVersionDiff(pkg: DryRunPackageChange): string {
+function formatVersionDiff(pkg: DryRunPackageChange): string {
     const typeBadge = getPackageKindBadge(pkg.type);
     if (pkg.isNew) {
         return `(new) -> v${pkg.afterVer || 'unknown'} ${typeBadge}`;
@@ -88,7 +88,7 @@ export function formatVersionDiff(pkg: DryRunPackageChange): string {
 /**
  * Parses the stdout JSON of `pixi update --dry-run --json`.
  */
-export function parseDryRunOutput(jsonStr: string): DryRunPackageChange[] {
+function parseDryRunOutput(jsonStr: string): DryRunPackageChange[] {
     const data = safeJsonParse<RawDryRunResult>(jsonStr, {});
     const envMap = data.environment || {};
     const result: DryRunPackageChange[] = [];
