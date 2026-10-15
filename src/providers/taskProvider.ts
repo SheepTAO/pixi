@@ -270,8 +270,8 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
 
         let projectPaths = this.projectManager.getProjectPaths();
         if (options.targetProjectPath) {
-            const normalized = path.normalize(options.targetProjectPath);
-            projectPaths = projectPaths.filter((p) => p === normalized);
+            const targetKey = getProjectKey(options.targetProjectPath);
+            projectPaths = projectPaths.filter((p) => getProjectKey(p) === targetKey);
         }
         if (projectPaths.length === 0) {
             return undefined;
