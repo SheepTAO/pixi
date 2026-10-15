@@ -14,7 +14,7 @@ import {
     updateGlobalTool,
 } from '../cli/globalCli';
 import { runWithProgressNotification } from '../common/execUtils';
-import { promptCondaChannel } from './workspace/channelCommands';
+import { DEFAULT_CONDA_CHANNEL, promptCondaChannel } from './workspace/channelCommands';
 
 interface GlobalActionQuickPickItem extends QuickPickItem {
     action: 'install' | 'list' | 'sync' | 'update' | 'uninstall' | 'edit';
@@ -82,7 +82,7 @@ export async function handleGlobalInstall(initialTool?: string): Promise<void> {
         return;
     }
 
-    const channelLabel = targetChannel ? `channel: ${targetChannel}` : 'channel: conda-forge';
+    const channelLabel = targetChannel ? `channel: ${targetChannel}` : `channel: ${DEFAULT_CONDA_CHANNEL}`;
     await runWithProgressNotification(
         `Pixi Global: Installing '${tools.join(', ')}' (${channelLabel})...`,
         (token) => installGlobalTools(tools, targetChannel, token),

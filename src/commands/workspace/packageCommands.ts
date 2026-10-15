@@ -4,6 +4,7 @@ import { PixiPackageSearchResult } from '../../cli/pixiCli';
 import { runPixiWithProgress } from '../../cli/workspaceCli';
 import { normalizeFolderPath, revealDefinitionInManifest } from '../../common/execUtils';
 import { getPackageKindBadge, sortPixiPackages, splitPackageSpec } from '../../core/packageManager';
+import { DEFAULT_CONDA_CHANNEL } from '../../core/projectDiscovery';
 import { PixiProjectManager } from '../../core/projectManager';
 import {
     extractCommandContext,
@@ -342,7 +343,7 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
                     }
                     args.push(...scopeArgs, spec);
 
-                    const sourceLabel = isPypi ? 'PyPI' : `Conda (${pkg.channel || 'conda-forge'})`;
+                    const sourceLabel = isPypi ? 'PyPI' : `Conda (${pkg.channel || DEFAULT_CONDA_CHANNEL})`;
                     await executeAddPackage(manager, projectPath, args, spec, sourceLabel, scopeLabel);
                     return;
                 }

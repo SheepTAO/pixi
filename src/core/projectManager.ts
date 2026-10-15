@@ -22,6 +22,9 @@ import {
     getProjectKey,
     isPixiProject,
     isPyproject,
+    LOCKFILE_NAME,
+    PIXI_MANIFEST_NAME,
+    PYPROJECT_MANIFEST_NAME,
     resolvePixiProjectPaths,
 } from './projectDiscovery';
 import { scanEnvironmentToolchains } from './toolchains';
@@ -93,7 +96,9 @@ export class PixiProjectManager implements Disposable {
             }, 500);
         };
 
-        const watcher = workspace.createFileSystemWatcher('{pixi.toml,pyproject.toml,pixi.lock}');
+        const watcher = workspace.createFileSystemWatcher(
+            `{${PIXI_MANIFEST_NAME},${PYPROJECT_MANIFEST_NAME},${LOCKFILE_NAME}}`,
+        );
 
         this.disposables.push(
             watcher,
@@ -135,7 +140,7 @@ export class PixiProjectManager implements Disposable {
             return {
                 name: this.getProjectName(p),
                 projectPath: p,
-                manifestPath: this.getManifestPath(p) || path.join(p, 'pixi.toml'),
+                manifestPath: this.getManifestPath(p) || path.join(p, PIXI_MANIFEST_NAME),
             };
         });
         return projects.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));

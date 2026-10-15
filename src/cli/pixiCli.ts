@@ -8,6 +8,7 @@ import which from 'which';
 
 import { quoteArgs, safeJsonParse, sanitizeArgsForLogging, untildify } from '../common/execUtils';
 import { traceError, traceInfo, traceVerbose } from '../common/logging';
+import { DEFAULT_CONDA_CHANNEL } from '../core/projectDiscovery';
 
 let _cachedPixi: string | undefined;
 
@@ -334,7 +335,7 @@ export async function searchPixiPackages(
                                 const chan = r.channel
                                     .replace(/^https?:\/\/conda\.anaconda\.org\//, '')
                                     .replace(/\/$/, '');
-                                item.channels.add(chan || 'conda-forge');
+                                item.channels.add(chan || DEFAULT_CONDA_CHANNEL);
                             }
                         }
                     }
@@ -352,7 +353,7 @@ export async function searchPixiPackages(
                     return b.localeCompare(a);
                 });
 
-                const channelStr = Array.from(item.channels).join(', ') || 'conda-forge';
+                const channelStr = Array.from(item.channels).join(', ') || DEFAULT_CONDA_CHANNEL;
                 results.push({
                     name: item.name,
                     latestVersion: sortedVersions[0] || 'unknown',

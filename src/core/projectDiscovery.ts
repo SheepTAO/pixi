@@ -2,15 +2,18 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { DocumentFilter, TextDocument, Uri, workspace } from 'vscode';
 
+export const PIXI_MANIFEST_NAME = 'pixi.toml';
+export const PYPROJECT_MANIFEST_NAME = 'pyproject.toml';
+export const LOCKFILE_NAME = 'pixi.lock';
+export const DEFAULT_CONDA_CHANNEL = 'conda-forge';
+
 /**
  * Standard document filter selectors for Pixi and pyproject manifests.
  */
 export const MANIFEST_SELECTORS: readonly DocumentFilter[] = [
-    { scheme: 'file', pattern: '**/pixi.toml' },
-    { scheme: 'file', pattern: '**/pyproject.toml' },
+    { scheme: 'file', pattern: `**/${PIXI_MANIFEST_NAME}` },
+    { scheme: 'file', pattern: `**/${PYPROJECT_MANIFEST_NAME}` },
 ];
-
-export const LOCKFILE_NAME = 'pixi.lock';
 
 /**
  * Resolves the lockfile path ('pixi.lock') for a given project directory.
@@ -27,7 +30,7 @@ export function isPyproject(target?: TextDocument | Uri | string | null): boolea
         return false;
     }
     const p = typeof target === 'string' ? target : 'uri' in target ? target.uri.fsPath : target.fsPath;
-    return path.basename(p) === 'pyproject.toml';
+    return path.basename(p) === PYPROJECT_MANIFEST_NAME;
 }
 
 /**
@@ -49,11 +52,11 @@ export function isPixiProject(folderPath: string): boolean {
  * Resolves the path to the manifest file ('pixi.toml' or 'pyproject.toml') for a given folder if it exists.
  */
 export function findManifestPath(folderPath: string): string | undefined {
-    const pixiToml = path.join(folderPath, 'pixi.toml');
+    const pixiToml = path.join(folderPath, PIXI_MANIFEST_NAME);
     if (fs.existsSync(pixiToml)) {
         return pixiToml;
     }
-    const pyprojectToml = path.join(folderPath, 'pyproject.toml');
+    const pyprojectToml = path.join(folderPath, PYPROJECT_MANIFEST_NAME);
     if (fs.existsSync(pyprojectToml)) {
         try {
             const content = fs.readFileSync(pyprojectToml, 'utf8');

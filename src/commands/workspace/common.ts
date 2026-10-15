@@ -16,6 +16,7 @@ import { runPixi } from '../../cli/pixiCli';
 import { normalizeFolderPath, normalizeLocationPath } from '../../common/execUtils';
 import { ensureEnvironmentReady, getEnvironmentStatusBadge, sortPixiEnvironments } from '../../core/environmentRules';
 import { normalizePkgName } from '../../core/packageManager';
+import { PIXI_MANIFEST_NAME, PYPROJECT_MANIFEST_NAME } from '../../core/projectDiscovery';
 import { PixiProjectManager } from '../../core/projectManager';
 import { PixiEnvironmentInfo, PixiPackage } from '../../core/types';
 import type { PixiTask } from '../../providers/taskProvider';
@@ -48,13 +49,13 @@ export async function pickManifestFormat(target?: Uri | string): Promise<'pixi' 
     const pick = await window.showQuickPick(
         [
             {
-                label: '$(file-code) pixi.toml',
+                label: `$(file-code) ${PIXI_MANIFEST_NAME}`,
                 description: 'Dedicated Pixi manifest format (Recommended)',
                 format: 'pixi' as const,
             },
             {
-                label: '$(file) pyproject.toml',
-                description: 'Standard Python pyproject.toml format',
+                label: `$(file) ${PYPROJECT_MANIFEST_NAME}`,
+                description: `Standard Python ${PYPROJECT_MANIFEST_NAME} format`,
                 format: 'pyproject' as const,
             },
         ],
@@ -64,7 +65,7 @@ export async function pickManifestFormat(target?: Uri | string): Promise<'pixi' 
 }
 
 export function getManifestPathForFormat(folder: string, format: 'pixi' | 'pyproject'): string {
-    return path.join(folder, format === 'pyproject' ? 'pyproject.toml' : 'pixi.toml');
+    return path.join(folder, format === 'pyproject' ? PYPROJECT_MANIFEST_NAME : PIXI_MANIFEST_NAME);
 }
 
 export interface TargetScope {

@@ -27,7 +27,13 @@ import { PixiExtensionApi } from '../api';
 import { pickPixiProject } from '../commands/workspace/common';
 import { encodeCommandArg, escapeRegex, revealRangeInEditor } from '../common/execUtils';
 import { normalizePkgName } from '../core/packageManager';
-import { getLockfilePath, isPyproject, MANIFEST_SELECTORS } from '../core/projectDiscovery';
+import {
+    DEFAULT_CONDA_CHANNEL,
+    getLockfilePath,
+    isPyproject,
+    LOCKFILE_NAME,
+    MANIFEST_SELECTORS,
+} from '../core/projectDiscovery';
 import { PixiProjectManager } from '../core/projectManager';
 import { PixiPackage } from '../core/types';
 
@@ -572,7 +578,7 @@ export class PixiDependencyManifestProvider
                     actions.push(`[$(link-external) PyPI](${pypiUrl} "Open package on PyPI")`);
                 } else {
                     const chMatch = targetPkg.source?.match(/conda\.anaconda\.org\/([^/]+)/);
-                    const channel = chMatch ? chMatch[1] : 'conda-forge';
+                    const channel = chMatch ? chMatch[1] : DEFAULT_CONDA_CHANNEL;
                     const prefixUrl = `https://prefix.dev/channels/${channel}/packages/${encodeURIComponent(targetPkg.name)}`;
                     actions.push(`[$(link-external) prefix.dev](${prefixUrl} "Open package on prefix.dev")`);
                 }
@@ -625,7 +631,7 @@ export class PixiDependencyManifestProvider
 
         const lockPath = getLockfilePath(projectPath);
         if (!fs.existsSync(lockPath)) {
-            window.showWarningMessage(`No pixi.lock found in ${projectPath}`);
+            window.showWarningMessage(`No ${LOCKFILE_NAME} found in ${projectPath}`);
             return;
         }
 

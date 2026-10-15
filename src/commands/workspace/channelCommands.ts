@@ -1,9 +1,11 @@
 import { commands, Disposable, QuickPickItem, window } from 'vscode';
 
 import { runPixiWithProgress } from '../../cli/workspaceCli';
-import { getWorkspaceChannels } from '../../core/projectDiscovery';
+import { DEFAULT_CONDA_CHANNEL, getWorkspaceChannels } from '../../core/projectDiscovery';
 import { PixiProjectManager } from '../../core/projectManager';
 import { extractFeatureName, formatScope, pickPixiProject, resolveWorkspaceOrFeatureScope } from './common';
+
+export { DEFAULT_CONDA_CHANNEL } from '../../core/projectDiscovery';
 
 export interface CondaChannelPreset {
     label: string;
@@ -13,24 +15,24 @@ export interface CondaChannelPreset {
 
 export const CONDA_CHANNEL_PRESETS: readonly CondaChannelPreset[] = [
     {
-        label: '$(server) conda-forge (default)',
+        label: `$(server) ${DEFAULT_CONDA_CHANNEL} (default)`,
         description: 'Community-driven Conda repository (default)',
-        channel: 'conda-forge',
+        channel: DEFAULT_CONDA_CHANNEL,
     },
     {
-        label: '$(rocket) Tsinghua Mirror (conda-forge)',
-        description: 'https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge',
-        channel: 'https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge',
+        label: `$(rocket) Tsinghua Mirror (${DEFAULT_CONDA_CHANNEL})`,
+        description: `https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/${DEFAULT_CONDA_CHANNEL}`,
+        channel: `https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/${DEFAULT_CONDA_CHANNEL}`,
     },
     {
-        label: '$(rocket) BFSU Mirror (conda-forge)',
-        description: 'https://mirrors.bfsu.edu.cn/anaconda/cloud/conda-forge',
-        channel: 'https://mirrors.bfsu.edu.cn/anaconda/cloud/conda-forge',
+        label: `$(rocket) BFSU Mirror (${DEFAULT_CONDA_CHANNEL})`,
+        description: `https://mirrors.bfsu.edu.cn/anaconda/cloud/${DEFAULT_CONDA_CHANNEL}`,
+        channel: `https://mirrors.bfsu.edu.cn/anaconda/cloud/${DEFAULT_CONDA_CHANNEL}`,
     },
     {
-        label: '$(rocket) Aliyun Mirror (conda-forge)',
-        description: 'https://mirrors.aliyun.com/anaconda/cloud/conda-forge',
-        channel: 'https://mirrors.aliyun.com/anaconda/cloud/conda-forge',
+        label: `$(rocket) Aliyun Mirror (${DEFAULT_CONDA_CHANNEL})`,
+        description: `https://mirrors.aliyun.com/anaconda/cloud/${DEFAULT_CONDA_CHANNEL}`,
+        channel: `https://mirrors.aliyun.com/anaconda/cloud/${DEFAULT_CONDA_CHANNEL}`,
     },
     {
         label: '$(server) pytorch',
@@ -75,7 +77,7 @@ export interface PromptCondaChannelOptions {
  * Returns the selected channel string (or undefined if defaultChannelValue was undefined), or null if cancelled.
  */
 export async function promptCondaChannel(options?: PromptCondaChannelOptions): Promise<string | undefined | null> {
-    const defaultVal = options?.defaultChannelValue !== undefined ? options.defaultChannelValue : 'conda-forge';
+    const defaultVal = options?.defaultChannelValue !== undefined ? options.defaultChannelValue : DEFAULT_CONDA_CHANNEL;
 
     interface ChannelItem extends QuickPickItem {
         channel?: string;
@@ -90,7 +92,7 @@ export async function promptCondaChannel(options?: PromptCondaChannelOptions): P
         ...availablePresets.map((p) => ({
             label: p.label,
             description: p.description,
-            channel: p.channel === 'conda-forge' ? defaultVal : p.channel,
+            channel: p.channel === DEFAULT_CONDA_CHANNEL ? defaultVal : p.channel,
         })),
         {
             label: '$(globe) Custom Channel...',

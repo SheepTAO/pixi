@@ -10,7 +10,7 @@ import {
 } from 'vscode';
 
 import { PixiPackageSearchResult, searchPixiPackages } from '../../cli/pixiCli';
-import { getProjectConfiguredChannels } from '../../core/projectDiscovery';
+import { DEFAULT_CONDA_CHANNEL, getProjectConfiguredChannels } from '../../core/projectDiscovery';
 import { handleGlobalInstall } from '../globalCommands';
 
 export type SourceMode = 'conda' | 'pypi' | 'pypi-custom' | 'path' | 'git';
@@ -243,7 +243,7 @@ export async function handlePackageSearchSelection(
     targetProjectPath?: string,
 ): Promise<void> {
     const isPypi = pkg.sourceType === 'pypi';
-    const primaryChan = pkg.channel ? pkg.channel.split(',')[0].trim() : 'conda-forge';
+    const primaryChan = pkg.channel ? pkg.channel.split(',')[0].trim() : DEFAULT_CONDA_CHANNEL;
     const webUrl = isPypi
         ? `https://pypi.org/project/${encodeURIComponent(pkg.name)}/`
         : `https://prefix.dev/channels/${encodeURIComponent(primaryChan)}/packages/${encodeURIComponent(pkg.name)}`;
@@ -508,7 +508,7 @@ export async function promptAddPackageSource(
 
     if (source.mode === 'conda') {
         const projectChannels = getProjectConfiguredChannels(projectPath);
-        const primaryChannel = projectChannels[0] || 'conda-forge';
+        const primaryChannel = projectChannels[0] || DEFAULT_CONDA_CHANNEL;
         sourceLabel = `Conda (${primaryChannel})`;
         args.push(...specs);
     } else if (source.mode === 'pypi') {
