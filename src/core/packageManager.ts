@@ -147,3 +147,25 @@ export function normalizePkgName(name: string): string {
         .toLowerCase()
         .replace(/[-_.]+/g, '-');
 }
+
+export interface SplitPackageSpecResult {
+    name: string;
+    constraint: string;
+}
+
+/**
+ * Splits a raw package specification into its bare package name and version constraint.
+ * e.g., "numpy>=1.20" -> { name: "numpy", constraint: ">=1.20" }
+ */
+export function splitPackageSpec(spec: string): SplitPackageSpecResult {
+    const name = extractPackageNameFromSpec(spec);
+    const constraint = spec.slice(name.length).trim();
+    return { name, constraint };
+}
+
+/**
+ * Returns a standardized badge string for a package ecosystem ('[PyPI]' or '[Conda]').
+ */
+export function getPackageKindBadge(kind?: string): string {
+    return kind === 'pypi' ? '[PyPI]' : '[Conda]';
+}

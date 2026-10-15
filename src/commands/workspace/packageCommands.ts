@@ -3,7 +3,7 @@ import { commands, Disposable, env as vscodeEnv, QuickPickItem, QuickPickItemKin
 import { PixiPackageSearchResult } from '../../cli/pixiCli';
 import { runPixiWithProgress } from '../../cli/workspaceCli';
 import { normalizeFolderPath, revealDefinitionInManifest } from '../../common/execUtils';
-import { extractPackageNameFromSpec, sortPixiPackages } from '../../core/packageManager';
+import { getPackageKindBadge, sortPixiPackages, splitPackageSpec } from '../../core/packageManager';
 import { PixiProjectManager } from '../../core/projectManager';
 import {
     extractCommandContext,
@@ -76,12 +76,11 @@ export async function buildDeclaredPackageQuickPickItems(
     ): DeclaredQuickPickItem[] => {
         const isPypi = kind === 'pypi';
         const icon = isPypi ? '$(symbol-keyword)' : '$(package)';
-        const badge = isPypi ? '[PyPI]' : '[Conda]';
+        const badge = getPackageKindBadge(kind);
         const scopeLabel = formatScope(scope);
 
         return specs.map((rawSpec) => {
-            const pkgName = extractPackageNameFromSpec(rawSpec);
-            const versionConstraint = rawSpec.slice(pkgName.length).trim();
+            const { name: pkgName, constraint: versionConstraint } = splitPackageSpec(rawSpec);
             return {
                 label: `${icon} ${pkgName}`,
                 description: versionConstraint ? `${badge} ${versionConstraint}` : badge,
@@ -483,7 +482,7 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
             }
 
             const items = sortPixiPackages(updatablePackages).map((p) => {
-                const channelBadge = p.kind === 'pypi' ? '[PyPI]' : '[Conda]';
+                const channelBadge = getPackageKindBadge(p.kind);
                 const explicitBadge = p.is_explicit ? 'explicit' : 'transitive';
                 return {
                     label: `${p.is_explicit ? '$(package)' : '$(symbol-field)'} ${p.name}`,

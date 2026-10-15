@@ -578,13 +578,24 @@ export async function resolveTargetFolder(targetItem?: unknown, placeHolder?: st
     return pick?.uri.fsPath;
 }
 
+/**
+ * Ensures at least one Pixi project exists in the workspace.
+ * Displays a standardized warning notification if none are found.
+ */
+export function ensureHasPixiProjects(manager: PixiProjectManager): boolean {
+    if (manager.getProjectPaths().length === 0) {
+        window.showWarningMessage('No Pixi projects found in the current workspace.');
+        return false;
+    }
+    return true;
+}
+
 export async function pickPixiProject(
     manager: PixiProjectManager,
     placeHolder: string,
     context?: unknown,
 ): Promise<string | undefined> {
     const direct = normalizeFolderPath(context);
-    const projectPaths = manager.getProjectPaths();
 
     if (direct) {
         const matched = manager.findProjectForUri(Uri.file(direct));
@@ -593,10 +604,11 @@ export async function pickPixiProject(
         }
     }
 
-    if (projectPaths.length === 0) {
-        window.showWarningMessage('No Pixi projects found in the current workspace.');
+    if (!ensureHasPixiProjects(manager)) {
         return undefined;
     }
+
+    const projectPaths = manager.getProjectPaths();
 
     if (projectPaths.length === 1) {
         return projectPaths[0];

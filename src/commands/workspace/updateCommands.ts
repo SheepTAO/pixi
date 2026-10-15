@@ -3,7 +3,7 @@ import { CancellationError, commands, Disposable, ProgressLocation, QuickPickIte
 import { runPixi } from '../../cli/pixiCli';
 import { runPixiWithProgress } from '../../cli/workspaceCli';
 import { escapeRegex, safeJsonParse } from '../../common/execUtils';
-import { normalizePkgName } from '../../core/packageManager';
+import { getPackageKindBadge, normalizePkgName } from '../../core/packageManager';
 import { PixiProjectManager } from '../../core/projectManager';
 import { extractEnvironmentName, pickPixiProject, pickProjectEnvironmentName } from './common';
 import { buildDeclaredPackageQuickPickItems } from './packageCommands';
@@ -72,7 +72,7 @@ export function parseCondaInfo(url?: string, pkgName?: string): { version?: stri
  * Formats a human-readable version diff for a package change.
  */
 export function formatVersionDiff(pkg: DryRunPackageChange): string {
-    const typeBadge = pkg.type === 'pypi' ? '[PyPI]' : '[Conda]';
+    const typeBadge = getPackageKindBadge(pkg.type);
     if (pkg.isNew) {
         return `(new) -> v${pkg.afterVer || 'unknown'} ${typeBadge}`;
     }

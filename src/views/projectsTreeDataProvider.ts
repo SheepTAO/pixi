@@ -19,12 +19,7 @@ import {
     getWorkspaceFeatures,
     WorkspaceListEntry,
 } from '../commands/workspace/common';
-import {
-    enrichLocalPackages,
-    extractPackageNameFromSpec,
-    normalizePkgName,
-    sortPixiPackages,
-} from '../core/packageManager';
+import { enrichLocalPackages, normalizePkgName, sortPixiPackages, splitPackageSpec } from '../core/packageManager';
 import { getProjectKey } from '../core/projectDiscovery';
 import { PixiProjectManager } from '../core/projectManager';
 import { formatToolchainDetails, formatToolchainSummary } from '../core/toolchains';
@@ -363,9 +358,8 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
 
         const fallbacks: PixiPackage[] = [];
         for (const { rawSpec, kind } of fallbackSpecs) {
-            const pkgName = extractPackageNameFromSpec(rawSpec);
+            const { name: pkgName, constraint } = splitPackageSpec(rawSpec);
             if (!matchedNames.has(normalizePkgName(pkgName))) {
-                const constraint = rawSpec.slice(pkgName.length).trim();
                 fallbacks.push({
                     name: pkgName,
                     version: constraint && constraint !== '*' ? constraint : '',

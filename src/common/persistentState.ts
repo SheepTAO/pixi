@@ -20,3 +20,9 @@ export function setPersistentState(context: ExtensionContext): void {
 export function getWorkspacePersistentState(): PersistentState {
     return persistentState;
 }
+
+export const GLOBAL_ENV_KEY = 'globalEnvName';
+
+export function getProjectEnvStorageKey(projectPath: string): string {
+    return `projectEnvName:${projectPath}`;
+}

@@ -19,7 +19,7 @@ import { Disposable, EventEmitter, ThemeIcon, Uri, window, workspace } from 'vsc
 import { PixiExtensionApi } from '../../api';
 import { getPixi } from '../../cli/pixiCli';
 import { traceVerbose } from '../../common/logging';
-import { getWorkspacePersistentState } from '../../common/persistentState';
+import { getProjectEnvStorageKey, getWorkspacePersistentState, GLOBAL_ENV_KEY } from '../../common/persistentState';
 import {
     ensureEnvironmentReady,
     getDefaultEnvironment,
@@ -194,7 +194,7 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
             const projectPath = envs[0]?.projectPath;
             const targetName =
                 this.activeEnv.get(key)?.pixiEnvName ||
-                (projectPath ? storage.get<string>(`projectEnvName:${projectPath}`) : undefined);
+                (projectPath ? storage.get<string>(getProjectEnvStorageKey(projectPath)) : undefined);
             const found = targetName ? envs.find((e) => e.pixiEnvName === targetName) : undefined;
             if (found) {
                 this.activeEnv.set(key, found);
@@ -203,7 +203,7 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
             }
         }
 
-        const globalTargetName = this.globalEnv?.pixiEnvName || storage.get<string>('globalEnvName');
+        const globalTargetName = this.globalEnv?.pixiEnvName || storage.get<string>(GLOBAL_ENV_KEY);
         if (globalTargetName) {
             const allEnvs = Array.from(this.projectToEnvs.values()).flat();
             const foundGlobal = allEnvs.find((e) => e.pixiEnvName === globalTargetName);

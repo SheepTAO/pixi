@@ -17,7 +17,7 @@ import {
 } from 'vscode';
 
 import { getPixi, runPixi } from '../cli/pixiCli';
-import { resolveReadyEnvironment } from '../commands/workspace/common';
+import { ensureHasPixiProjects, resolveReadyEnvironment } from '../commands/workspace/common';
 import { quoteStringIfNecessary, safeJsonParse } from '../common/execUtils';
 import { traceError, traceVerbose } from '../common/logging';
 import { ensureEnvironmentReady } from '../core/environmentRules';
@@ -251,7 +251,7 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
         const scope = workspace.getWorkspaceFolder(Uri.file(t.projectPath)) || TaskScope.Workspace;
         const task = new Task(def, scope, t.name, 'pixi', new ShellExecution(commandLine, { cwd: t.projectPath }));
 
-        task.detail = t.description || t.cmd;
+        task.detail = formatTaskDetail(t);
 
         const lower = t.name.toLowerCase();
         if (lower.includes('test')) {
@@ -264,13 +264,16 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
     }
 
     public async pickTask(options: PickTaskOptions): Promise<PixiTask | undefined> {
+        if (!ensureHasPixiProjects(this.projectManager)) {
+            return undefined;
+        }
+
         let projectPaths = this.projectManager.getProjectPaths();
         if (options.targetProjectPath) {
             const normalized = path.normalize(options.targetProjectPath);
             projectPaths = projectPaths.filter((p) => p === normalized);
         }
         if (projectPaths.length === 0) {
-            window.showWarningMessage('No Pixi projects found in the workspace.');
             return undefined;
         }
 

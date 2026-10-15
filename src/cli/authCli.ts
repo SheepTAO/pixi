@@ -4,9 +4,9 @@ import * as os from 'os';
 import * as path from 'path';
 import { CancellationError, CancellationToken, workspace } from 'vscode';
 
-import { quoteArgs, safeJsonParse, sanitizeArgsForLogging } from '../common/execUtils';
+import { safeJsonParse, sanitizeArgsForLogging } from '../common/execUtils';
 import { traceError } from '../common/logging';
-import { getPixi, runPixi } from './pixiCli';
+import { getPixi, resolveSpawnArgs, runPixi } from './pixiCli';
 
 export type AuthMethod = 'BearerToken' | 'CondaToken' | 'BasicHTTP' | 'S3' | 'OAuth2' | 'Unknown';
 
@@ -144,10 +144,8 @@ export async function loginPixiHostOAuth(
     token?: CancellationToken,
 ): Promise<string> {
     const pixi = await getPixi();
-    const isWindows = process.platform === 'win32';
-    const useShell = isWindows && !pixi.toLowerCase().endsWith('.exe');
     const args = ['auth', 'login', host, '--oauth', '--no-progress'];
-    const finalArgs = useShell ? quoteArgs(args) : args;
+    const { useShell, finalArgs } = resolveSpawnArgs(pixi, args);
 
     return new Promise<string>((resolve, reject) => {
         const proc = ch.spawn(pixi, finalArgs, {

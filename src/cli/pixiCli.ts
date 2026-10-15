@@ -70,6 +70,17 @@ export type PixiRunOptions = ch.SpawnOptions & {
     includeStderr?: boolean;
 };
 
+/**
+ * Resolves whether child_process execution requires shell invocation on Windows (for non-.exe binaries)
+ * and applies argument quoting accordingly.
+ */
+export function resolveSpawnArgs(executable: string, args: string[]): { useShell: boolean; finalArgs: string[] } {
+    const isWindows = process.platform === 'win32';
+    const useShell = isWindows && !executable.toLowerCase().endsWith('.exe');
+    const finalArgs = useShell ? quoteArgs(args) : args;
+    return { useShell, finalArgs };
+}
+
 export async function runPixi(args: string[], options?: PixiRunOptions, token?: CancellationToken): Promise<string> {
     const pixi = await getPixi();
     const defaultCwd = workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -78,9 +89,7 @@ export async function runPixi(args: string[], options?: PixiRunOptions, token?: 
         ...options,
     };
 
-    const isWindows = process.platform === 'win32';
-    const useShell = isWindows && !pixi.toLowerCase().endsWith('.exe');
-    const finalArgs = useShell ? quoteArgs(args) : args;
+    const { useShell, finalArgs } = resolveSpawnArgs(pixi, args);
 
     return new Promise<string>((resolve, reject) => {
         const proc = ch.spawn(pixi, finalArgs, {

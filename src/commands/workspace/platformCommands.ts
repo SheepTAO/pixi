@@ -20,6 +20,11 @@ export const CONDA_PLATFORM_PRESETS: readonly CondaPlatformPreset[] = [
     { name: 'win-arm64', description: 'Windows ARM64 architecture' },
 ];
 
+export const COMMON_PLATFORMS: readonly { label: string; detail: string }[] = [
+    ...CONDA_PLATFORM_PRESETS.map((p) => ({ label: p.name, detail: p.description })),
+    { label: 'noarch', detail: 'Platform-independent Conda packages' },
+];
+
 interface RawPlatformListJson {
     platforms?: Array<{
         name: string;

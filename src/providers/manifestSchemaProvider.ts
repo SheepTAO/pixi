@@ -19,7 +19,7 @@ import {
 } from 'vscode';
 
 import { COMMON_CHANNELS } from '../commands/workspace/channelCommands';
-import { CONDA_PLATFORM_PRESETS } from '../commands/workspace/platformCommands';
+import { COMMON_PLATFORMS } from '../commands/workspace/platformCommands';
 import { traceError, traceVerbose } from '../common/logging';
 import { isPyproject, MANIFEST_SELECTORS } from '../core/projectDiscovery';
 
@@ -42,11 +42,6 @@ interface ManifestSchemaMetadata {
     environmentProperties: Map<string, string>;
     allPropertiesDoc: Map<string, string>;
 }
-
-const COMMON_PLATFORMS = [
-    ...CONDA_PLATFORM_PRESETS.map((p) => ({ label: p.name, detail: p.description })),
-    { label: 'noarch', detail: 'Platform-independent Conda packages' },
-];
 
 export class PixiManifestSchemaProvider implements CompletionItemProvider, HoverProvider, Disposable {
     private readonly disposables: Disposable[] = [];

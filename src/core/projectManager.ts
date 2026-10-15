@@ -14,7 +14,7 @@ import {
 import { runPixi } from '../cli/pixiCli';
 import { safeJsonParse } from '../common/execUtils';
 import { traceError, traceVerbose } from '../common/logging';
-import { getWorkspacePersistentState } from '../common/persistentState';
+import { getProjectEnvStorageKey, getWorkspacePersistentState } from '../common/persistentState';
 import { getDefaultEnvironment, matchEnvironmentForUri, sortPixiEnvironments } from './environmentRules';
 import { listPixiPackages } from './packageManager';
 import {
@@ -207,7 +207,7 @@ export class PixiProjectManager implements Disposable {
         if (envs.length === 0) {
             return undefined;
         }
-        const activeName = getWorkspacePersistentState().get<string>(`projectEnvName:${projectPath}`);
+        const activeName = getWorkspacePersistentState().get<string>(getProjectEnvStorageKey(projectPath));
         if (activeName) {
             const match = envs.find((e) => e.pixiEnvName === activeName);
             if (match) {

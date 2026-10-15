@@ -1,6 +1,6 @@
 import { Disposable, Event, EventEmitter, Uri } from 'vscode';
 
-import { getWorkspacePersistentState } from '../common/persistentState';
+import { getProjectEnvStorageKey, getWorkspacePersistentState, GLOBAL_ENV_KEY } from '../common/persistentState';
 import { PixiProjectManager } from '../core/projectManager';
 import { ActiveEnvironmentChangeEvent, PixiEnvironmentInfo, PixiExtensionApi, PixiPackage, PixiProject } from './types';
 
@@ -26,7 +26,7 @@ export class PixiExtensionApiImpl implements PixiExtensionApi, Disposable {
     private pruneSavedActiveEnvironments(): void {
         const storage = getWorkspacePersistentState();
         for (const projectPath of this.projectManager.getProjectPaths()) {
-            const key = `projectEnvName:${projectPath}`;
+            const key = getProjectEnvStorageKey(projectPath);
             const savedEnv = storage.get<string>(key);
             if (savedEnv) {
                 const envs = this.projectManager.getEnvironmentsForProject(projectPath);
@@ -35,11 +35,11 @@ export class PixiExtensionApiImpl implements PixiExtensionApi, Disposable {
                 }
             }
         }
-        const globalSaved = storage.get<string>('globalEnvName');
+        const globalSaved = storage.get<string>(GLOBAL_ENV_KEY);
         if (globalSaved) {
             const allEnvs = this.projectManager.getAllEnvironments();
             if (allEnvs.length > 0 && !allEnvs.some((e) => e.pixiEnvName === globalSaved)) {
-                void storage.set('globalEnvName', undefined);
+                void storage.set(GLOBAL_ENV_KEY, undefined);
             }
         }
     }
@@ -85,7 +85,7 @@ export class PixiExtensionApiImpl implements PixiExtensionApi, Disposable {
         }
 
         // Global or first project default
-        const globalActiveEnvName = getWorkspacePersistentState().get<string>('globalEnvName');
+        const globalActiveEnvName = getWorkspacePersistentState().get<string>(GLOBAL_ENV_KEY);
         if (globalActiveEnvName) {
             const allEnvs = this.projectManager.getAllEnvironments();
             const match = allEnvs.find((e) => e.pixiEnvName === globalActiveEnvName);
@@ -124,9 +124,9 @@ export class PixiExtensionApiImpl implements PixiExtensionApi, Disposable {
 
         const storage = getWorkspacePersistentState();
         const targetName = targetEnv?.pixiEnvName;
-        const storageKey = projectPath ? `projectEnvName:${projectPath}` : 'globalEnvName';
+        const storageKey = projectPath ? getProjectEnvStorageKey(projectPath) : GLOBAL_ENV_KEY;
         const prevScoped = storage.get<string>(storageKey);
-        const prevGlobal = !scope ? storage.get<string>('globalEnvName') : targetName;
+        const prevGlobal = !scope ? storage.get<string>(GLOBAL_ENV_KEY) : targetName;
 
         if (prevScoped === targetName && prevGlobal === targetName) {
             return true;
@@ -135,8 +135,8 @@ export class PixiExtensionApiImpl implements PixiExtensionApi, Disposable {
         if (prevScoped !== targetName) {
             await storage.set(storageKey, targetName);
         }
-        if (!scope && prevGlobal !== targetName && storageKey !== 'globalEnvName') {
-            await storage.set('globalEnvName', targetName);
+        if (!scope && prevGlobal !== targetName && storageKey !== GLOBAL_ENV_KEY) {
+            await storage.set(GLOBAL_ENV_KEY, targetName);
         }
         this._onDidChangeActiveEnvironment.fire({ scope, environment: targetEnv });
         return true;

@@ -24,7 +24,8 @@ import {
 } from 'vscode';
 
 import { PixiExtensionApi } from '../api';
-import { encodeCommandArg, escapeRegex, normalizeFolderPath, revealRangeInEditor } from '../common/execUtils';
+import { pickPixiProject } from '../commands/workspace/common';
+import { encodeCommandArg, escapeRegex, revealRangeInEditor } from '../common/execUtils';
 import { normalizePkgName } from '../core/packageManager';
 import { getLockfilePath, isPyproject, MANIFEST_SELECTORS } from '../core/projectDiscovery';
 import { PixiProjectManager } from '../core/projectManager';
@@ -617,14 +618,8 @@ export class PixiDependencyManifestProvider
      */
     public async openLockfileCommand(options?: { projectPath?: string; packageName?: string } | Uri): Promise<void> {
         const packageName = options instanceof Uri ? undefined : options?.packageName;
-        const activeUri = window.activeTextEditor?.document.uri;
-        const projectPath =
-            normalizeFolderPath(options) ||
-            (activeUri ? this.projectManager.findProjectForUri(activeUri) : undefined) ||
-            this.projectManager.getProjectPaths()[0];
-
+        const projectPath = await pickPixiProject(this.projectManager, 'Select Pixi project to open lockfile', options);
         if (!projectPath) {
-            window.showWarningMessage('No Pixi project found in workspace.');
             return;
         }
 
