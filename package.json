@@ -1303,6 +1303,22 @@
                     "description": "Control automatic environment installation when opening a Pixi project with uninstalled environments.",
                     "scope": "resource"
                 },
+                "pixi.executionMode": {
+                    "type": "string",
+                    "enum": [
+                        "smart",
+                        "terminal",
+                        "notification"
+                    ],
+                    "enumDescriptions": [
+                        "Smartly run heavy installation and download tasks in the integrated terminal with native progress bars, and run lightweight operations in the background notification.",
+                        "Always run package and environment operations in the integrated terminal with native interactive progress bars.",
+                        "Always run operations silently in the background with a progress notification."
+                    ],
+                    "default": "smart",
+                    "description": "Execution mode for package and environment operations (install, add, update, remove, etc.).",
+                    "scope": "resource"
+                },
                 "pixi.terminal.defaultEnvironment": {
                     "type": "string",
                     "default": "",

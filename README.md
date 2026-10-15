@@ -98,7 +98,7 @@ Launch any command via the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) by t
 | **Pixi: Feature ...**                           | `pixi.feature`            | Interactive hub to create/remove features, add packages to a feature, or jump to feature definitions.           |
 | **Pixi: Channel ...**                           | `pixi.channel`            | Interactive hub to add Conda presets/mirrors (prepend/append) or remove channels at workspace or feature scope. |
 | **Pixi: Platform ...**                          | `pixi.platform`           | Configure target platforms via check/uncheck picker at workspace or feature scope.                              |
-| **Pixi: System Requirements ...**              | `pixi.systemRequirements` | Configure project hardware & OS requirements (CUDA, libc, Linux, macOS, archspec, UNIX) with version presets.   |
+| **Pixi: System Requirements ...**               | `pixi.systemRequirements` | Configure project hardware & OS requirements (CUDA, libc, Linux, macOS, archspec, UNIX) with version presets.   |
 | **Pixi: Authentication ...**                    | `pixi.auth`               | Interactive hub to login, logout, copy tokens, or inspect authentication entries (`pixi auth`).                 |
 | **Pixi: Search Packages ...**                   | `pixi.searchPackages`     | Search Conda & PyPI packages to inspect platforms, licenses, metadata, and docs.                                |
 | **Pixi: Add Package ...**                       | `pixi.addPackage`         | Add packages to features, inline environments, or global scope with channel/version picking.                    |
@@ -126,26 +126,27 @@ Launch any command via the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) by t
 
 ## Extension Settings
 
-| Setting                            | Type       | Default                 | Scope    | Description                                                                                             |
-| :--------------------------------- | :--------- | :---------------------- | :------- | :------------------------------------------------------------------------------------------------------ |
-| `pixi.executablePath`              | `string`   | `""`                    | Machine  | Path to the Pixi binary. Discovered from system `PATH` if empty.                                        |
-| `pixi.displayNameFormat`           | `string`   | `"${project}:${env}"`   | Resource | Display format for environments. Placeholders: `${project}`, `${env}`, `${version}`.                    |
-| `pixi.defaultManifestFormat`       | `string`   | `"ask"`                 | Resource | Default manifest format for project initialization (`"ask"`, `"pixi"`, or `"pyproject"`).               |
-| `pixi.autoInstallOnOpen`           | `string`   | `"prompt"`              | Resource | Behavior when opening projects with uninstalled environments (`"prompt"`, `"always"`, `"never"`).       |
-| `pixi.environmentRules`            | `string[]` | `[]`                    | Resource | Map glob patterns to environment names (e.g. `tests/**=dev`, `train/**=gpu`).                           |
-| `pixi.terminal.defaultEnvironment` | `string`   | `""`                    | Resource | Default environment name to activate when opening a Pixi terminal (prompts if empty).                   |
-| `pixi.packageSearch.maxResults`   | `integer`  | `5`                     | Resource | Maximum number of Conda packages to display in search and package add pickers.                          |
+| Setting                                        | Type       | Default                 | Scope    | Description                                                                                             |
+| :--------------------------------------------- | :--------- | :---------------------- | :------- | :------------------------------------------------------------------------------------------------------ |
+| `pixi.executablePath`                          | `string`   | `""`                    | Machine  | Path to the Pixi binary. Discovered from system `PATH` if empty.                                        |
+| `pixi.displayNameFormat`                       | `string`   | `"${project}:${env}"`   | Resource | Display format for environments. Placeholders: `${project}`, `${env}`, `${version}`.                    |
+| `pixi.defaultManifestFormat`                   | `string`   | `"ask"`                 | Resource | Default manifest format for project initialization (`"ask"`, `"pixi"`, or `"pyproject"`).               |
+| `pixi.autoInstallOnOpen`                       | `string`   | `"prompt"`              | Resource | Behavior when opening projects with uninstalled environments (`"prompt"`, `"always"`, `"never"`).       |
+| `pixi.executionMode`                           | `string`   | `"smart"`               | Resource | Execution mode for package/environment tasks (`"smart"`, `"terminal"`, `"notification"`).               |
+| `pixi.environmentRules`                        | `string[]` | `[]`                    | Resource | Map glob patterns to environment names (e.g. `tests/**=dev`, `train/**=gpu`).                           |
+| `pixi.terminal.defaultEnvironment`             | `string`   | `""`                    | Resource | Default environment name to activate when opening a Pixi terminal (prompts if empty).                   |
+| `pixi.packageSearch.maxResults`                | `integer`  | `5`                     | Resource | Maximum number of Conda packages to display in search and package add pickers.                          |
 | `pixi.packages.displayMode`                    | `string`   | `"grouped"`             | Resource | Package tree display mode (`"grouped"`, `"explicitOnly"`, or `"all"`).                                  |
 | `pixi.environments.viewMode`                   | `string`   | `"environment"`         | Resource | Environments view grouping mode (`"environment"` or `"feature"`).                                       |
-| `pixi.environments.systemRequirementsPosition` | `string`   | `"bottom"`              | Resource | Placement of System Requirements in Environments view (`"bottom"`, `"top"`, `"hidden"`).                 |
+| `pixi.environments.systemRequirementsPosition` | `string`   | `"bottom"`              | Resource | Placement of System Requirements in Environments view (`"bottom"`, `"top"`, `"hidden"`).                |
 | `pixi.cache.autoMeasureSize`                   | `boolean`  | `true`                  | Window   | Automatically compute Pixi cache disk usage in Pixi Info.                                               |
-| `pixi.tasks.groupBy`               | `string`   | `"prefix"`              | Resource | Task grouping mode in Tasks view (`"prefix"`, `"environment"`, `"none"`).                               |
-| `pixi.tasks.prefixSeparators`      | `string[]` | `["-", "_", ":", "::"]` | Resource | Delimiters used to parse namespace prefixes from task names.                                            |
-| `pixi.tasks.minGroupSize`          | `integer`  | `2`                     | Resource | Minimum tasks required to form a prefix group folder (isolated tasks stay flat).                        |
-| `pixi.tasks.maxDepth`              | `integer`  | `1`                     | Resource | Maximum nesting depth for prefix-based task groups (1–3).                                               |
-| `pixi.tasks.manifestActions`       | `string`   | `"hover"`               | Resource | Display style for task actions in manifests (`"hover"`, `"compact"`, `"full"`, `"header"`, `"off"`).    |
-| `pixi.dependencies.inlayHints`     | `boolean`  | `true`                  | Resource | Show locked dependency versions as inline hints in manifests (`pixi.toml`, `pyproject.toml`).           |
-| `pixi.manifest.schemaSupport`      | `boolean`  | `true`                  | Resource | Enable offline schema-based autocompletion and hover documentation in `pixi.toml` and `pyproject.toml`. |
+| `pixi.tasks.groupBy`                           | `string`   | `"prefix"`              | Resource | Task grouping mode in Tasks view (`"prefix"`, `"environment"`, `"none"`).                               |
+| `pixi.tasks.prefixSeparators`                  | `string[]` | `["-", "_", ":", "::"]` | Resource | Delimiters used to parse namespace prefixes from task names.                                            |
+| `pixi.tasks.minGroupSize`                      | `integer`  | `2`                     | Resource | Minimum tasks required to form a prefix group folder (isolated tasks stay flat).                        |
+| `pixi.tasks.maxDepth`                          | `integer`  | `1`                     | Resource | Maximum nesting depth for prefix-based task groups (1–3).                                               |
+| `pixi.tasks.manifestActions`                   | `string`   | `"hover"`               | Resource | Display style for task actions in manifests (`"hover"`, `"compact"`, `"full"`, `"header"`, `"off"`).    |
+| `pixi.dependencies.inlayHints`                 | `boolean`  | `true`                  | Resource | Show locked dependency versions as inline hints in manifests (`pixi.toml`, `pyproject.toml`).           |
+| `pixi.manifest.schemaSupport`                  | `boolean`  | `true`                  | Resource | Enable offline schema-based autocompletion and hover documentation in `pixi.toml` and `pyproject.toml`. |
 
 ### Example Configuration
 
