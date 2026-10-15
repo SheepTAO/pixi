@@ -1,3 +1,4 @@
+import * as path from 'path';
 import { ExtensionContext, Memento } from 'vscode';
 
 export interface PersistentState {
@@ -24,5 +25,7 @@ export function getWorkspacePersistentState(): PersistentState {
 export const GLOBAL_ENV_KEY = 'globalEnvName';
 
 export function getProjectEnvStorageKey(projectPath: string): string {
-    return `projectEnvName:${projectPath}`;
+    const normalized = path.normalize(projectPath).replace(/[/\\]+$/, '');
+    const key = process.platform === 'win32' ? normalized.toLowerCase() : normalized;
+    return `projectEnvName:${key}`;
 }

@@ -42,6 +42,28 @@ interface ManifestSchemaMetadata {
     allPropertiesDoc: Map<string, string>;
 }
 
+interface ArrayRegexPattern {
+    singleLine: RegExp;
+    arrayStart: RegExp;
+}
+
+const ARRAY_REGEX_CACHE = new Map<string, ArrayRegexPattern>([
+    ['channels', { singleLine: /channels\s*=\s*\[[^\]]*$/, arrayStart: /^\s*channels\s*=\s*\[/ }],
+    ['platforms', { singleLine: /platforms\s*=\s*\[[^\]]*$/, arrayStart: /^\s*platforms\s*=\s*\[/ }],
+]);
+
+function getArrayRegexPatterns(arrayKey: string): ArrayRegexPattern {
+    let patterns = ARRAY_REGEX_CACHE.get(arrayKey);
+    if (!patterns) {
+        patterns = {
+            singleLine: new RegExp(`${arrayKey}\\s*=\\s*\\[[^\\]]*$`),
+            arrayStart: new RegExp(`^\\s*${arrayKey}\\s*=\\s*\\[`),
+        };
+        ARRAY_REGEX_CACHE.set(arrayKey, patterns);
+    }
+    return patterns;
+}
+
 export class PixiManifestSchemaProvider implements CompletionItemProvider, HoverProvider, Disposable {
     private readonly disposables: Disposable[] = [];
     private schemaLoadingPromise?: Promise<ManifestSchemaMetadata | null>;
@@ -423,9 +445,9 @@ export class PixiManifestSchemaProvider implements CompletionItemProvider, Hover
     private getActiveSection(document: TextDocument, currentLine: number): string | null {
         for (let i = currentLine; i >= 0; i--) {
             const text = document.lineAt(i).text.trim();
-            const match = text.match(/^\[([A-Za-z0-9_.-]+)\]/);
+            const match = text.match(/^\s*\[+([^\]]+)\]+/);
             if (match) {
-                return match[1];
+                return match[1].trim();
             }
         }
         return null;
@@ -434,9 +456,9 @@ export class PixiManifestSchemaProvider implements CompletionItemProvider, Hover
     private isInsideArray(document: TextDocument, position: Position, arrayKey: string): boolean {
         const line = document.lineAt(position.line).text;
         const beforeCursor = line.substring(0, position.character);
+        const { singleLine, arrayStart } = getArrayRegexPatterns(arrayKey);
 
-        const singleLineMatch = new RegExp(`${arrayKey}\\s*=\\s*\\[[^\\]]*$`).test(beforeCursor);
-        if (singleLineMatch) {
+        if (singleLine.test(beforeCursor)) {
             return true;
         }
 
@@ -444,13 +466,12 @@ export class PixiManifestSchemaProvider implements CompletionItemProvider, Hover
             return false;
         }
 
-        const arrayStartRegex = new RegExp(`^\\s*${arrayKey}\\s*=\\s*\\[`);
         for (let i = position.line - 1; i >= Math.max(0, position.line - 15); i--) {
             const text = document.lineAt(i).text;
             if (text.includes(']')) {
                 return false;
             }
-            if (arrayStartRegex.test(text)) {
+            if (arrayStart.test(text)) {
                 return true;
             }
             if (text.trim().startsWith('[')) {
