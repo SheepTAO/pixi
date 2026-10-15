@@ -48,13 +48,7 @@ export function isPixiManifestSection(section?: string | null, isPyprojectDoc?: 
     return !isPyprojectDoc || section === 'tool.pixi' || section.startsWith('tool.pixi.');
 }
 
-/**
- * Generates a normalized project key for map caching, taking into account OS path casing.
- */
-export function getProjectKey(projectPath: string): string {
-    const normalized = path.normalize(projectPath).replace(/[/\\]+$/, '');
-    return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
-}
+export { getProjectKey } from '../common/execUtils';
 
 /**
  * Checks if a directory is a Pixi project.

@@ -22,6 +22,12 @@ import {
 import { enrichLocalPackages, normalizePkgName, sortPixiPackages, splitPackageSpec } from '../core/packageManager';
 import { getProjectKey } from '../core/projectDiscovery';
 import { PixiProjectManager } from '../core/projectManager';
+import {
+    formatSystemRequirementsSummary,
+    getProjectSystemRequirements,
+    SYSTEM_REQUIREMENT_DESCRIPTORS,
+    SystemRequirementsRecord,
+} from '../core/systemRequirements';
 import { formatToolchainDetails, formatToolchainSummary } from '../core/toolchains';
 import { PixiEnvironmentInfo, PixiPackage, PixiProject } from '../core/types';
 
@@ -239,6 +245,44 @@ export class PixiFeatureTreeItem extends TreeItem {
     }
 }
 
+export class PixiSystemRequirementsTreeItem extends TreeItem {
+    constructor(
+        public readonly project: PixiProject,
+        public readonly requirements: SystemRequirementsRecord,
+    ) {
+        super('System Requirements', TreeItemCollapsibleState.Collapsed);
+        this.iconPath = new ThemeIcon('server-process');
+        this.contextValue = 'pixiSystemRequirements';
+        this.description = formatSystemRequirementsSummary(requirements);
+        const lines = [
+            `System Requirements: ${project.name}`,
+            ...Object.entries(requirements).map(([k, v]) => `  ${k}: ${v}`),
+            'Expand to view properties, or click inline actions to reveal/configure in manifest',
+        ];
+        this.tooltip = lines.join('\n');
+    }
+}
+
+export class PixiSystemRequirementPropertyTreeItem extends TreeItem {
+    constructor(
+        public readonly propertyName: string,
+        public readonly propertyValue: string,
+        public readonly project: PixiProject,
+    ) {
+        super(propertyName, TreeItemCollapsibleState.None);
+        const descriptor = SYSTEM_REQUIREMENT_DESCRIPTORS.find((d) => d.id === propertyName);
+        this.iconPath = new ThemeIcon(descriptor?.icon || 'symbol-property');
+        this.contextValue = 'pixiSystemRequirementProperty';
+        this.description = propertyValue;
+        this.tooltip = `${propertyName} = "${propertyValue}"\nClick to edit requirement`;
+        this.command = {
+            command: 'pixi.systemRequirements.editProperty',
+            title: 'Edit Requirement',
+            arguments: [project.projectPath, propertyName],
+        };
+    }
+}
+
 export type ProjectsViewMode = 'environment' | 'feature';
 
 export type PixiProjectsTreeItem =
@@ -247,7 +291,9 @@ export type PixiProjectsTreeItem =
     | PixiFeatureTreeItem
     | PixiPackageTreeItem
     | PixiEmptyTreeItem
-    | PixiTransitiveGroupTreeItem;
+    | PixiTransitiveGroupTreeItem
+    | PixiSystemRequirementsTreeItem
+    | PixiSystemRequirementPropertyTreeItem;
 
 export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjectsTreeItem>, Disposable {
     private readonly _onDidChangeTreeData = new EventEmitter<PixiProjectsTreeItem | undefined | null | void>();
@@ -270,14 +316,17 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
                 if (e.affectsConfiguration('pixi.packages.displayMode')) {
                     this._onDidChangeTreeData.fire();
                 }
-                if (e.affectsConfiguration('pixi.environments.viewMode')) {
+                if (
+                    e.affectsConfiguration('pixi.environments.viewMode') ||
+                    e.affectsConfiguration('pixi.environments.systemRequirementsPosition')
+                ) {
                     const newMode = workspace
                         .getConfiguration('pixi.environments')
                         .get<ProjectsViewMode>('viewMode', 'environment');
                     if (newMode !== this.currentViewMode) {
                         this.currentViewMode = newMode;
-                        this.refresh();
                     }
+                    this.refresh();
                 }
             }),
         );
@@ -409,10 +458,28 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
         return envs.map((e) => new PixiEnvironmentTreeItem(e, project, envFeaturesMap.get(e.pixiEnvName)));
     }
 
-    private getProjectChildren(project: PixiProject): Promise<PixiProjectsTreeItem[]> {
-        return this.currentViewMode === 'feature'
-            ? this.getFeatureItemsForProject(project)
-            : this.getEnvironmentItemsForProject(project);
+    private async getProjectChildren(project: PixiProject): Promise<PixiProjectsTreeItem[]> {
+        const items =
+            this.currentViewMode === 'feature'
+                ? await this.getFeatureItemsForProject(project)
+                : await this.getEnvironmentItemsForProject(project);
+
+        const config = workspace.getConfiguration('pixi.environments', Uri.file(project.projectPath));
+        const position = config.get<'bottom' | 'top' | 'hidden'>('systemRequirementsPosition', 'bottom');
+
+        if (position !== 'hidden') {
+            const reqs = getProjectSystemRequirements(project.projectPath);
+            if (reqs) {
+                const reqItem = new PixiSystemRequirementsTreeItem(project, reqs);
+                if (position === 'top') {
+                    items.unshift(reqItem);
+                } else {
+                    items.push(reqItem);
+                }
+            }
+        }
+
+        return items;
     }
 
     public async getChildren(element?: PixiProjectsTreeItem): Promise<PixiProjectsTreeItem[]> {
@@ -516,6 +583,12 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
 
         if (element instanceof PixiTransitiveGroupTreeItem) {
             return element.packages.map((pkg) => new PixiPackageTreeItem(pkg, element.env, element.project));
+        }
+
+        if (element instanceof PixiSystemRequirementsTreeItem) {
+            return Object.entries(element.requirements).map(
+                ([prop, val]) => new PixiSystemRequirementPropertyTreeItem(prop, val ?? '', element.project),
+            );
         }
 
         return [];

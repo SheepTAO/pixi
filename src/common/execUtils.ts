@@ -38,6 +38,17 @@ export function quoteArgs(args: string[]): string[] {
     return args.map(quoteStringIfNecessary);
 }
 
+/**
+ * Strips surrounding single or double quotes from a string, if present.
+ */
+export function unquoteString(val: string): string {
+    const trimmed = val.trim();
+    if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+        return trimmed.slice(1, -1);
+    }
+    return trimmed;
+}
+
 export interface ExecutableCandidates {
     posix: string[];
     win32: string[];
@@ -145,6 +156,14 @@ export function normalizeFolderPath(target?: unknown): string | undefined {
 }
 
 /**
+ * Generates a normalized project key for map caching, taking into account OS path casing.
+ */
+export function getProjectKey(projectPath: string): string {
+    const normalized = path.normalize(projectPath).replace(/[/\\]+$/, '');
+    return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
+}
+
+/**
  * Escapes characters with special meaning in regular expressions.
  */
 export function escapeRegex(str: string): string {
@@ -171,7 +190,7 @@ export function revealRangeInEditor(editor: TextEditor, line: number, startCol: 
 export interface RevealDefinitionOptions {
     manifestPath?: string;
     targetName: string;
-    kind: 'package' | 'task' | 'feature';
+    kind: 'package' | 'task' | 'feature' | 'system-requirements';
 }
 
 /**
@@ -209,7 +228,23 @@ export async function revealDefinitionInManifest(options: RevealDefinitionOption
                 currentSection = sectionMatch[1].trim();
             }
 
-            if (kind === 'task') {
+            if (kind === 'system-requirements') {
+                const sysReqSectionRegex = /^\s*\[+(?:tool\.pixi\.)?(?:workspace\.)?system-requirements\]+/i;
+                if (targetName === 'system-requirements') {
+                    if (sysReqSectionRegex.test(line)) {
+                        targetLine = i;
+                        break;
+                    }
+                } else {
+                    const isSysReqSection = /(^|\.)system-requirements(\.|$)/i.test(currentSection);
+                    if (keyRegex.test(line) && isSysReqSection) {
+                        targetLine = i;
+                        break;
+                    } else if (sysReqSectionRegex.test(line) && fallbackLine < 0) {
+                        fallbackLine = i;
+                    }
+                }
+            } else if (kind === 'task') {
                 if (taskSectionRegex.test(line)) {
                     targetLine = i;
                     break;

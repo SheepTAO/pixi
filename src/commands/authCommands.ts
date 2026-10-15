@@ -12,6 +12,7 @@ import {
 import {
     getPixiAuthStatus,
     getPixiAuthToken,
+    isTokenAuthMethod,
     loginPixiHost,
     loginPixiHostOAuth,
     logoutPixiHost,
@@ -466,9 +467,7 @@ export async function promptCopyToken(targetItem?: unknown): Promise<void> {
 
     if (!targetHost) {
         const entries = await readStoredCredentials();
-        const tokenEntries = entries.filter(
-            (e) => e.method === 'BearerToken' || e.method === 'CondaToken' || e.method === 'OAuth2',
-        );
+        const tokenEntries = entries.filter((e) => isTokenAuthMethod(e.method));
         if (tokenEntries.length === 0) {
             window.showInformationMessage(
                 entries.length === 0

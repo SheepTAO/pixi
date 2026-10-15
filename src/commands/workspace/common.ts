@@ -477,6 +477,7 @@ export interface ExtractedCommandContext {
     pkg?: PixiPackage;
     featureName?: string;
     task?: PixiTask;
+    propertyName?: string;
 }
 
 export function extractCommandContext(target?: unknown): ExtractedCommandContext {
@@ -496,6 +497,7 @@ export function extractCommandContext(target?: unknown): ExtractedCommandContext
         feature?: { name?: string };
         task?: PixiTask;
         name?: string;
+        propertyName?: string;
     };
 
     const task =
@@ -512,6 +514,7 @@ export function extractCommandContext(target?: unknown): ExtractedCommandContext
         pkg: item.pkg,
         featureName: item.featureName || item.feature?.name,
         task,
+        propertyName: item.propertyName,
     };
 }
 

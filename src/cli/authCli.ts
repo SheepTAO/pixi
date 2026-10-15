@@ -10,6 +10,13 @@ import { getPixi, resolveSpawnArgs, runPixi } from './pixiCli';
 
 export type AuthMethod = 'BearerToken' | 'CondaToken' | 'BasicHTTP' | 'S3' | 'OAuth2' | 'Unknown';
 
+/**
+ * Checks whether an authentication method provides a copyable bearer/conda/OAuth token.
+ */
+export function isTokenAuthMethod(method: AuthMethod): boolean {
+    return method === 'BearerToken' || method === 'CondaToken' || method === 'OAuth2';
+}
+
 export interface StoredAuthEntry {
     hostPattern: string;
     method: AuthMethod;

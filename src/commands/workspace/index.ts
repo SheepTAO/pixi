@@ -6,6 +6,7 @@ import { registerChannelCommands } from './channelCommands';
 import { registerEnvironmentCommands } from './environmentCommands';
 import { registerPackageCommands } from './packageCommands';
 import { registerPlatformCommands } from './platformCommands';
+import { registerSystemRequirementsCommands } from './systemRequirementsCommands';
 import { registerTaskCommands } from './taskCommands';
 import { registerUpdateCommands } from './updateCommands';
 
@@ -15,6 +16,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager, taskProvi
         ...registerPackageCommands(manager),
         ...registerChannelCommands(manager),
         ...registerPlatformCommands(manager),
+        ...registerSystemRequirementsCommands(manager),
         ...registerUpdateCommands(manager),
         ...registerTaskCommands(manager, taskProvider),
     );

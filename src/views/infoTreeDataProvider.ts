@@ -13,7 +13,7 @@ import {
     workspace,
 } from 'vscode';
 
-import { readStoredCredentials, setCachedAuthDir } from '../cli/authCli';
+import { isTokenAuthMethod, readStoredCredentials, setCachedAuthDir } from '../cli/authCli';
 import { runPixi } from '../cli/pixiCli';
 import { safeJsonParse } from '../common/execUtils';
 import { traceError } from '../common/logging';
@@ -252,8 +252,7 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
             const authChildren: PixiInfoItem[] = [];
 
             for (const entry of entries) {
-                const hasToken =
-                    entry.method === 'BearerToken' || entry.method === 'CondaToken' || entry.method === 'OAuth2';
+                const hasToken = isTokenAuthMethod(entry.method);
                 const userDesc = entry.username ? ` (${entry.username})` : '';
                 const item = new PixiInfoItem(
                     entry.hostPattern,
@@ -287,13 +286,7 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
                     ? `Credentials File: ${info.auth_dir}\n${entries.length} authenticated host(s)\nClick to open credentials location`
                     : `Credentials File: ${info.auth_dir}\nNo authenticated hosts yet\nClick to login or manage authentication`;
             authGroup.contextValue = 'pixiInfoAuthStorage';
-            if (entries.length > 0) {
-                authGroup.command = {
-                    command: 'pixi.openLocation',
-                    title: 'Open Credentials Location',
-                    arguments: [info.auth_dir],
-                };
-            } else {
+            if (entries.length === 0) {
                 authGroup.command = {
                     command: 'pixi.auth.login',
                     title: 'Login to Host / Registry',

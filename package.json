@@ -102,6 +102,30 @@
                 "icon": "$(device-desktop)"
             },
             {
+                "command": "pixi.systemRequirements",
+                "title": "System Requirements ...",
+                "category": "Pixi",
+                "icon": "$(server-process)"
+            },
+            {
+                "command": "pixi.systemRequirements.reveal",
+                "title": "Reveal in Manifest",
+                "category": "Pixi",
+                "icon": "$(go-to-file)"
+            },
+            {
+                "command": "pixi.systemRequirements.editProperty",
+                "title": "Edit Requirement ...",
+                "category": "Pixi",
+                "icon": "$(edit)"
+            },
+            {
+                "command": "pixi.systemRequirements.removeProperty",
+                "title": "Remove Requirement",
+                "category": "Pixi",
+                "icon": "$(trash)"
+            },
+            {
                 "command": "pixi.openManifest",
                 "title": "Open Manifest",
                 "category": "Pixi",
@@ -449,6 +473,10 @@
                     "when": "pixi.hasPixiProject"
                 },
                 {
+                    "command": "pixi.systemRequirements",
+                    "when": "pixi.hasPixiProject"
+                },
+                {
                     "command": "pixi.addPackage",
                     "when": "pixi.hasPixiProject"
                 },
@@ -538,6 +566,18 @@
                 },
                 {
                     "command": "pixi.revealPackageInManifest",
+                    "when": "false"
+                },
+                {
+                    "command": "pixi.systemRequirements.reveal",
+                    "when": "false"
+                },
+                {
+                    "command": "pixi.systemRequirements.editProperty",
+                    "when": "false"
+                },
+                {
+                    "command": "pixi.systemRequirements.removeProperty",
                     "when": "false"
                 },
                 {
@@ -665,6 +705,11 @@
                     "group": "1_manage@3"
                 },
                 {
+                    "command": "pixi.systemRequirements",
+                    "when": "view == pixi.views.projects && pixi.hasPixiProject",
+                    "group": "1_manage@3.5"
+                },
+                {
                     "command": "pixi.lock",
                     "when": "view == pixi.views.projects && pixi.hasPixiProject",
                     "group": "1_manage@4"
@@ -780,6 +825,11 @@
                     "command": "pixi.platform",
                     "when": "view == pixi.views.projects && viewItem == pixiProject",
                     "group": "2_channel@3"
+                },
+                {
+                    "command": "pixi.systemRequirements",
+                    "when": "view == pixi.views.projects && viewItem == pixiProject",
+                    "group": "2_channel@4"
                 },
                 {
                     "command": "pixi.addPackage",
@@ -910,6 +960,51 @@
                     "command": "pixi.removeFeature",
                     "when": "view == pixi.views.projects && viewItem == pixiFeatureItem",
                     "group": "2_manage@4"
+                },
+                {
+                    "command": "pixi.systemRequirements.reveal",
+                    "when": "view == pixi.views.projects && viewItem == pixiSystemRequirements",
+                    "group": "inline@1"
+                },
+                {
+                    "command": "pixi.systemRequirements",
+                    "when": "view == pixi.views.projects && viewItem == pixiSystemRequirements",
+                    "group": "inline@2"
+                },
+                {
+                    "command": "pixi.systemRequirements.reveal",
+                    "when": "view == pixi.views.projects && viewItem == pixiSystemRequirements",
+                    "group": "1_manage@1"
+                },
+                {
+                    "command": "pixi.systemRequirements",
+                    "when": "view == pixi.views.projects && viewItem == pixiSystemRequirements",
+                    "group": "1_manage@2"
+                },
+                {
+                    "command": "pixi.systemRequirements.editProperty",
+                    "when": "view == pixi.views.projects && viewItem == pixiSystemRequirementProperty",
+                    "group": "inline@1"
+                },
+                {
+                    "command": "pixi.systemRequirements.removeProperty",
+                    "when": "view == pixi.views.projects && viewItem == pixiSystemRequirementProperty",
+                    "group": "inline@2"
+                },
+                {
+                    "command": "pixi.systemRequirements.reveal",
+                    "when": "view == pixi.views.projects && viewItem == pixiSystemRequirementProperty",
+                    "group": "1_manage@1"
+                },
+                {
+                    "command": "pixi.systemRequirements.editProperty",
+                    "when": "view == pixi.views.projects && viewItem == pixiSystemRequirementProperty",
+                    "group": "1_manage@2"
+                },
+                {
+                    "command": "pixi.systemRequirements.removeProperty",
+                    "when": "view == pixi.views.projects && viewItem == pixiSystemRequirementProperty",
+                    "group": "2_danger@1"
                 },
                 {
                     "command": "pixi.global.updateTool",
@@ -1250,6 +1345,22 @@
                     ],
                     "default": "environment",
                     "description": "Control how the Environments tree view is organized: by environment or by feature.",
+                    "scope": "resource"
+                },
+                "pixi.environments.systemRequirementsPosition": {
+                    "type": "string",
+                    "enum": [
+                        "bottom",
+                        "top",
+                        "hidden"
+                    ],
+                    "enumDescriptions": [
+                        "Display System Requirements pinned at the bottom of the project environments tree (default)",
+                        "Display System Requirements pinned at the top of the project environments tree",
+                        "Do not display System Requirements in the tree view"
+                    ],
+                    "default": "bottom",
+                    "description": "Control the placement of the System Requirements item in the Environments view when system requirements are configured in the project manifest.",
                     "scope": "resource"
                 },
                 "pixi.cache.autoMeasureSize": {
