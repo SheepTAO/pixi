@@ -408,8 +408,7 @@ export async function promptAddPackageSpec(
         quickPick.title = targetEnvName
             ? `Pixi: Add Package to '${targetEnvName}' (Conda Search & Direct Add)`
             : 'Pixi: Add Package (Conda Search & Direct Add)';
-        quickPick.placeholder =
-            'Type package to search Conda or press Enter to add directly (PyPI / Conda)';
+        quickPick.placeholder = 'Type package to search Conda or press Enter to add directly (PyPI / Conda)';
         quickPick.matchOnDescription = true;
         quickPick.matchOnDetail = true;
 

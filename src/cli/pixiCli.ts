@@ -280,9 +280,7 @@ export async function searchPixiPackages(
                         item.versions.add(r.version);
                         item.platforms.add(subPlatform);
                         if (r.channel) {
-                            const chan = r.channel
-                                .replace(/^https?:\/\/conda\.anaconda\.org\//, '')
-                                .replace(/\/$/, '');
+                            const chan = r.channel.replace(/^https?:\/\/conda\.anaconda\.org\//, '').replace(/\/$/, '');
                             item.channels.add(chan || DEFAULT_CONDA_CHANNEL);
                         }
                     }

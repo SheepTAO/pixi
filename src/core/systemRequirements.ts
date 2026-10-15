@@ -184,18 +184,12 @@ export function updateManifestSystemRequirementsContent(
 
     if (headerIdx === -1) {
         // Section does not exist. Add it if we have non-null updates.
-        const toAdd = Object.entries(updates).filter(
-            ([_, v]) => v !== null && v !== undefined && v !== '',
-        );
+        const toAdd = Object.entries(updates).filter(([_, v]) => v !== null && v !== undefined && v !== '');
         if (toAdd.length === 0) {
             return content;
         }
 
-        const newBlock = [
-            '',
-            `[${targetHeader}]`,
-            ...toAdd.map(([k, v]) => `${k} = ${formatTomlValue(k, v!)}`),
-        ];
+        const newBlock = ['', `[${targetHeader}]`, ...toAdd.map(([k, v]) => `${k} = ${formatTomlValue(k, v!)}`)];
         return content.trimEnd() + eol + newBlock.join(eol) + eol;
     }
 
@@ -281,4 +275,3 @@ export async function updateProjectSystemRequirements(
     }
     return applied;
 }
-

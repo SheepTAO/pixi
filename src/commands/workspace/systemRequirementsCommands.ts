@@ -142,15 +142,14 @@ export function registerSystemRequirementsCommands(manager: PixiProjectManager):
 
             const targetProp = preselectedProp || ctx.propertyName;
             if (targetProp) {
-                const descriptor =
-                    SYSTEM_REQUIREMENT_DESCRIPTORS.find((d) => d.id === targetProp) || {
-                        id: targetProp,
-                        label: targetProp,
-                        description: `System requirement '${targetProp}'`,
-                        icon: 'symbol-property',
-                        presets: [],
-                        placeholder: `Enter value for '${targetProp}'`,
-                    };
+                const descriptor = SYSTEM_REQUIREMENT_DESCRIPTORS.find((d) => d.id === targetProp) || {
+                    id: targetProp,
+                    label: targetProp,
+                    description: `System requirement '${targetProp}'`,
+                    icon: 'symbol-property',
+                    presets: [],
+                    placeholder: `Enter value for '${targetProp}'`,
+                };
                 const currentReqs = getProjectSystemRequirements(projectPath) ?? {};
                 const newVal = await promptForPropertyValue(descriptor, currentReqs[descriptor.id]);
                 if (newVal === undefined) {
@@ -242,33 +241,26 @@ export function registerSystemRequirementsCommands(manager: PixiProjectManager):
     );
 
     // 2. Reveal in Manifest
-    const revealCommand = commands.registerCommand(
-        'pixi.systemRequirements.reveal',
-        async (targetItem?: unknown) => {
-            const ctx = extractCommandContext(targetItem);
-            const projectPath =
-                ctx.projectPath ||
-                (await pickPixiProject(
-                    manager,
-                    'Select Pixi project to reveal system requirements for',
-                    targetItem,
-                ));
-            if (!projectPath) {
-                return;
-            }
-            const manifestPath = findManifestPath(projectPath);
-            if (!manifestPath) {
-                window.showErrorMessage('No manifest file found for this project.');
-                return;
-            }
+    const revealCommand = commands.registerCommand('pixi.systemRequirements.reveal', async (targetItem?: unknown) => {
+        const ctx = extractCommandContext(targetItem);
+        const projectPath =
+            ctx.projectPath ||
+            (await pickPixiProject(manager, 'Select Pixi project to reveal system requirements for', targetItem));
+        if (!projectPath) {
+            return;
+        }
+        const manifestPath = findManifestPath(projectPath);
+        if (!manifestPath) {
+            window.showErrorMessage('No manifest file found for this project.');
+            return;
+        }
 
-            await revealDefinitionInManifest({
-                manifestPath,
-                targetName: ctx.propertyName || 'system-requirements',
-                kind: 'system-requirements',
-            });
-        },
-    );
+        await revealDefinitionInManifest({
+            manifestPath,
+            targetName: ctx.propertyName || 'system-requirements',
+            kind: 'system-requirements',
+        });
+    });
 
     // 3. Edit single property
     const editPropCommand = commands.registerCommand(
@@ -288,11 +280,7 @@ export function registerSystemRequirementsCommands(manager: PixiProjectManager):
             const targetProp = propName || ctx.propertyName;
             const projectPath =
                 ctx.projectPath ||
-                (await pickPixiProject(
-                    manager,
-                    'Select Pixi project to remove system requirement from',
-                    targetItem,
-                ));
+                (await pickPixiProject(manager, 'Select Pixi project to remove system requirement from', targetItem));
             if (!projectPath || !targetProp) {
                 return;
             }
@@ -313,4 +301,3 @@ export function registerSystemRequirementsCommands(manager: PixiProjectManager):
 
     return [configCommand, revealCommand, editPropCommand, removePropCommand];
 }
-
