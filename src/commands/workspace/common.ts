@@ -13,7 +13,7 @@ import {
 } from 'vscode';
 
 import { runPixi } from '../../cli/pixiCli';
-import { normalizeFolderPath, normalizeLocationPath } from '../../common/execUtils';
+import { normalizeFolderPath } from '../../common/execUtils';
 import { ensureEnvironmentReady, getEnvironmentStatusBadge, sortPixiEnvironments } from '../../core/environmentRules';
 import { normalizePkgName } from '../../core/packageManager';
 import { PIXI_MANIFEST_NAME, PYPROJECT_MANIFEST_NAME } from '../../core/projectDiscovery';
@@ -483,7 +483,7 @@ export function extractCommandContext(target?: unknown): ExtractedCommandContext
     if (!target) {
         return {};
     }
-    const projectPath = normalizeLocationPath(target);
+    const projectPath = normalizeFolderPath(target);
     if (typeof target !== 'object' || target instanceof Uri) {
         return { projectPath };
     }
@@ -879,7 +879,7 @@ export async function resolveReadyEnvironment(
     let env = ctx.env;
 
     if (!env) {
-        const folder = ctx.projectPath || normalizeFolderPath(targetItem);
+        const folder = ctx.projectPath;
         const targetProjectPath = folder ? manager.findProjectForUri(Uri.file(folder)) || folder : undefined;
         env = await pickPixiEnvironment(manager, targetProjectPath, options);
     }

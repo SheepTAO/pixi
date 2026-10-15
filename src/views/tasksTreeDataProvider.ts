@@ -23,6 +23,37 @@ import {
 } from '../providers/taskProvider';
 import { PixiProjectTreeItem } from './projectsTreeDataProvider';
 
+interface TaskIconRule {
+    keywords: readonly string[];
+    icon: string;
+    color?: string;
+}
+
+const TASK_ICON_RULES: readonly TaskIconRule[] = [
+    { keywords: ['test'], icon: 'beaker', color: 'charts.green' },
+    { keywords: ['bench', 'profile', 'eval'], icon: 'pulse', color: 'charts.yellow' },
+    { keywords: ['build', 'compile', 'pkg'], icon: 'tools', color: 'charts.orange' },
+    { keywords: ['deploy', 'release', 'publish', 'upload'], icon: 'rocket', color: 'charts.red' },
+    { keywords: ['run', 'start', 'serve', 'sim', 'app'], icon: 'play', color: 'charts.blue' },
+    { keywords: ['lint', 'check', 'format', 'fmt'], icon: 'check-all', color: 'charts.purple' },
+    { keywords: ['preprocess', 'data', 'prep', 'etl'], icon: 'database', color: 'charts.blue' },
+    { keywords: ['install', 'download', 'fetch', 'pull', 'update'], icon: 'cloud-download', color: 'charts.blue' },
+    { keywords: ['watch', 'monitor'], icon: 'eye', color: 'charts.cyan' },
+    { keywords: ['clean'], icon: 'clear-all', color: 'descriptionForeground' },
+    { keywords: ['doc'], icon: 'book', color: 'charts.yellow' },
+    { keywords: ['sync', 'setup'], icon: 'sync', color: 'charts.green' },
+];
+
+function resolveTaskIcon(taskName: string): ThemeIcon {
+    const lower = taskName.toLowerCase();
+    for (const rule of TASK_ICON_RULES) {
+        if (rule.keywords.some((kw) => lower.includes(kw))) {
+            return rule.color ? new ThemeIcon(rule.icon, new ThemeColor(rule.color)) : new ThemeIcon(rule.icon);
+        }
+    }
+    return new ThemeIcon('terminal-view-icon');
+}
+
 export class PixiTaskTreeItem extends TreeItem {
     constructor(
         public readonly task: PixiTask,
@@ -35,61 +66,7 @@ export class PixiTaskTreeItem extends TreeItem {
         this.description = [envTag, descText].filter(Boolean).join(' ');
 
         // Intelligent Codicon matching based on task name semantics
-        const lower = task.name.toLowerCase();
-        if (lower.includes('test')) {
-            this.iconPath = new ThemeIcon('beaker', new ThemeColor('charts.green'));
-        } else if (lower.includes('bench') || lower.includes('profile') || lower.includes('eval')) {
-            this.iconPath = new ThemeIcon('pulse', new ThemeColor('charts.yellow'));
-        } else if (lower.includes('build') || lower.includes('compile') || lower.includes('pkg')) {
-            this.iconPath = new ThemeIcon('tools', new ThemeColor('charts.orange'));
-        } else if (
-            lower.includes('deploy') ||
-            lower.includes('release') ||
-            lower.includes('publish') ||
-            lower.includes('upload')
-        ) {
-            this.iconPath = new ThemeIcon('rocket', new ThemeColor('charts.red'));
-        } else if (
-            lower.includes('run') ||
-            lower.includes('start') ||
-            lower.includes('serve') ||
-            lower.includes('sim') ||
-            lower.includes('app')
-        ) {
-            this.iconPath = new ThemeIcon('play', new ThemeColor('charts.blue'));
-        } else if (
-            lower.includes('lint') ||
-            lower.includes('check') ||
-            lower.includes('format') ||
-            lower.includes('fmt')
-        ) {
-            this.iconPath = new ThemeIcon('check-all', new ThemeColor('charts.purple'));
-        } else if (
-            lower.includes('preprocess') ||
-            lower.includes('data') ||
-            lower.includes('prep') ||
-            lower.includes('etl')
-        ) {
-            this.iconPath = new ThemeIcon('database', new ThemeColor('charts.blue'));
-        } else if (
-            lower.includes('install') ||
-            lower.includes('download') ||
-            lower.includes('fetch') ||
-            lower.includes('pull') ||
-            lower.includes('update')
-        ) {
-            this.iconPath = new ThemeIcon('cloud-download', new ThemeColor('charts.blue'));
-        } else if (lower.includes('watch') || lower.includes('monitor')) {
-            this.iconPath = new ThemeIcon('eye', new ThemeColor('charts.cyan'));
-        } else if (lower.includes('clean')) {
-            this.iconPath = new ThemeIcon('clear-all', new ThemeColor('descriptionForeground'));
-        } else if (lower.includes('doc')) {
-            this.iconPath = new ThemeIcon('book', new ThemeColor('charts.yellow'));
-        } else if (lower.includes('sync') || lower.includes('setup')) {
-            this.iconPath = new ThemeIcon('sync', new ThemeColor('charts.green'));
-        } else {
-            this.iconPath = new ThemeIcon('terminal-view-icon');
-        }
+        this.iconPath = resolveTaskIcon(task.name);
 
         const lines = [`Task: ${task.name}`];
         if (task.cmd) {

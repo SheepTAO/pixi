@@ -155,8 +155,9 @@ export interface SplitPackageSpecResult {
  * e.g., "numpy>=1.20" -> { name: "numpy", constraint: ">=1.20" }
  */
 export function splitPackageSpec(spec: string): SplitPackageSpecResult {
-    const name = extractPackageNameFromSpec(spec);
-    const constraint = spec.slice(name.length).trim();
+    const trimmed = spec.trim();
+    const name = extractPackageNameFromSpec(trimmed);
+    const constraint = trimmed.slice(name.length).trim();
     return { name, constraint };
 }
 
