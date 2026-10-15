@@ -7,6 +7,7 @@ import {
     QuickPickItemKind,
     Uri,
     window,
+    workspace,
 } from 'vscode';
 
 import { PixiPackageSearchResult, searchPixiPackages } from '../../cli/pixiCli';
@@ -136,10 +137,13 @@ export function attachDebouncedPackageSearch<T extends QuickPickItem>(
                 ...prefixItems,
                 {
                     label: '$(info) Start typing to search...',
-                    description: 'Type at least 2 characters to search Conda & PyPI packages',
+                    description: 'Type at least 2 characters to search Conda packages',
                     alwaysShow: true,
                 } as unknown as T,
             ];
+            if (prefixItems.length > 0) {
+                quickPick.activeItems = [prefixItems[0]];
+            }
             quickPick.busy = false;
             return;
         }
@@ -147,11 +151,14 @@ export function attachDebouncedPackageSearch<T extends QuickPickItem>(
         quickPick.items = [
             ...prefixItems,
             {
-                label: '$(sync~spin) Searching Conda & PyPI packages...',
+                label: '$(sync~spin) Searching Conda packages...',
                 description: `Looking up "${trimmed}"...`,
                 alwaysShow: true,
             } as unknown as T,
         ];
+        if (prefixItems.length > 0) {
+            quickPick.activeItems = [prefixItems[0]];
+        }
         quickPick.busy = true;
 
         debounceTimer = setTimeout(async () => {
@@ -159,9 +166,13 @@ export function attachDebouncedPackageSearch<T extends QuickPickItem>(
             const token = searchCts.token;
 
             try {
+                const maxResults = workspace
+                    .getConfiguration('pixi', options.projectPath ? Uri.file(options.projectPath) : undefined)
+                    .get<number>('packageSearch.maxResults', 5);
+
                 const results = await searchPixiPackages(
                     trimmed,
-                    { cwd: options.projectPath, channels: projectChannels },
+                    { cwd: options.projectPath, channels: projectChannels, limit: maxResults },
                     token,
                 );
                 if (token.isCancellationRequested) {
@@ -173,13 +184,23 @@ export function attachDebouncedPackageSearch<T extends QuickPickItem>(
                         ...prefixItems,
                         {
                             label: '$(info) No packages found',
-                            description: `No Conda or PyPI packages matching "${trimmed}"`,
+                            description: `No Conda packages matching "${trimmed}"`,
                             alwaysShow: true,
                         } as unknown as T,
                     ];
                 } else {
                     const searchItems = results.map(createPackageQuickPickItem) as unknown as T[];
-                    quickPick.items = [...prefixItems, ...searchItems];
+                    const items: T[] = [...prefixItems];
+                    items.push({
+                        label: `Conda Packages (${results.length})`,
+                        kind: QuickPickItemKind.Separator,
+                    } as unknown as T);
+                    items.push(...searchItems);
+                    quickPick.items = items;
+                }
+
+                if (prefixItems.length > 0) {
+                    quickPick.activeItems = [prefixItems[0]];
                 }
             } catch (err: unknown) {
                 if (!token.isCancellationRequested) {
@@ -194,6 +215,9 @@ export function attachDebouncedPackageSearch<T extends QuickPickItem>(
                             alwaysShow: true,
                         } as unknown as T,
                     ];
+                    if (prefixItems.length > 0) {
+                        quickPick.activeItems = [prefixItems[0]];
+                    }
                 }
             } finally {
                 if (!token.isCancellationRequested) {
@@ -210,8 +234,8 @@ export function attachDebouncedPackageSearch<T extends QuickPickItem>(
 
 export async function showPackageSearchPicker(targetProjectPath?: string, initialQuery?: string): Promise<void> {
     const quickPick = window.createQuickPick<SearchResultQuickPickItem>();
-    quickPick.title = 'Pixi: Search Packages (Conda & PyPI)';
-    quickPick.placeholder = 'Type package name to search Conda & PyPI... (e.g. numpy, uv, torch, ruff)';
+    quickPick.title = 'Pixi: Search Conda Packages';
+    quickPick.placeholder = 'Type package name to search Conda channels... (e.g. numpy, uv, torch, ruff)';
     quickPick.matchOnDescription = true;
     quickPick.matchOnDetail = true;
 
@@ -382,10 +406,10 @@ export async function promptAddPackageSpec(
     return new Promise((resolve) => {
         const quickPick = window.createQuickPick<SearchResultQuickPickItem>();
         quickPick.title = targetEnvName
-            ? `Pixi: Add Package to '${targetEnvName}' (Search Conda & PyPI)`
-            : 'Pixi: Add Package (Search Conda & PyPI)';
+            ? `Pixi: Add Package to '${targetEnvName}' (Conda Search & Direct Add)`
+            : 'Pixi: Add Package (Conda Search & Direct Add)';
         quickPick.placeholder =
-            'Type package name to search or enter spec (e.g. numpy>=1.26, requests, or press Enter)';
+            'Type package to search Conda or press Enter to add directly (PyPI / Conda)';
         quickPick.matchOnDescription = true;
         quickPick.matchOnDetail = true;
 
@@ -400,7 +424,7 @@ export async function promptAddPackageSpec(
                 return [
                     {
                         label: `$(edit) Add: "${query}"`,
-                        description: 'Press Enter to select source channel and install directly',
+                        description: 'Press Enter to select source (Conda, PyPI, Git, Path)',
                         alwaysShow: true,
                     },
                 ];

@@ -1214,10 +1214,12 @@
                     "description": "Default environment name to activate when opening a Pixi terminal (e.g. 'default' or 'dev'). If empty, prompts for selection when multiple environments exist.",
                     "scope": "resource"
                 },
-                "pixi.packageSearch.includePypi": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "Include PyPI packages in package search results.",
+                "pixi.packageSearch.maxResults": {
+                    "type": "integer",
+                    "default": 5,
+                    "minimum": 1,
+                    "maximum": 50,
+                    "description": "Maximum number of Conda packages to display in search and package add pickers.",
                     "scope": "resource"
                 },
                 "pixi.packages.displayMode": {

@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import semver from 'semver';
-import { CancellationError, CancellationToken, commands, Uri, window, workspace } from 'vscode';
+import { CancellationError, CancellationToken, commands, window, workspace } from 'vscode';
 import which from 'which';
 
 import { quoteArgs, safeJsonParse, sanitizeArgsForLogging, untildify } from '../common/execUtils';
@@ -209,67 +209,13 @@ export async function cleanGlobalCache(token?: CancellationToken, cwd?: string):
     return output;
 }
 
-async function fetchPypiPackage(
-    packageName: string,
-    token?: CancellationToken,
-): Promise<PixiPackageSearchResult | null> {
-    if (token?.isCancellationRequested) {
-        return null;
-    }
-
-    const controller = new AbortController();
-    const cancelDisposable = token?.onCancellationRequested(() => controller.abort());
-    const timeoutId = setTimeout(() => controller.abort(), 2500);
-
-    try {
-        const targetUrl = `https://pypi.org/pypi/${encodeURIComponent(packageName)}/json`;
-        const res = await fetch(targetUrl, { signal: controller.signal });
-        if (!res.ok) {
-            return null;
-        }
-
-        const data = (await res.json()) as {
-            info?: {
-                name?: string;
-                version?: string;
-                license?: string;
-                summary?: string;
-            };
-        };
-
-        if (!data?.info?.name || !data?.info?.version) {
-            return null;
-        }
-
-        return {
-            name: data.info.name,
-            latestVersion: data.info.version,
-            versions: [data.info.version],
-            platforms: ['all'],
-            channel: 'pypi',
-            sourceType: 'pypi',
-            license: data.info.license || undefined,
-            summary: data.info.summary || undefined,
-        };
-    } catch (err: unknown) {
-        if (token?.isCancellationRequested) {
-            return null;
-        }
-        traceError(`PyPI registry fetch failed for '${packageName}':`, err);
-        throw err;
-    } finally {
-        clearTimeout(timeoutId);
-        cancelDisposable?.dispose();
-    }
-}
-
 export async function searchPixiPackages(
     query: string,
     options?: {
         cwd?: string;
         platform?: string;
         channels?: string[];
-        includePypi?: boolean;
+        limit?: number;
     },
     token?: CancellationToken,
 ): Promise<PixiPackageSearchResult[]> {
@@ -284,7 +230,9 @@ export async function searchPixiPackages(
     const channelsKey = allChannels.slice().sort().join(',');
     const cacheKey = `${options?.cwd || ''}:${platform}:${channelsKey}:${cleanQuery}`;
     if (searchCache.has(cacheKey)) {
-        return searchCache.get(cacheKey)!;
+        const cached = searchCache.get(cacheKey)!;
+        const limit = options?.limit ?? 30;
+        return cached.slice(0, Math.max(1, limit));
     }
 
     const args = ['search', cleanQuery, '--json', '-p', platform];
@@ -292,115 +240,90 @@ export async function searchPixiPackages(
         args.push('-c', ch);
     }
 
-    const condaPromise = (async (): Promise<PixiPackageSearchResult[]> => {
-        try {
-            const stdout = await runPixi(args, { cwd: options?.cwd }, token);
-            const rawJson = safeJsonParse(stdout, {});
+    const results: PixiPackageSearchResult[] = [];
+    try {
+        const stdout = await runPixi(args, { cwd: options?.cwd }, token);
+        const rawJson = safeJsonParse(stdout, {});
 
-            // Group packages by name across platforms
-            const pkgMap = new Map<
-                string,
-                {
-                    name: string;
-                    versions: Set<string>;
-                    platforms: Set<string>;
-                    channels: Set<string>;
-                    license?: string;
-                    summary?: string;
-                }
-            >();
+        // Group packages by name across platforms
+        const pkgMap = new Map<
+            string,
+            {
+                name: string;
+                versions: Set<string>;
+                platforms: Set<string>;
+                channels: Set<string>;
+                license?: string;
+                summary?: string;
+            }
+        >();
 
-            if (rawJson && typeof rawJson === 'object') {
-                for (const [subPlatform, records] of Object.entries(rawJson)) {
-                    if (Array.isArray(records)) {
-                        for (const r of records) {
-                            if (!r || !r.name || !r.version) {
-                                continue;
-                            }
-                            let item = pkgMap.get(r.name);
-                            if (!item) {
-                                item = {
-                                    name: r.name,
-                                    versions: new Set<string>(),
-                                    platforms: new Set<string>(),
-                                    channels: new Set<string>(),
-                                    license: r.license || undefined,
-                                    summary: r.description || r.summary || undefined,
-                                };
-                                pkgMap.set(r.name, item);
-                            }
-                            item.versions.add(r.version);
-                            item.platforms.add(subPlatform);
-                            if (r.channel) {
-                                const chan = r.channel
-                                    .replace(/^https?:\/\/conda\.anaconda\.org\//, '')
-                                    .replace(/\/$/, '');
-                                item.channels.add(chan || DEFAULT_CONDA_CHANNEL);
-                            }
+        if (rawJson && typeof rawJson === 'object') {
+            for (const [subPlatform, records] of Object.entries(rawJson)) {
+                if (Array.isArray(records)) {
+                    for (const r of records) {
+                        if (!r || !r.name || !r.version) {
+                            continue;
+                        }
+                        let item = pkgMap.get(r.name);
+                        if (!item) {
+                            item = {
+                                name: r.name,
+                                versions: new Set<string>(),
+                                platforms: new Set<string>(),
+                                channels: new Set<string>(),
+                                license: r.license || undefined,
+                                summary: r.description || r.summary || undefined,
+                            };
+                            pkgMap.set(r.name, item);
+                        }
+                        item.versions.add(r.version);
+                        item.platforms.add(subPlatform);
+                        if (r.channel) {
+                            const chan = r.channel
+                                .replace(/^https?:\/\/conda\.anaconda\.org\//, '')
+                                .replace(/\/$/, '');
+                            item.channels.add(chan || DEFAULT_CONDA_CHANNEL);
                         }
                     }
                 }
             }
-
-            const results: PixiPackageSearchResult[] = [];
-            for (const item of pkgMap.values()) {
-                const sortedVersions = Array.from(item.versions).sort((a, b) => {
-                    const sA = semver.coerce(a);
-                    const sB = semver.coerce(b);
-                    if (sA && sB) {
-                        return semver.rcompare(sA, sB);
-                    }
-                    return b.localeCompare(a);
-                });
-
-                const channelStr = Array.from(item.channels).join(', ') || DEFAULT_CONDA_CHANNEL;
-                results.push({
-                    name: item.name,
-                    latestVersion: sortedVersions[0] || 'unknown',
-                    versions: sortedVersions,
-                    platforms: Array.from(item.platforms),
-                    channel: channelStr,
-                    sourceType: 'conda',
-                    license: item.license,
-                    summary: item.summary,
-                });
-            }
-
-            return results;
-        } catch (err: unknown) {
-            const msg = err instanceof Error ? err.message : String(err);
-            if (msg.includes('No packages found')) {
-                return [];
-            }
-            traceError(`Conda package search failed for '${cleanQuery}':`, err);
-            throw err;
         }
-    })();
 
-    const shouldIncludePypi =
-        options?.includePypi ??
-        workspace
-            .getConfiguration('pixi', options?.cwd ? Uri.file(options.cwd) : undefined)
-            .get<boolean>('packageSearch.includePypi', true);
+        for (const item of pkgMap.values()) {
+            const sortedVersions = Array.from(item.versions).sort((a, b) => {
+                const sA = semver.coerce(a);
+                const sB = semver.coerce(b);
+                if (sA && sB) {
+                    return semver.rcompare(sA, sB);
+                }
+                return b.localeCompare(a);
+            });
 
-    const pypiPromise = !shouldIncludePypi ? Promise.resolve(null) : fetchPypiPackage(cleanQuery, token);
-
-    const [condaRes, pypiRes] = await Promise.allSettled([condaPromise, pypiPromise]);
-    const condaResults = condaRes.status === 'fulfilled' ? condaRes.value : [];
-    const pypiResult = pypiRes.status === 'fulfilled' ? pypiRes.value : null;
-
-    if (condaRes.status === 'rejected') {
-        if (pypiResult) {
-            return [pypiResult];
+            const channelStr = Array.from(item.channels).join(', ') || DEFAULT_CONDA_CHANNEL;
+            results.push({
+                name: item.name,
+                latestVersion: sortedVersions[0] || 'unknown',
+                versions: sortedVersions,
+                platforms: Array.from(item.platforms),
+                channel: channelStr,
+                sourceType: 'conda',
+                license: item.license,
+                summary: item.summary,
+            });
         }
-        throw condaRes.reason;
+    } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes('No packages found')) {
+            return [];
+        }
+        traceError(`Conda package search failed for '${cleanQuery}':`, err);
+        throw err;
     }
-
-    const combined: PixiPackageSearchResult[] = [...condaResults];
 
     // Sort Conda results: exact match first, then by name length / alphabetical
     const lowerQ = cleanQuery.toLowerCase();
-    combined.sort((a, b) => {
+    results.sort((a, b) => {
         const aName = a.name.toLowerCase();
         const bName = b.name.toLowerCase();
         const aExact = aName === lowerQ;
@@ -416,23 +339,14 @@ export async function searchPixiPackages(
         return a.name.localeCompare(b.name);
     });
 
-    // If PyPI returned a match for this package, insert PyPI item
-    if (pypiResult) {
-        const exactIndex = combined.findIndex((p) => p.name.toLowerCase() === lowerQ);
-        if (exactIndex !== -1) {
-            combined.splice(exactIndex + 1, 0, pypiResult);
-        } else {
-            combined.unshift(pypiResult);
-        }
-    }
-
-    const limited = combined.slice(0, 30);
     if (searchCache.size >= MAX_SEARCH_CACHE_SIZE) {
         const oldestKey = searchCache.keys().next().value;
         if (oldestKey !== undefined) {
             searchCache.delete(oldestKey);
         }
     }
-    searchCache.set(cacheKey, limited);
-    return limited;
+    searchCache.set(cacheKey, results);
+
+    const limit = options?.limit ?? 30;
+    return results.slice(0, Math.max(1, limit));
 }

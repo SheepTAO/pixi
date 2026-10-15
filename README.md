@@ -133,7 +133,7 @@ Launch any command via the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) by t
 | `pixi.autoInstallOnOpen`           | `string`   | `"prompt"`              | Resource | Behavior when opening projects with uninstalled environments (`"prompt"`, `"always"`, `"never"`).       |
 | `pixi.environmentRules`            | `string[]` | `[]`                    | Resource | Map glob patterns to environment names (e.g. `tests/**=dev`, `train/**=gpu`).                           |
 | `pixi.terminal.defaultEnvironment` | `string`   | `""`                    | Resource | Default environment name to activate when opening a Pixi terminal (prompts if empty).                   |
-| `pixi.packageSearch.includePypi`   | `boolean`  | `true`                  | Resource | Include PyPI packages in package search results.                                                        |
+| `pixi.packageSearch.maxResults`   | `integer`  | `5`                     | Resource | Maximum number of Conda packages to display in search and package add pickers.                          |
 | `pixi.packages.displayMode`        | `string`   | `"grouped"`             | Resource | Package tree display mode (`"grouped"`, `"explicitOnly"`, or `"all"`).                                  |
 | `pixi.environments.viewMode`       | `string`   | `"environment"`         | Resource | Environments view grouping mode (`"environment"` or `"feature"`).                                       |
 | `pixi.cache.autoMeasureSize`       | `boolean`  | `true`                  | Window   | Automatically compute Pixi cache disk usage in Pixi Info.                                               |
