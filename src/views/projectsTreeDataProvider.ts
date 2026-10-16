@@ -155,11 +155,18 @@ export class PixiEnvironmentTreeItem extends TreeItem {
 
         if (isInstalled) {
             this.iconPath = new ThemeIcon('pass-filled', new ThemeColor('testing.iconPassed'));
-            this.description = toolchainSummary;
+            const descParts: string[] = [];
+            if (toolchainSummary) {
+                descParts.push(toolchainSummary);
+            }
+            if (env.solveGroup) {
+                descParts.push(`[${env.solveGroup}]`);
+            }
+            this.description = descParts.join(' ') || undefined;
             this.contextValue = 'pixiEnvInstalled';
         } else if (env.pixiStatus === 'uninstalled') {
             this.iconPath = new ThemeIcon('circle-outline', new ThemeColor('disabledForeground'));
-            this.description = '(not installed)';
+            this.description = env.solveGroup ? `(not installed) [${env.solveGroup}]` : '(not installed)';
             this.contextValue = 'pixiEnvUninstalled';
             this.command = {
                 command: 'pixi.installEnvironment',
@@ -168,7 +175,7 @@ export class PixiEnvironmentTreeItem extends TreeItem {
             };
         } else {
             this.iconPath = new ThemeIcon('error', new ThemeColor('testing.iconFailed'));
-            this.description = '(incompatible)';
+            this.description = env.solveGroup ? `(incompatible) [${env.solveGroup}]` : '(incompatible)';
             this.contextValue = 'pixiEnvIncompatible';
         }
 
@@ -178,6 +185,12 @@ export class PixiEnvironmentTreeItem extends TreeItem {
             `Project: ${project.name}`,
             `Prefix: ${env.prefix}`,
         ];
+        if (env.solveGroup) {
+            lines.push(`Solve Group: ${env.solveGroup}`);
+        }
+        if (env.environmentSize) {
+            lines.push(`Size on Disk: ${env.environmentSize}`);
+        }
         if (envFeatures && envFeatures.length > 0) {
             lines.push(`Features: ${envFeatures.join(', ')}`);
         }

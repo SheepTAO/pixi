@@ -1,4 +1,6 @@
-import { commands, Disposable, OutputChannel, QuickPickItem, window, workspace } from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
+import { commands, Disposable, OutputChannel, QuickPickItem, ThemeIcon, Uri, window, workspace } from 'vscode';
 
 import { getPixi, runPixi } from '../../cli/pixiCli';
 import { runPixiWithProgress } from '../../cli/workspaceCli';
@@ -591,6 +593,224 @@ export function registerVersionCommands(manager: PixiProjectManager): Disposable
             });
             terminal.show();
             terminal.sendText(`"${pixiBin}" exec ${cleanCmd}`);
+        }),
+
+        // Pixi: Manage Workspace Dependencies ([workspace.dependencies])...
+        commands.registerCommand('pixi.workspaceDependencies', async (targetItem?: unknown) => {
+            const ctx = extractCommandContext(targetItem);
+            const projectPath =
+                ctx.projectPath || (await pickPixiProject(manager, 'Select Pixi project to manage workspace dependencies for'));
+            if (!projectPath) {
+                return;
+            }
+
+            const projectName = manager.getProjectName(projectPath);
+
+            let currentListOutput = '';
+            try {
+                currentListOutput = await runPixi(['workspace', 'dependencies', 'list'], { cwd: projectPath });
+            } catch {
+                // ignore
+            }
+
+            const action = await window.showQuickPick(
+                [
+                    {
+                        label: '$(list-unordered) View Workspace Dependencies',
+                        description: 'pixi workspace dependencies list',
+                        detail: currentListOutput.trim() || 'List dependencies in [workspace.dependencies]',
+                        action: 'list',
+                    },
+                    {
+                        label: '$(add) Add Workspace Dependency...',
+                        description: 'pixi workspace dependencies add <SPEC>',
+                        detail: 'Add shared dependency to [workspace.dependencies] table',
+                        action: 'add',
+                    },
+                    {
+                        label: '$(trash) Remove Workspace Dependency...',
+                        description: 'pixi workspace dependencies remove <PACKAGE>',
+                        detail: 'Remove shared dependency from [workspace.dependencies]',
+                        action: 'remove',
+                    },
+                ],
+                {
+                    title: `Pixi: Workspace Dependencies (${projectName})`,
+                    placeHolder: 'Select action to manage [workspace.dependencies]',
+                },
+            );
+
+            if (!action) {
+                return;
+            }
+
+            if (action.action === 'list') {
+                const lines = currentListOutput
+                    .split(/\r?\n/)
+                    .map((l) => l.trim())
+                    .filter(Boolean);
+                if (lines.length === 0) {
+                    window.showInformationMessage(`No workspace dependencies found in '${projectName}'.`);
+                    return;
+                }
+                await window.showQuickPick(
+                    lines.map((line) => ({
+                        label: line,
+                        iconPath: new ThemeIcon('package'),
+                    })),
+                    {
+                        title: `Pixi: Workspace Dependencies (${projectName})`,
+                        placeHolder: 'Dependencies defined in [workspace.dependencies]',
+                    },
+                );
+                return;
+            }
+
+            if (action.action === 'add') {
+                const spec = await window.showInputBox({
+                    title: `Pixi: Add Workspace Dependency (${projectName})`,
+                    prompt: 'Enter dependency name or MatchSpec (e.g. pytest>=8.0, ruff, or cmake)',
+                    placeHolder: 'pytest>=8.0',
+                    validateInput: (val) => (!val.trim() ? 'Dependency specification cannot be empty' : null),
+                });
+                if (!spec) {
+                    return;
+                }
+
+                await runPixiWithProgress(
+                    `Pixi: Adding workspace dependency '${spec.trim()}' to ${projectName}...`,
+                    ['workspace', 'dependencies', 'add', spec.trim()],
+                    projectPath,
+                    manager,
+                    `Pixi: Workspace dependency '${spec.trim()}' added to ${projectName}.`,
+                );
+                return;
+            }
+
+            if (action.action === 'remove') {
+                const parsedPackages = currentListOutput
+                    .split(/\r?\n/)
+                    .map((l) => l.trim().replace(/^[-*•├│└─\s]+/, ''))
+                    .map((l) => l.split(/[\s=:<>~]/)[0]?.trim())
+                    .filter((n): n is string => Boolean(n && /^[a-zA-Z0-9_\-.]+$/.test(n)));
+                const uniquePackages = Array.from(new Set(parsedPackages));
+
+                let pkg: string | undefined;
+                if (uniquePackages.length > 0) {
+                    interface PkgPickItem extends QuickPickItem {
+                        pkgName?: string;
+                        isManual?: boolean;
+                    }
+                    const items: PkgPickItem[] = [
+                        ...uniquePackages.map((p) => ({
+                            label: `$(package) ${p}`,
+                            description: 'Remove from [workspace.dependencies]',
+                            pkgName: p,
+                        })),
+                        {
+                            label: '$(edit) Enter package name manually...',
+                            isManual: true,
+                        },
+                    ];
+                    const picked = await window.showQuickPick(items, {
+                        title: `Pixi: Remove Workspace Dependency (${projectName})`,
+                        placeHolder: 'Select a workspace dependency to remove',
+                    });
+                    if (!picked) {
+                        return;
+                    }
+                    if (picked.isManual) {
+                        pkg = await window.showInputBox({
+                            title: `Pixi: Remove Workspace Dependency (${projectName})`,
+                            prompt: 'Enter package name to remove from [workspace.dependencies]',
+                            placeHolder: 'e.g. pytest',
+                            validateInput: (val) => (!val.trim() ? 'Package name cannot be empty' : null),
+                        });
+                    } else {
+                        pkg = picked.pkgName;
+                    }
+                } else {
+                    pkg = await window.showInputBox({
+                        title: `Pixi: Remove Workspace Dependency (${projectName})`,
+                        prompt: 'Enter package name to remove from [workspace.dependencies]',
+                        placeHolder: 'e.g. pytest',
+                        validateInput: (val) => (!val.trim() ? 'Package name cannot be empty' : null),
+                    });
+                }
+
+                if (!pkg || !pkg.trim()) {
+                    return;
+                }
+
+                await runPixiWithProgress(
+                    `Pixi: Removing workspace dependency '${pkg.trim()}' from ${projectName}...`,
+                    ['workspace', 'dependencies', 'remove', pkg.trim()],
+                    projectPath,
+                    manager,
+                    `Pixi: Workspace dependency '${pkg.trim()}' removed from ${projectName}.`,
+                );
+            }
+        }),
+
+        // Pixi: Import Environment File (environment.yml or requirements.txt)...
+        commands.registerCommand('pixi.import', async (targetItem?: unknown) => {
+            const ctx = extractCommandContext(targetItem);
+            let targetFilePath: string | undefined;
+            if (targetItem instanceof Uri && fs.existsSync(targetItem.fsPath)) {
+                targetFilePath = targetItem.fsPath;
+            }
+
+            const projectPath =
+                ctx.projectPath ||
+                (targetFilePath ? (manager.findProjectForUri(Uri.file(targetFilePath)) || path.dirname(targetFilePath)) : undefined) ||
+                (await pickPixiProject(manager, 'Select Pixi project to import environment into')) ||
+                workspace.workspaceFolders?.[0]?.uri.fsPath;
+
+            if (!projectPath) {
+                return;
+            }
+
+            const projectName = manager.getProjectName(projectPath);
+
+            if (!targetFilePath) {
+                const files = await window.showOpenDialog({
+                    canSelectFiles: true,
+                    canSelectFolders: false,
+                    canSelectMany: false,
+                    title: 'Select Environment File to Import',
+                    filters: {
+                        'Environment Files': ['yml', 'yaml', 'txt'],
+                        'All Files': ['*'],
+                    },
+                    defaultUri: Uri.file(projectPath),
+                });
+                if (!files || files.length === 0) {
+                    return;
+                }
+                targetFilePath = files[0].fsPath;
+            }
+
+            const targetEnv = await window.showInputBox({
+                title: `Pixi: Import '${path.basename(targetFilePath)}' (${projectName})`,
+                prompt: 'Enter target environment name to import into (optional, press Enter for default)',
+                placeHolder: 'e.g. imported-env or dev',
+            });
+            if (targetEnv === undefined) {
+                return;
+            }
+
+            const args = ['import', targetFilePath];
+            if (targetEnv.trim()) {
+                args.push('-e', targetEnv.trim());
+            }
+
+            await runPixiWithProgress(
+                `Pixi: Importing '${path.basename(targetFilePath)}' into ${projectName}...`,
+                args,
+                projectPath,
+                manager,
+                `Pixi: File '${path.basename(targetFilePath)}' successfully imported into ${projectName}.`,
+            );
         }),
     ];
 }

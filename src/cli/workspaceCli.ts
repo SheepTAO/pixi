@@ -31,7 +31,7 @@ export function isHeavyPixiCommand(args: string[]): boolean {
     if (!subCmd) {
         return false;
     }
-    return ['add', 'install', 'update', 'upgrade', 'reinstall'].includes(subCmd);
+    return ['add', 'install', 'update', 'upgrade', 'reinstall', 'import'].includes(subCmd);
 }
 
 /**

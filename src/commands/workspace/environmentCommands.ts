@@ -198,12 +198,61 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                 return;
             }
 
+            // Optional Solve Group selection (Pixi 0.80+)
+            const existingSolveGroups = Array.from(
+                new Set(existingEnvs.map((e) => e.solveGroup).filter((g): g is string => Boolean(g))),
+            );
+            interface SolveGroupPickItem extends QuickPickItem {
+                groupName?: string;
+                isNew?: boolean;
+            }
+            const solveGroupItems: SolveGroupPickItem[] = [
+                {
+                    label: '$(circle-slash) No Solve Group (Default)',
+                    description: 'Environment solves independently',
+                    groupName: undefined,
+                },
+                ...existingSolveGroups.map((g) => ({
+                    label: `$(layers) ${g}`,
+                    description: `Join existing solve group '${g}'`,
+                    groupName: g,
+                })),
+                {
+                    label: '$(plus) New Solve Group...',
+                    description: 'Create and join a new solve group',
+                    isNew: true,
+                },
+            ];
+
+            const pickedGroupItem = await window.showQuickPick(solveGroupItems, {
+                title: `Pixi: Solve Group for '${trimmedName}' (Optional)`,
+                placeHolder: 'Select a solve group or skip for independent environment',
+            });
+            if (!pickedGroupItem) {
+                return;
+            }
+
+            let selectedSolveGroup: string | undefined = pickedGroupItem.groupName;
+            if (pickedGroupItem.isNew) {
+                const newGroupName = await window.showInputBox({
+                    title: `Pixi: New Solve Group for '${trimmedName}'`,
+                    prompt: 'Enter solve group name (leave empty to skip solve group)',
+                    placeHolder: 'e.g. prod, test, py311',
+                });
+                if (newGroupName === undefined) {
+                    return;
+                }
+                selectedSolveGroup = newGroupName.trim() || undefined;
+            }
+
+            const solveGroupArgs = selectedSolveGroup ? ['--solve-group', selectedSolveGroup] : [];
+
             if (selectedMode.action === 'companion') {
                 if (companionFeatureExists) {
                     await runPixiWithProgress(
                         `Pixi: Creating environment '${trimmedName}' with feature '${trimmedName}'...`,
                         [
-                            ['workspace', 'environment', 'add', trimmedName, '--feature', trimmedName],
+                            ['workspace', 'environment', 'add', trimmedName, '--feature', trimmedName, ...solveGroupArgs],
                             ['install', '-e', trimmedName],
                         ],
                         projectPath,
@@ -232,6 +281,7 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                             'add',
                             trimmedName,
                             ...(pkgs.length > 0 ? ['--feature', trimmedName] : []),
+                            ...solveGroupArgs,
                         ],
                         ['install', '-e', trimmedName],
                     );
@@ -261,6 +311,7 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                     'add',
                     trimmedName,
                     ...pickedFeatures.flatMap((p) => ['--feature', p.featureName]),
+                    ...solveGroupArgs,
                 ];
                 await runPixiWithProgress(
                     `Pixi: Creating and installing environment '${trimmedName}'...`,
@@ -276,7 +327,7 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
             await runPixiWithProgress(
                 `Pixi: Creating and installing environment '${trimmedName}'...`,
                 [
-                    ['workspace', 'environment', 'add', trimmedName],
+                    ['workspace', 'environment', 'add', trimmedName, ...solveGroupArgs],
                     ['install', '-e', trimmedName],
                 ],
                 projectPath,
@@ -392,6 +443,16 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                         action: 'environment',
                     },
                     {
+                        label: '$(zap) Clean Activation Scripts Cache',
+                        description: 'Remove cached activation scripts (pixi clean --activation-cache)',
+                        action: 'activation-cache',
+                    },
+                    {
+                        label: '$(tools) Clean Pixi Build Cache',
+                        description: 'Remove pixi-build cache in project (pixi clean --build)',
+                        action: 'build-cache',
+                    },
+                    {
                         label: '$(database) Clean Global Package Cache...',
                         description: 'Clean downloaded package cache in ~/.cache/rattler (pixi clean cache)',
                         action: 'cache',
@@ -417,6 +478,28 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
             }
 
             const projectName = manager.getProjectName(projectPath);
+
+            if (choice.action === 'activation-cache') {
+                await runPixiWithProgress(
+                    `Pixi: Cleaning activation cache for ${projectName}...`,
+                    ['clean', '--activation-cache'],
+                    projectPath,
+                    manager,
+                    `Pixi: Activation cache cleaned for ${projectName}.`,
+                );
+                return;
+            }
+
+            if (choice.action === 'build-cache') {
+                await runPixiWithProgress(
+                    `Pixi: Cleaning build cache for ${projectName}...`,
+                    ['clean', '--build'],
+                    projectPath,
+                    manager,
+                    `Pixi: Build cache cleaned for ${projectName}.`,
+                );
+                return;
+            }
 
             if (choice.action === 'environment') {
                 const targetEnvName = await pickProjectEnvironmentName(manager, projectPath, {

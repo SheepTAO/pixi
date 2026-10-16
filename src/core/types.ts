@@ -22,14 +22,18 @@ export interface PixiRawEnvironmentInfo {
     channels?: string[];
     features?: string[];
     tasks?: string[];
+    solve_group?: string | null;
+    environment_size?: string | null;
 }
 
 export interface PixiInfo {
     platform?: string;
+    cache_size?: string | null;
     project_info?: {
         name: string;
         manifest_path: string;
         version?: string | null;
+        pixi_folder_size?: string | null;
     } | null;
     environments_info: PixiRawEnvironmentInfo[];
 }
@@ -63,6 +67,8 @@ export interface PixiEnvironmentInfo {
     resolvedPlatform?: string | null;
     channels?: string[];
     features?: string[];
+    solveGroup?: string | null;
+    environmentSize?: string | null;
     toolchains?: EnvironmentToolchains;
 }
 

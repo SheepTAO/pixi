@@ -46,6 +46,8 @@ export interface PixiTask {
     inputs?: string[];
     outputs?: string[];
     clean_env?: boolean;
+    cwd?: string;
+    env?: Record<string, string>;
     projectPath: string;
     args?: string[];
     rawArgs?: string;
@@ -71,6 +73,9 @@ interface RawPixiTask {
     inputs?: string[];
     outputs?: string[];
     clean_env?: boolean;
+    cwd?: string;
+    env?: Record<string, string>;
+    args?: string[];
 }
 
 interface RawPixiTaskEnvironment {
@@ -192,12 +197,17 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
                     inputs: Array.isArray(t.inputs) && t.inputs.length > 0 ? t.inputs : undefined,
                     outputs: Array.isArray(t.outputs) && t.outputs.length > 0 ? t.outputs : undefined,
                     clean_env: typeof t.clean_env === 'boolean' ? t.clean_env : undefined,
+                    cwd: t.cwd || undefined,
+                    env: t.env && typeof t.env === 'object' ? t.env : undefined,
+                    args: Array.isArray(t.args) && t.args.length > 0 ? t.args : undefined,
                     projectPath,
                 });
             } else {
                 existing.default_environment ||= scope.fallbackEnv;
                 existing.feature ||= scope.feature;
                 existing.inline_environment ||= scope.inlineEnv;
+                existing.cwd ||= t.cwd;
+                existing.env ||= t.env && typeof t.env === 'object' ? t.env : undefined;
             }
         };
 
@@ -248,8 +258,13 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
             commandLine += ` ${def.args.map(quoteStringIfNecessary).join(' ')}`;
         }
 
+        const shellOptions: { cwd: string; env?: Record<string, string> } = { cwd: t.projectPath };
+        if (t.env && Object.keys(t.env).length > 0) {
+            shellOptions.env = t.env;
+        }
+
         const scope = workspace.getWorkspaceFolder(Uri.file(t.projectPath)) || TaskScope.Workspace;
-        const task = new Task(def, scope, t.name, 'pixi', new ShellExecution(commandLine, { cwd: t.projectPath }));
+        const task = new Task(def, scope, t.name, 'pixi', new ShellExecution(commandLine, shellOptions));
 
         task.detail = formatTaskDetail(t);
 
@@ -386,8 +401,18 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
 }
 
 export function formatTaskDetail(task: PixiTask): string | undefined {
-    if (task.description || task.cmd) {
-        return task.description || task.cmd;
+    const parts: string[] = [];
+    if (task.description) {
+        parts.push(task.description);
+    }
+    if (task.cmd) {
+        parts.push(task.description ? `(${task.cmd})` : task.cmd);
+    }
+    if (task.cwd) {
+        parts.push(`[cwd: ${task.cwd}]`);
+    }
+    if (parts.length > 0) {
+        return parts.join(' ');
     }
     if (task.depends_on && task.depends_on.length > 0) {
         return `depends: ${task.depends_on.map((d) => d.task_name).join(', ')}`;

@@ -114,6 +114,18 @@
                 "icon": "$(terminal)"
             },
             {
+                "command": "pixi.workspaceDependencies",
+                "title": "Manage Workspace Dependencies ...",
+                "category": "Pixi",
+                "icon": "$(layers)"
+            },
+            {
+                "command": "pixi.import",
+                "title": "Import Environment File ...",
+                "category": "Pixi",
+                "icon": "$(cloud-upload)"
+            },
+            {
                 "command": "pixi.searchPackages",
                 "title": "Search Packages ...",
                 "category": "Pixi",
@@ -542,6 +554,14 @@
                 },
                 {
                     "command": "pixi.exec",
+                    "when": "pixi.hasPixiProject"
+                },
+                {
+                    "command": "pixi.workspaceDependencies",
+                    "when": "pixi.hasPixiProject"
+                },
+                {
+                    "command": "pixi.import",
                     "when": "pixi.hasPixiProject"
                 },
                 {

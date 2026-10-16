@@ -126,23 +126,83 @@ export function registerInfoCommands(infoProvider: PixiInfoTreeDataProvider): Di
         commands.registerCommand('pixi.refreshInfo', () => {
             infoProvider.refresh();
         }),
-        commands.registerCommand('pixi.cleanCache', async () => {
+        commands.registerCommand('pixi.cleanCache', async (presetTarget?: unknown) => {
+            interface CacheCleanChoice extends QuickPickItem {
+                target: 'all' | 'conda' | 'pypi' | 'repodata' | 'exec' | 'build';
+            }
+            const choices: CacheCleanChoice[] = [
+                {
+                    label: '$(trash) Clean All Caches (Default)',
+                    description: 'pixi clean cache -y',
+                    detail: 'Clean all Conda, PyPI, repodata, build, and temporary exec caches',
+                    target: 'all',
+                },
+                {
+                    label: '$(package) Conda Packages Cache',
+                    description: 'pixi clean cache --conda -y',
+                    detail: 'Clean only downloaded Conda packages and tarballs',
+                    target: 'conda',
+                },
+                {
+                    label: '$(symbol-keyword) PyPI Wheels Cache',
+                    description: 'pixi clean cache --pypi -y',
+                    detail: 'Clean only downloaded PyPI wheels and sdist packages',
+                    target: 'pypi',
+                },
+                {
+                    label: '$(database) Repodata Index Cache',
+                    description: 'pixi clean cache --repodata -y',
+                    detail: 'Clean channel repodata index cache, forcing fresh index download on next solve',
+                    target: 'repodata',
+                },
+                {
+                    label: '$(terminal) Temporary Exec Cache',
+                    description: 'pixi clean cache --exec -y',
+                    detail: 'Clean temporary environments created by `pixi exec`',
+                    target: 'exec',
+                },
+                {
+                    label: '$(tools) Build & Backend Cache',
+                    description: 'pixi clean cache --build -y',
+                    detail: 'Clean pixi-build outputs and build-backend environments cache',
+                    target: 'build',
+                },
+            ];
+
+            let selectedTarget: 'all' | 'conda' | 'pypi' | 'repodata' | 'exec' | 'build' = 'all';
+            let targetLabel = 'Global Pixi Cache';
+
+            if (typeof presetTarget === 'string' && choices.some((c) => c.target === presetTarget)) {
+                selectedTarget = presetTarget as typeof selectedTarget;
+                targetLabel = choices.find((c) => c.target === presetTarget)?.label || presetTarget;
+            } else {
+                const picked = await window.showQuickPick(choices, {
+                    title: 'Pixi: Clean Package Cache',
+                    placeHolder: 'Select cache target to clean',
+                });
+                if (!picked) {
+                    return;
+                }
+                selectedTarget = picked.target;
+                targetLabel = picked.label.replace(/\$\([^)]+\)\s*/, '');
+            }
+
             const confirm = await window.showWarningMessage(
-                'Are you sure you want to clean the global Pixi package cache? Subsequent installations will re-download packages from the network.',
+                `Are you sure you want to clean ${targetLabel}? Subsequent installations will re-download packages from the network.`,
                 { modal: true },
-                'Clean Global Cache',
+                'Clean Cache',
             );
-            if (confirm !== 'Clean Global Cache') {
+            if (confirm !== 'Clean Cache') {
                 return;
             }
 
             await runWithProgressNotification(
-                'Pixi: Cleaning global package cache...',
+                `Pixi: Cleaning ${targetLabel}...`,
                 async (token) => {
-                    await cleanGlobalCache(token);
+                    await cleanGlobalCache(token, undefined, { target: selectedTarget });
                     infoProvider.refresh();
                 },
-                'Pixi: Global package cache cleaned.',
+                `Pixi: ${targetLabel} cleaned.`,
                 { errorPrefix: 'Failed to clean cache' },
             );
         }),

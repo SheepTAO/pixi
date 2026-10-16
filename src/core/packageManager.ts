@@ -66,21 +66,26 @@ export async function enrichLocalPackages(packages: PixiPackage[], projectPath: 
                 }
 
                 pkg.is_local = true;
-                const editableMatch = pkg.requested_spec?.match(/editable\s*=\s*(true|false)/i);
-                pkg.is_editable = editableMatch
-                    ? editableMatch[1].toLowerCase() === 'true'
-                    : Boolean(pkg.source && (pkg.source.startsWith('.') || pkg.source.includes('packages')));
+                if (pkg.is_editable === undefined) {
+                    const editableMatch = pkg.requested_spec?.match(/editable\s*=\s*(true|false)/i);
+                    pkg.is_editable = editableMatch
+                        ? editableMatch[1].toLowerCase() === 'true'
+                        : Boolean(pkg.source && (pkg.source.startsWith('.') || pkg.source.includes('packages')));
+                }
                 pkg.local_path = path.relative(projectPath, candidateDir);
 
                 for (const candidate of MANIFEST_CANDIDATES) {
                     const candidateFile = path.join(candidateDir, candidate.filename);
-                    const content = await fs.promises.readFile(candidateFile, 'utf8').catch(() => null);
-                    if (content !== null) {
+                    const fileStat = await fs.promises.stat(candidateFile).catch(() => null);
+                    if (fileStat && fileStat.isFile()) {
                         pkg.local_manifest_path = candidateFile;
                         if (!pkg.version) {
-                            const m = content.match(candidate.versionRegex);
-                            if (m?.[1]) {
-                                pkg.version = m[1];
+                            const content = await fs.promises.readFile(candidateFile, 'utf8').catch(() => null);
+                            if (content !== null) {
+                                const m = content.match(candidate.versionRegex);
+                                if (m?.[1]) {
+                                    pkg.version = m[1];
+                                }
                             }
                         }
                         break;

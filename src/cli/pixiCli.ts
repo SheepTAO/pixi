@@ -291,11 +291,23 @@ export function clearSearchCache(): void {
     searchCache.clear();
 }
 
+export interface CleanCacheOptions {
+    target?: 'all' | 'conda' | 'pypi' | 'repodata' | 'exec' | 'build';
+}
+
 /**
  * Cleans the global package cache and invalidates in-memory caches.
  */
-export async function cleanGlobalCache(token?: CancellationToken, cwd?: string): Promise<string> {
-    const output = await runPixi(['clean', 'cache', '-y'], cwd ? { cwd } : undefined, token);
+export async function cleanGlobalCache(
+    token?: CancellationToken,
+    cwd?: string,
+    options?: CleanCacheOptions,
+): Promise<string> {
+    const args = ['clean', 'cache', '-y'];
+    if (options?.target && options.target !== 'all') {
+        args.push(`--${options.target}`);
+    }
+    const output = await runPixi(args, cwd ? { cwd } : undefined, token);
     clearSearchCache();
     return output;
 }

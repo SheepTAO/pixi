@@ -148,6 +148,22 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
         }
         const currentEpoch = this.cacheCalculationEpoch;
         try {
+            // 1. First attempt native Pixi CLI extended calculation (Pixi 0.80+)
+            try {
+                const extendedJson = await runPixi(['info', '--json', '--extended']);
+                const extendedInfo = safeJsonParse<PixiSystemInfo>(extendedJson);
+                if (extendedInfo?.cache_size && this.cacheCalculationEpoch === currentEpoch) {
+                    this.cachedCacheSize = String(extendedInfo.cache_size);
+                    if (this.cachedSystemInfo) {
+                        this.cachedSystemInfo.cache_size = extendedInfo.cache_size;
+                    }
+                    return;
+                }
+            } catch {
+                // Fall back to du / robocopy if extended flag fails or is unsupported
+            }
+
+            // 2. Fallback to du / robocopy if native calculation returned empty
             const bytes = await computeDirectorySize(cacheDir);
             if (this.cacheCalculationEpoch !== currentEpoch) {
                 return;

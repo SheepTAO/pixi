@@ -435,6 +435,8 @@ export class PixiProjectManager implements Disposable {
                         resolvedPlatform,
                         channels: rawEnv.channels,
                         features: rawEnv.features,
+                        solveGroup: rawEnv.solve_group || null,
+                        environmentSize: rawEnv.environment_size || null,
                     };
 
                     if (status === 'installed') {
