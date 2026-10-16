@@ -190,7 +190,7 @@ export function revealRangeInEditor(editor: TextEditor, line: number, startCol: 
 export interface RevealDefinitionOptions {
     manifestPath?: string;
     targetName: string;
-    kind: 'package' | 'task' | 'feature' | 'system-requirements';
+    kind: 'package' | 'task' | 'feature' | 'platforms';
 }
 
 /**
@@ -228,19 +228,19 @@ export async function revealDefinitionInManifest(options: RevealDefinitionOption
                 currentSection = sectionMatch[1].trim();
             }
 
-            if (kind === 'system-requirements') {
-                const sysReqSectionRegex = /^\s*\[+(?:tool\.pixi\.)?(?:workspace\.)?system-requirements\]+/i;
-                if (targetName === 'system-requirements') {
-                    if (sysReqSectionRegex.test(line)) {
+            if (kind === 'platforms') {
+                const platformsRegex = /^\s*\[+(?:tool\.pixi\.)?(?:workspace\.)?platforms\]+/i;
+                const platformsKeyRegex = /^\s*platforms\s*=/i;
+                if (targetName === 'platforms') {
+                    if (platformsRegex.test(line) || platformsKeyRegex.test(line)) {
                         targetLine = i;
                         break;
                     }
                 } else {
-                    const isSysReqSection = /(^|\.)system-requirements(\.|$)/i.test(currentSection);
-                    if (keyRegex.test(line) && isSysReqSection) {
+                    if (keyRegex.test(line) || line.includes(targetName)) {
                         targetLine = i;
                         break;
-                    } else if (sysReqSectionRegex.test(line) && fallbackLine < 0) {
+                    } else if ((platformsRegex.test(line) || platformsKeyRegex.test(line)) && fallbackLine < 0) {
                         fallbackLine = i;
                     }
                 }

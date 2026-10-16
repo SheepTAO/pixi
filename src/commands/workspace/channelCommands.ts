@@ -2,7 +2,7 @@ import { commands, Disposable, QuickPickItem, window } from 'vscode';
 
 import { runPixiWithProgress } from '../../cli/workspaceCli';
 import { CONDA_CHANNEL_PRESETS } from '../../core/presets';
-import { DEFAULT_CONDA_CHANNEL, getWorkspaceChannels } from '../../core/projectDiscovery';
+import { DEFAULT_CONDA_CHANNEL } from '../../core/projectDiscovery';
 import { PixiProjectManager } from '../../core/projectManager';
 import { extractFeatureName, formatScope, pickPixiProject, resolveWorkspaceOrFeatureScope } from './common';
 
@@ -91,7 +91,7 @@ export function registerChannelCommands(manager: PixiProjectManager): Disposable
                 return;
             }
 
-            const existingChannels = getWorkspaceChannels(projectPath);
+            const existingChannels = manager.getWorkspaceChannels(projectPath);
             const existingInScope = new Set(
                 existingChannels.filter((c) => c.feature === targetFeature).map((c) => c.channel),
             );
@@ -158,7 +158,7 @@ export function registerChannelCommands(manager: PixiProjectManager): Disposable
                 return;
             }
 
-            const existingChannels = getWorkspaceChannels(projectPath);
+            const existingChannels = manager.getWorkspaceChannels(projectPath);
             if (existingChannels.length === 0) {
                 window.showInformationMessage('No configurable channels found in this Pixi project.');
                 return;

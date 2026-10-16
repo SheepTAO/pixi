@@ -18,7 +18,10 @@ export interface PixiRawEnvironmentInfo {
     name: string;
     prefix: string;
     platforms?: Array<PixiEnvironmentPlatform | string>;
-    resolved_platform?: PixiEnvironmentPlatform | null;
+    resolved_platform?: PixiEnvironmentPlatform | string | null;
+    channels?: string[];
+    features?: string[];
+    tasks?: string[];
 }
 
 export interface PixiInfo {
@@ -26,7 +29,8 @@ export interface PixiInfo {
     project_info?: {
         name: string;
         manifest_path: string;
-    };
+        version?: string | null;
+    } | null;
     environments_info: PixiRawEnvironmentInfo[];
 }
 
@@ -56,6 +60,9 @@ export interface PixiEnvironmentInfo {
     pixiStatus: PixiEnvironmentStatus;
     statusReason?: string;
     platforms?: Array<PixiEnvironmentPlatform | string>;
+    resolvedPlatform?: string | null;
+    channels?: string[];
+    features?: string[];
     toolchains?: EnvironmentToolchains;
 }
 

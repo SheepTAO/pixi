@@ -11,28 +11,31 @@ import {
     workspace,
 } from 'vscode';
 
-import { runPixi } from '../cli/pixiCli';
+import { runPixi, setCachedHostPlatform } from '../cli/pixiCli';
 import { safeJsonParse } from '../common/execUtils';
-import { traceError, traceVerbose } from '../common/logging';
+import { traceVerbose } from '../common/logging';
 import { getProjectEnvStorageKey, getWorkspacePersistentState } from '../common/persistentState';
 import { getDefaultEnvironment, matchEnvironmentForUri, sortPixiEnvironments } from './environmentRules';
 import { listPixiPackages } from './packageManager';
 import {
-    findManifestPath,
+    DEFAULT_CONDA_CHANNEL,
     getProjectKey,
-    isPixiProject,
     isPyproject,
     LOCKFILE_NAME,
     PIXI_MANIFEST_NAME,
-    resolvePixiProjectPaths,
     SUPPORTED_MANIFEST_NAMES,
+    WorkspaceChannelEntry,
 } from './projectDiscovery';
+import { WorkspacePlatformEntry } from './systemRequirements';
 import { scanEnvironmentToolchains } from './toolchains';
 import { PixiEnvironmentInfo, PixiEnvironmentStatus, PixiInfo, PixiPackage, PixiProject } from './types';
 
 export class PixiProjectManager implements Disposable {
     private projectPaths: string[] = [];
     private projectToEnvs = new Map<string, PixiEnvironmentInfo[]>();
+    private projectToManifest = new Map<string, string>();
+    private projectToName = new Map<string, string>();
+    private projectToPlatforms = new Map<string, WorkspacePlatformEntry[]>();
     private readonly packagesCache = new Map<string, Map<string, Promise<PixiPackage[]>>>();
     private readonly disposables: Disposable[] = [];
 
@@ -61,23 +64,15 @@ export class PixiProjectManager implements Disposable {
                 for (const u of uris) {
                     const filePath = path.normalize(u.fsPath);
                     const projectDir = this.findProjectForUri(u);
-                    if (isPyproject(filePath)) {
-                        const knownManifest = projectDir ? this.getManifestPath(projectDir) : undefined;
-                        const isKnownManifest =
-                            knownManifest !== undefined && path.normalize(knownManifest) === filePath;
-                        const isCurrentManifest = findManifestPath(path.dirname(filePath)) === filePath;
-                        if (!isKnownManifest && !isCurrentManifest) {
-                            continue;
-                        }
-                    }
                     if (projectDir) {
-                        if (isPixiProject(projectDir)) {
-                            projectUris.add(projectDir);
-                        } else {
-                            needsFullRefresh = true;
-                            break;
+                        if (isPyproject(filePath)) {
+                            const knownManifest = this.getManifestPath(projectDir);
+                            if (knownManifest && path.normalize(knownManifest) !== filePath) {
+                                continue;
+                            }
                         }
-                    } else if (isPixiProject(path.dirname(filePath))) {
+                        projectUris.add(projectDir);
+                    } else {
                         needsFullRefresh = true;
                         break;
                     }
@@ -121,16 +116,45 @@ export class PixiProjectManager implements Disposable {
     }
 
     public getManifestPath(projectPath: string): string | undefined {
-        const envs = this.projectToEnvs.get(getProjectKey(projectPath));
+        const key = getProjectKey(projectPath);
+        const envs = this.projectToEnvs.get(key);
         if (envs && envs.length > 0 && envs[0].manifestPath) {
             return envs[0].manifestPath;
         }
-        return findManifestPath(projectPath);
+        return this.projectToManifest.get(key);
     }
 
     public getProjectName(projectPath: string): string {
-        const envs = this.projectToEnvs.get(getProjectKey(projectPath));
-        return (envs && envs.length > 0 && envs[0].projectName) || path.basename(path.normalize(projectPath));
+        const key = getProjectKey(projectPath);
+        return (
+            this.projectToName.get(key) ||
+            this.projectToEnvs.get(key)?.[0]?.projectName ||
+            path.basename(path.normalize(projectPath))
+        );
+    }
+
+    public getWorkspaceChannels(projectPath: string): WorkspaceChannelEntry[] {
+        const envs = this.getEnvironmentsForProject(projectPath);
+        const entries: WorkspaceChannelEntry[] = [];
+        const seen = new Set<string>();
+
+        for (const env of envs) {
+            const nonDefaultFeatures = (env.features || []).filter((f) => f !== 'default');
+            const featureScope = nonDefaultFeatures.length === 1 ? nonDefaultFeatures[0] : undefined;
+            for (const channel of env.channels || []) {
+                const key = `${featureScope ?? ''}::${channel}`;
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    entries.push({ channel, feature: featureScope });
+                }
+            }
+        }
+        return entries;
+    }
+
+    public getProjectConfiguredChannels(projectPath: string): string[] {
+        const channels = this.getWorkspaceChannels(projectPath).map((e) => e.channel);
+        return channels.length > 0 ? Array.from(new Set(channels)) : [DEFAULT_CONDA_CHANNEL];
     }
 
     public getProjects(): PixiProject[] {
@@ -146,6 +170,10 @@ export class PixiProjectManager implements Disposable {
 
     public getEnvironmentsForProject(projectPath: string): PixiEnvironmentInfo[] {
         return this.projectToEnvs.get(getProjectKey(projectPath)) || [];
+    }
+
+    public getPlatformsForProject(projectPath: string): WorkspacePlatformEntry[] {
+        return this.projectToPlatforms.get(getProjectKey(projectPath)) || [];
     }
 
     public getAllEnvironments(): PixiEnvironmentInfo[] {
@@ -237,10 +265,12 @@ export class PixiProjectManager implements Disposable {
     public async refresh(scope?: Uri): Promise<void> {
         if (scope) {
             const projectPath = this.findProjectForUri(scope);
-            if (projectPath && isPixiProject(projectPath)) {
-                await this.refreshProject(projectPath);
-                this._onDidChangeEnvironments.fire();
-                return;
+            if (projectPath && this.projectPaths.includes(projectPath)) {
+                const stillValid = await this.refreshProject(projectPath);
+                if (stillValid) {
+                    this._onDidChangeEnvironments.fire();
+                    return;
+                }
             }
         }
 
@@ -248,8 +278,33 @@ export class PixiProjectManager implements Disposable {
     }
 
     private async refreshAll(): Promise<void> {
+        const workspaceFolders = workspace.workspaceFolders || [];
+        const detectedPaths: string[] = [];
+
+        if (workspaceFolders.length > 0) {
+            await window.withProgress(
+                {
+                    location: ProgressLocation.Window,
+                    title: 'Pixi: Refreshing projects...',
+                },
+                async () => {
+                    await Promise.all(
+                        workspaceFolders.map(async (folder) => {
+                            const folderPath = path.normalize(folder.uri.fsPath);
+                            const isProject = await this.refreshProject(folderPath);
+                            if (isProject) {
+                                detectedPaths.push(folderPath);
+                            }
+                        }),
+                    );
+                },
+            );
+        }
+
         const oldPaths = new Set(this.projectPaths);
-        this.projectPaths = resolvePixiProjectPaths();
+        this.projectPaths = [...new Set(detectedPaths)].sort((a, b) =>
+            a.localeCompare(b, undefined, { sensitivity: 'base' }),
+        );
         await this.updateHasPixiProjectContext();
 
         const currentPaths = new Set(this.projectPaths);
@@ -259,20 +314,11 @@ export class PixiProjectManager implements Disposable {
         for (const knownPath of this.projectToEnvs.keys()) {
             if (!currentPaths.has(knownPath)) {
                 this.projectToEnvs.delete(knownPath);
+                this.projectToManifest.delete(knownPath);
+                this.projectToName.delete(knownPath);
+                this.projectToPlatforms.delete(knownPath);
                 this.clearPackagesCache(knownPath);
             }
-        }
-
-        if (this.projectPaths.length > 0) {
-            await window.withProgress(
-                {
-                    location: ProgressLocation.Window,
-                    title: 'Pixi: Refreshing projects...',
-                },
-                async () => {
-                    await Promise.all(this.projectPaths.map((p) => this.refreshProject(p)));
-                },
-            );
         }
 
         if (pathsChanged) {
@@ -281,8 +327,9 @@ export class PixiProjectManager implements Disposable {
         this._onDidChangeEnvironments.fire();
     }
 
-    private async refreshProject(projectPath: string): Promise<void> {
+    private async refreshProject(projectPath: string): Promise<boolean> {
         const normalized = path.normalize(projectPath);
+        const projectKey = getProjectKey(normalized);
         this.clearPackagesCache(normalized);
         try {
             const stdout = await runPixi(['info', '--json'], { cwd: normalized });
@@ -290,13 +337,59 @@ export class PixiProjectManager implements Disposable {
 
             if (!pixiInfo.project_info) {
                 traceVerbose(`No project_info returned from pixi info for ${normalized}`);
-                this.projectToEnvs.set(getProjectKey(normalized), []);
-                return;
+                this.projectToEnvs.delete(projectKey);
+                this.projectToManifest.delete(projectKey);
+                this.projectToName.delete(projectKey);
+                this.projectToPlatforms.delete(projectKey);
+                return false;
             }
 
             const projectName = pixiInfo.project_info.name;
             const manifestPath = pixiInfo.project_info.manifest_path;
             const currentPlatform = pixiInfo.platform;
+            if (currentPlatform) {
+                setCachedHostPlatform(currentPlatform);
+            }
+
+            this.projectToManifest.set(projectKey, manifestPath);
+            this.projectToName.set(projectKey, projectName);
+
+            const platformsMap = new Map<string, WorkspacePlatformEntry>();
+            for (const rawEnv of pixiInfo.environments_info || []) {
+                for (const p of rawEnv.platforms || []) {
+                    const platName = typeof p === 'string' ? p : p.name;
+                    const subdir = typeof p === 'object' ? p.subdir : undefined;
+                    const vps: string[] =
+                        typeof p === 'object' && Array.isArray(p.virtual_packages) ? p.virtual_packages : [];
+                    if (!platformsMap.has(platName)) {
+                        platformsMap.set(platName, {
+                            name: platName,
+                            subdir,
+                            virtualPackages: [...vps],
+                            features: rawEnv.features || [],
+                            environments: [rawEnv.name],
+                        });
+                    } else {
+                        const entry = platformsMap.get(platName)!;
+                        for (const vp of vps) {
+                            if (!entry.virtualPackages.includes(vp)) {
+                                entry.virtualPackages.push(vp);
+                            }
+                        }
+                        if (rawEnv.features) {
+                            for (const f of rawEnv.features) {
+                                if (!entry.features.includes(f)) {
+                                    entry.features.push(f);
+                                }
+                            }
+                        }
+                        if (!entry.environments.includes(rawEnv.name)) {
+                            entry.environments.push(rawEnv.name);
+                        }
+                    }
+                }
+            }
+            this.projectToPlatforms.set(projectKey, Array.from(platformsMap.values()));
 
             const envs: PixiEnvironmentInfo[] = await Promise.all(
                 (pixiInfo.environments_info || []).map(async (rawEnv) => {
@@ -325,6 +418,11 @@ export class PixiProjectManager implements Disposable {
                         statusReason = `Environment '${rawEnv.name}' is not installed on disk. Run 'pixi install -e ${rawEnv.name}' to create it.`;
                     }
 
+                    const resolvedPlatform =
+                        typeof rawEnv.resolved_platform === 'string'
+                            ? rawEnv.resolved_platform
+                            : (rawEnv.resolved_platform?.name ?? null);
+
                     const envInfo: PixiEnvironmentInfo = {
                         pixiEnvName: rawEnv.name,
                         prefix: rawEnv.prefix,
@@ -334,6 +432,9 @@ export class PixiProjectManager implements Disposable {
                         pixiStatus: status,
                         statusReason,
                         platforms: rawEnv.platforms,
+                        resolvedPlatform,
+                        channels: rawEnv.channels,
+                        features: rawEnv.features,
                     };
 
                     if (status === 'installed') {
@@ -345,10 +446,15 @@ export class PixiProjectManager implements Disposable {
                 }),
             );
 
-            this.projectToEnvs.set(getProjectKey(normalized), sortPixiEnvironments(envs));
+            this.projectToEnvs.set(projectKey, sortPixiEnvironments(envs));
+            return true;
         } catch (error) {
-            traceError(`Failed to refresh Pixi project at ${normalized}:`, error);
-            this.projectToEnvs.set(getProjectKey(normalized), []);
+            traceVerbose(`Failed to refresh Pixi project at ${normalized}: ${error}`);
+            this.projectToEnvs.delete(projectKey);
+            this.projectToManifest.delete(projectKey);
+            this.projectToName.delete(projectKey);
+            this.projectToPlatforms.delete(projectKey);
+            return false;
         }
     }
 

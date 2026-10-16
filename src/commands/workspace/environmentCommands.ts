@@ -1,10 +1,8 @@
-import * as fs from 'fs';
 import * as path from 'path';
 import { commands, Disposable, QuickPickItem, Uri, window, workspace } from 'vscode';
 
 import { runPixiWithProgress } from '../../cli/workspaceCli';
 import { revealDefinitionInManifest } from '../../common/execUtils';
-import { findManifestPath } from '../../core/projectDiscovery';
 import { PixiProjectManager } from '../../core/projectManager';
 import {
     extractCommandContext,
@@ -78,7 +76,7 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                 return;
             }
 
-            const manifestPath = findManifestPath(targetFolder);
+            const manifestPath = manager.getManifestPath(targetFolder);
 
             if (manifestPath) {
                 window.showInformationMessage(
@@ -449,14 +447,6 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                 return;
             }
 
-            const pixiDir = path.join(projectPath, '.pixi');
-            if (!fs.existsSync(pixiDir)) {
-                window.showInformationMessage(
-                    `No installed environments found in ${projectName} (.pixi directory does not exist).`,
-                );
-                return;
-            }
-
             const confirmed = await window.showWarningMessage(
                 `Are you sure you want to clean all installed Pixi environments in ${projectName}? (The .pixi directory will be removed)`,
                 'Clean All',
@@ -750,7 +740,7 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
 
                 const [allFeatures, allEnvs] = await Promise.all([
                     getWorkspaceFeatures(projectPath),
-                    getWorkspaceEnvironments(projectPath),
+                    getWorkspaceEnvironments(projectPath, manager),
                 ]);
                 const envEntry = allEnvs.find((e) => e.name === envName);
                 const currentBoundFeatures = envEntry?.features || ['default'];
@@ -846,7 +836,7 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                 return;
             }
 
-            const allEnvs = await getWorkspaceEnvironments(projectPath);
+            const allEnvs = await getWorkspaceEnvironments(projectPath, manager);
             const referencingEnvs = getReferencingEnvs(allEnvs, featureName!);
             if (referencingEnvs.length > 0) {
                 const choice = await window.showWarningMessage(

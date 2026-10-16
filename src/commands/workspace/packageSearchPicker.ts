@@ -12,7 +12,8 @@ import {
 
 import { PixiPackageSearchResult, searchPixiPackages } from '../../cli/pixiCli';
 import { getPrefixDevPackageUrl, getPypiPackageUrl } from '../../core/packageManager';
-import { DEFAULT_CONDA_CHANNEL, getProjectConfiguredChannels } from '../../core/projectDiscovery';
+import { DEFAULT_CONDA_CHANNEL } from '../../core/projectDiscovery';
+import { PixiProjectManager } from '../../core/projectManager';
 import { handleGlobalInstall } from '../globalCommands';
 
 export type SourceMode = 'conda' | 'pypi' | 'pypi-custom' | 'path' | 'git';
@@ -107,6 +108,7 @@ export function attachDebouncedPackageSearch<T extends QuickPickItem>(
     quickPick: ReturnType<typeof window.createQuickPick<T>>,
     options: {
         projectPath?: string;
+        manager?: PixiProjectManager;
         channels?: string[];
         buildPrefixItems?: (query: string) => T[];
     },
@@ -114,7 +116,10 @@ export function attachDebouncedPackageSearch<T extends QuickPickItem>(
     let debounceTimer: NodeJS.Timeout | undefined;
     let searchCts: CancellationTokenSource | undefined;
     const projectChannels =
-        options.channels ?? (options.projectPath ? getProjectConfiguredChannels(options.projectPath) : []);
+        options.channels ??
+        (options.manager && options.projectPath
+            ? options.manager.getProjectConfiguredChannels(options.projectPath)
+            : [DEFAULT_CONDA_CHANNEL]);
 
     const cleanup = () => {
         if (debounceTimer) {
@@ -232,14 +237,18 @@ export function attachDebouncedPackageSearch<T extends QuickPickItem>(
     return { triggerSearch: performSearch, dispose: cleanup };
 }
 
-export async function showPackageSearchPicker(targetProjectPath?: string, initialQuery?: string): Promise<void> {
+export async function showPackageSearchPicker(
+    targetProjectPath?: string,
+    initialQuery?: string,
+    manager?: PixiProjectManager,
+): Promise<void> {
     const quickPick = window.createQuickPick<SearchResultQuickPickItem>();
     quickPick.title = 'Pixi: Search Conda Packages';
     quickPick.placeholder = 'Type package name to search Conda channels... (e.g. numpy, uv, torch, ruff)';
     quickPick.matchOnDescription = true;
     quickPick.matchOnDetail = true;
 
-    const search = attachDebouncedPackageSearch(quickPick, { projectPath: targetProjectPath });
+    const search = attachDebouncedPackageSearch(quickPick, { projectPath: targetProjectPath, manager });
 
     quickPick.onDidAccept(async () => {
         const selected = quickPick.selectedItems[0];
@@ -402,6 +411,7 @@ export async function promptAddPackageSpec(
     projectPath: string,
     targetEnvName?: string,
     initialQuery?: string,
+    manager?: PixiProjectManager,
 ): Promise<AddPackagePromptResult | undefined> {
     return new Promise((resolve) => {
         const quickPick = window.createQuickPick<SearchResultQuickPickItem>();
@@ -416,6 +426,7 @@ export async function promptAddPackageSpec(
 
         const search = attachDebouncedPackageSearch(quickPick, {
             projectPath,
+            manager,
             buildPrefixItems: (query: string): SearchResultQuickPickItem[] => {
                 if (!query) {
                     return [];
@@ -487,6 +498,7 @@ export async function promptAddPackageSpec(
 export async function promptAddPackageSource(
     projectPath: string,
     specs: string[],
+    manager?: PixiProjectManager,
 ): Promise<{ args: string[]; sourceLabel: string } | undefined> {
     const source = await window.showQuickPick<SourceQuickPickItem>(
         [
@@ -529,7 +541,7 @@ export async function promptAddPackageSource(
     let sourceLabel = 'Conda';
 
     if (source.mode === 'conda') {
-        const projectChannels = getProjectConfiguredChannels(projectPath);
+        const projectChannels = manager ? manager.getProjectConfiguredChannels(projectPath) : [DEFAULT_CONDA_CHANNEL];
         const primaryChannel = projectChannels[0] || DEFAULT_CONDA_CHANNEL;
         sourceLabel = `Conda (${primaryChannel})`;
         args.push(...specs);

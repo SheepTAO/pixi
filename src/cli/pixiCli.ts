@@ -15,6 +15,7 @@ let _cachedPixi: string | undefined;
 export function clearPixiCache(): void {
     _cachedPixi = undefined;
     searchCache.clear();
+    clearHostVirtualPackagesCache();
 }
 
 async function findPixi(): Promise<string | undefined> {
@@ -133,7 +134,7 @@ export async function runPixi(args: string[], options?: PixiRunOptions, token?: 
     });
 }
 
-const MINIMUM_PIXI_VERSION = '0.53.0';
+const MINIMUM_PIXI_VERSION = '0.80.0';
 
 export async function validatePixiCli(): Promise<boolean> {
     try {
@@ -167,6 +168,93 @@ export async function validatePixiCli(): Promise<boolean> {
     }
 }
 
+export interface HostVirtualPackages {
+    cuda?: string;
+    glibc?: string;
+    linux?: string;
+    osx?: string;
+    win?: string;
+    archspec?: string;
+    raw: string[];
+}
+
+let _cachedHostVirtualPackages: HostVirtualPackages | undefined;
+let _cachedHostPlatform: string | undefined;
+
+export function clearHostVirtualPackagesCache(): void {
+    _cachedHostVirtualPackages = undefined;
+    _cachedHostPlatform = undefined;
+}
+
+export function setCachedHostPlatform(platform: string): void {
+    if (platform) {
+        _cachedHostPlatform = platform;
+    }
+}
+
+export async function getHostVirtualPackages(cwd?: string): Promise<HostVirtualPackages> {
+    if (_cachedHostVirtualPackages) {
+        return _cachedHostVirtualPackages;
+    }
+
+    try {
+        const stdout = await runPixi(['info', '--json'], cwd ? { cwd } : undefined);
+        const parsed = safeJsonParse<{ virtual_packages?: string[]; platform?: string }>(stdout, {});
+        if (parsed?.platform) {
+            _cachedHostPlatform = parsed.platform;
+        }
+        const raw = Array.isArray(parsed?.virtual_packages) ? parsed.virtual_packages : [];
+        const result: HostVirtualPackages = { raw };
+
+        for (const vp of raw) {
+            const parts = vp.split('=');
+            const name = parts[0];
+            const version = parts[1];
+            if (name === '__cuda') {
+                result.cuda = version;
+            } else if (name === '__glibc') {
+                result.glibc = version;
+            } else if (name === '__linux') {
+                result.linux = version;
+            } else if (name === '__osx') {
+                result.osx = version;
+            } else if (name === '__win') {
+                result.win = version;
+            } else if (name === '__archspec') {
+                result.archspec = parts[2] || version;
+            }
+        }
+
+        _cachedHostVirtualPackages = result;
+        return result;
+    } catch {
+        return { raw: [] };
+    }
+}
+
+export async function getHostDetectedVirtualPackageValue(propId: string, cwd?: string): Promise<string | undefined> {
+    const vps = await getHostVirtualPackages(cwd);
+    switch (propId.toLowerCase()) {
+        case 'cuda':
+            return vps.cuda;
+        case 'libc':
+        case 'glibc':
+            return vps.glibc;
+        case 'linux':
+            return vps.linux;
+        case 'macos':
+        case 'osx':
+            return vps.osx;
+        case 'windows':
+        case 'win':
+            return vps.win;
+        case 'archspec':
+            return vps.archspec;
+        default:
+            return undefined;
+    }
+}
+
 export interface PixiPackageSearchResult {
     name: string;
     latestVersion: string;
@@ -179,6 +267,9 @@ export interface PixiPackageSearchResult {
 }
 
 export function getHostCondaPlatform(): string {
+    if (_cachedHostPlatform) {
+        return _cachedHostPlatform;
+    }
     const platform = process.platform;
     const arch = process.arch;
     if (platform === 'linux') {

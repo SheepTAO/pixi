@@ -121,17 +121,23 @@ export class PixiPythonPackageManager implements PackageManager, Disposable {
             await runWithProgressNotification(`Pixi: Uninstalling ${uninstallList.join(', ')}...`, async (token) => {
                 const [features, envs] = await Promise.all([
                     getWorkspaceFeatures(details.projectPath),
-                    getWorkspaceEnvironments(details.projectPath),
+                    getWorkspaceEnvironments(details.projectPath, this.projectManager),
                 ]);
                 let cachedPkgs: PixiPackage[] | undefined;
                 for (const pkg of uninstallList) {
                     if (token.isCancellationRequested) {
                         break;
                     }
-                    const scope = await findPackageScope(details.projectPath, pkg, details.envName, {
-                        features,
-                        envs,
-                    });
+                    const scope = await findPackageScope(
+                        details.projectPath,
+                        pkg,
+                        details.envName,
+                        {
+                            features,
+                            envs,
+                        },
+                        this.projectManager,
+                    );
                     let isPypi = scope?.isPypi ?? false;
                     if (!scope) {
                         cachedPkgs ??= await this.projectManager.getPackagesForEnvironment(

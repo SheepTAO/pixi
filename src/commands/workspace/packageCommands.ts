@@ -54,10 +54,11 @@ export interface DeclaredQuickPickItem extends QuickPickItem {
 export async function buildDeclaredPackageQuickPickItems(
     projectPath: string,
     options?: Pick<PickDeclaredPackageOptions, 'filterFeature' | 'filterEnv'> & { pickedByDefault?: boolean },
+    manager?: PixiProjectManager,
 ): Promise<DeclaredQuickPickItem[]> {
     const [features, envs] = await Promise.all([
         getWorkspaceFeatures(projectPath),
-        getWorkspaceEnvironments(projectPath),
+        getWorkspaceEnvironments(projectPath, manager),
     ]);
 
     const envFeatures = options?.filterEnv ? envs.find((e) => e.name === options.filterEnv)?.features : undefined;
@@ -148,8 +149,9 @@ export async function buildDeclaredPackageQuickPickItems(
 export async function pickDeclaredPackage(
     projectPath: string,
     options?: PickDeclaredPackageOptions,
+    manager?: PixiProjectManager,
 ): Promise<DeclaredPackageItem | undefined> {
-    const items = await buildDeclaredPackageQuickPickItems(projectPath, options);
+    const items = await buildDeclaredPackageQuickPickItems(projectPath, options, manager);
 
     if (items.length === 0) {
         window.showInformationMessage(
@@ -255,7 +257,7 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
             if (!projectPath) {
                 return undefined;
             }
-            const picked = await pickDeclaredPackage(projectPath, pickerOptions);
+            const picked = await pickDeclaredPackage(projectPath, pickerOptions, manager);
             if (!picked) {
                 return undefined;
             }
@@ -270,7 +272,7 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
         // Pixi: Search Packages...
         commands.registerCommand('pixi.searchPackages', async (targetItem?: unknown) => {
             const targetProjectPath = normalizeFolderPath(targetItem);
-            await showPackageSearchPicker(targetProjectPath);
+            await showPackageSearchPicker(targetProjectPath, undefined, manager);
         }),
 
         // Pixi: Add Package...
@@ -318,6 +320,7 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
                         projectPath,
                         directScopeName,
                         typeof initialPkg === 'string' ? initialPkg : undefined,
+                        manager,
                     );
                 }
                 if (!promptResult) {
@@ -349,7 +352,7 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
                 }
 
                 const specs = promptResult.specs;
-                const sourceConfig = await promptAddPackageSource(projectPath, specs);
+                const sourceConfig = await promptAddPackageSource(projectPath, specs, manager);
                 if (!sourceConfig) {
                     return;
                 }
@@ -376,7 +379,7 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
                     ? ctx.featureName === 'default'
                         ? { kind: 'global', isPypi: pkg.kind === 'pypi' }
                         : { kind: 'feature', name: ctx.featureName, isPypi: pkg.kind === 'pypi' }
-                    : await findPackageScope(projectPath, pkg.name, ctx.envName);
+                    : await findPackageScope(projectPath, pkg.name, ctx.envName, undefined, manager);
                 if (!scope) {
                     window
                         .showWarningMessage(
@@ -419,13 +422,17 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
             const filterFeature = ctx.featureName;
             const filterEnv = ctx.envName && ctx.envName !== 'default' ? ctx.envName : undefined;
 
-            const picked = await pickDeclaredPackage(projectPath, {
-                title: 'Pixi: Remove Package',
-                placeHolder: 'Select a declared package to remove from manifest',
-                filterFeature,
-                filterEnv,
-                emptyWarning: 'No declared packages found in this Pixi project manifest.',
-            });
+            const picked = await pickDeclaredPackage(
+                projectPath,
+                {
+                    title: 'Pixi: Remove Package',
+                    placeHolder: 'Select a declared package to remove from manifest',
+                    filterFeature,
+                    filterEnv,
+                    emptyWarning: 'No declared packages found in this Pixi project manifest.',
+                },
+                manager,
+            );
             if (!picked) {
                 return;
             }

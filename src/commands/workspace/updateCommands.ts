@@ -328,10 +328,14 @@ async function handleUpgradeDependencies(
     projectName: string,
     filterEnv?: string,
 ): Promise<void> {
-    const items = await buildDeclaredPackageQuickPickItems(projectPath, {
-        filterEnv,
-        pickedByDefault: true,
-    });
+    const items = await buildDeclaredPackageQuickPickItems(
+        projectPath,
+        {
+            filterEnv,
+            pickedByDefault: true,
+        },
+        manager,
+    );
     const extractUniqueNames = (list: typeof items): string[] => [
         ...new Set(list.flatMap((s) => (s.declaredPkg ? [s.declaredPkg.pkgName] : []))),
     ];
@@ -353,10 +357,61 @@ async function handleUpgradeDependencies(
         return;
     }
 
+    interface PinningStrategyItem extends QuickPickItem {
+        strategy: 'semver' | 'minor' | 'major' | 'latest-up' | 'exact-version' | 'no-pin';
+    }
+
+    const strategyItems: PinningStrategyItem[] = [
+        {
+            label: 'Default (semver)',
+            description: 'Standard SemVer: e.g. >=1.2.3, <2 (>=0.1.0, <0.2 for 0.x)',
+            strategy: 'semver',
+        },
+        {
+            label: 'Minor',
+            description: 'Pin latest minor: e.g. >=1.2.3, <1.3',
+            strategy: 'minor',
+        },
+        {
+            label: 'Major',
+            description: 'Pin latest major: e.g. >=1.2.3, <2',
+            strategy: 'major',
+        },
+        {
+            label: 'Latest-Up',
+            description: 'Pin to latest or higher: e.g. >=1.2.3',
+            strategy: 'latest-up',
+        },
+        {
+            label: 'Exact Version',
+            description: 'Pin exact solver version: e.g. ==1.2.3',
+            strategy: 'exact-version',
+        },
+        {
+            label: 'No Pin',
+            description: 'Unconstrained: e.g. *',
+            strategy: 'no-pin',
+        },
+    ];
+
+    const chosenStrategy = await window.showQuickPick(strategyItems, {
+        title: `Pixi: Select Pinning Strategy (${projectName})`,
+        placeHolder: 'Select how version constraints should be updated in manifest (Default: semver)',
+    });
+    if (!chosenStrategy) {
+        return;
+    }
+
     const selectedNames = extractUniqueNames(selected);
     const isUpgradeAll = !filterEnv && selectedNames.length === totalUniqueNames;
 
     const upgradeArgs = isUpgradeAll ? ['upgrade'] : ['upgrade', ...selectedNames];
+    if (filterEnv) {
+        upgradeArgs.push('-e', filterEnv);
+    }
+    if (chosenStrategy.strategy) {
+        upgradeArgs.push('--pinning-strategy', chosenStrategy.strategy);
+    }
     const pkgSummary = selectedNames.length <= 4 ? selectedNames.join(', ') : `${selectedNames.length} packages`;
 
     await runPixiWithProgress(
@@ -452,6 +507,19 @@ export function registerUpdateCommands(manager: PixiProjectManager): Disposable[
     return [
         commands.registerCommand('pixi.update', async (targetItem?: unknown, envName?: string) => {
             await executeUnifiedUpdate(manager, targetItem, envName);
+        }),
+        commands.registerCommand('pixi.upgrade', async (targetItem?: unknown, envName?: string) => {
+            const projectPath = await pickPixiProject(
+                manager,
+                'Select Pixi project to upgrade dependencies',
+                targetItem,
+            );
+            if (!projectPath) {
+                return;
+            }
+            const projectName = manager.getProjectName(projectPath);
+            const directEnv = extractEnvironmentName(targetItem, envName);
+            await handleUpgradeDependencies(manager, projectPath, projectName, directEnv);
         }),
     ];
 }

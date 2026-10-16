@@ -60,6 +60,60 @@
                 "icon": "$(sync)"
             },
             {
+                "command": "pixi.upgrade",
+                "title": "Upgrade Dependencies ...",
+                "category": "Pixi",
+                "icon": "$(rocket)"
+            },
+            {
+                "command": "pixi.bumpVersion",
+                "title": "Bump / Set Workspace Version ...",
+                "category": "Pixi",
+                "icon": "$(tag)"
+            },
+            {
+                "command": "pixi.exportEnvironment",
+                "title": "Export Environment (Conda YAML) ...",
+                "category": "Pixi",
+                "icon": "$(export)"
+            },
+            {
+                "command": "pixi.setDescription",
+                "title": "Set Workspace Description ...",
+                "category": "Pixi",
+                "icon": "$(edit)"
+            },
+            {
+                "command": "pixi.setRequiresPixi",
+                "title": "Set Minimum Pixi Requirement ...",
+                "category": "Pixi",
+                "icon": "$(verified)"
+            },
+            {
+                "command": "pixi.setProjectName",
+                "title": "Rename Workspace ...",
+                "category": "Pixi",
+                "icon": "$(edit)"
+            },
+            {
+                "command": "pixi.managePreviewFlags",
+                "title": "Manage Workspace Preview Flags ...",
+                "category": "Pixi",
+                "icon": "$(beaker)"
+            },
+            {
+                "command": "pixi.manageActivation",
+                "title": "Manage Environment Activation ...",
+                "category": "Pixi",
+                "icon": "$(play)"
+            },
+            {
+                "command": "pixi.exec",
+                "title": "Run in Temporary Environment (Exec) ...",
+                "category": "Pixi",
+                "icon": "$(terminal)"
+            },
+            {
                 "command": "pixi.searchPackages",
                 "title": "Search Packages ...",
                 "category": "Pixi",
@@ -100,6 +154,12 @@
                 "title": "Platform ...",
                 "category": "Pixi",
                 "icon": "$(device-desktop)"
+            },
+            {
+                "command": "pixi.platform.autoDetect",
+                "title": "Auto-detect & Add Host Platform",
+                "category": "Pixi",
+                "icon": "$(sparkle)"
             },
             {
                 "command": "pixi.systemRequirements",
@@ -449,6 +509,42 @@
                     "when": "pixi.hasPixiProject"
                 },
                 {
+                    "command": "pixi.upgrade",
+                    "when": "pixi.hasPixiProject"
+                },
+                {
+                    "command": "pixi.bumpVersion",
+                    "when": "pixi.hasPixiProject"
+                },
+                {
+                    "command": "pixi.exportEnvironment",
+                    "when": "pixi.hasPixiProject"
+                },
+                {
+                    "command": "pixi.setDescription",
+                    "when": "pixi.hasPixiProject"
+                },
+                {
+                    "command": "pixi.setRequiresPixi",
+                    "when": "pixi.hasPixiProject"
+                },
+                {
+                    "command": "pixi.setProjectName",
+                    "when": "pixi.hasPixiProject"
+                },
+                {
+                    "command": "pixi.managePreviewFlags",
+                    "when": "pixi.hasPixiProject"
+                },
+                {
+                    "command": "pixi.manageActivation",
+                    "when": "pixi.hasPixiProject"
+                },
+                {
+                    "command": "pixi.exec",
+                    "when": "pixi.hasPixiProject"
+                },
+                {
                     "command": "pixi.lock",
                     "when": "pixi.hasPixiProject"
                 },
@@ -470,6 +566,10 @@
                 },
                 {
                     "command": "pixi.platform",
+                    "when": "pixi.hasPixiProject"
+                },
+                {
+                    "command": "pixi.platform.autoDetect",
                     "when": "pixi.hasPixiProject"
                 },
                 {
@@ -658,6 +758,11 @@
                     "group": "navigation@3"
                 },
                 {
+                    "command": "pixi.upgrade",
+                    "when": "resourceExtname == .toml && (resourceFilename == pixi.toml || resourceFilename == pyproject.toml) && pixi.hasPixiProject",
+                    "group": "navigation@3.5"
+                },
+                {
                     "command": "pixi.reinstall",
                     "when": "resourceExtname == .toml && (resourceFilename == pixi.toml || resourceFilename == pyproject.toml) && pixi.hasPixiProject",
                     "group": "navigation@4"
@@ -718,6 +823,21 @@
                     "command": "pixi.update",
                     "when": "view == pixi.views.projects && pixi.hasPixiProject",
                     "group": "1_manage@5"
+                },
+                {
+                    "command": "pixi.bumpVersion",
+                    "when": "view == pixi.views.projects && pixi.hasPixiProject",
+                    "group": "1_manage@5.5"
+                },
+                {
+                    "command": "pixi.setDescription",
+                    "when": "view == pixi.views.projects && pixi.hasPixiProject",
+                    "group": "1_manage@5.6"
+                },
+                {
+                    "command": "pixi.setRequiresPixi",
+                    "when": "view == pixi.views.projects && pixi.hasPixiProject",
+                    "group": "1_manage@5.7"
                 },
                 {
                     "command": "pixi.reinstall",
@@ -807,9 +927,44 @@
                     "group": "1_manage@2"
                 },
                 {
+                    "command": "pixi.setProjectName",
+                    "when": "view == pixi.views.projects && viewItem == pixiProject",
+                    "group": "1_manage@2.4"
+                },
+                {
+                    "command": "pixi.bumpVersion",
+                    "when": "view == pixi.views.projects && viewItem == pixiProject",
+                    "group": "1_manage@2.5"
+                },
+                {
+                    "command": "pixi.setDescription",
+                    "when": "view == pixi.views.projects && viewItem == pixiProject",
+                    "group": "1_manage@2.6"
+                },
+                {
+                    "command": "pixi.setRequiresPixi",
+                    "when": "view == pixi.views.projects && viewItem == pixiProject",
+                    "group": "1_manage@2.7"
+                },
+                {
+                    "command": "pixi.managePreviewFlags",
+                    "when": "view == pixi.views.projects && viewItem == pixiProject",
+                    "group": "1_manage@2.8"
+                },
+                {
+                    "command": "pixi.manageActivation",
+                    "when": "view == pixi.views.projects && viewItem == pixiProject",
+                    "group": "1_manage@2.9"
+                },
+                {
                     "command": "pixi.lock",
                     "when": "view == pixi.views.projects && viewItem == pixiProject",
                     "group": "1_manage@3"
+                },
+                {
+                    "command": "pixi.exec",
+                    "when": "view == pixi.views.projects && viewItem == pixiProject",
+                    "group": "1_manage@3.1"
                 },
                 {
                     "command": "pixi.addChannel",
@@ -825,6 +980,11 @@
                     "command": "pixi.platform",
                     "when": "view == pixi.views.projects && viewItem == pixiProject",
                     "group": "2_channel@3"
+                },
+                {
+                    "command": "pixi.platform.autoDetect",
+                    "when": "view == pixi.views.projects && viewItem == pixiProject",
+                    "group": "2_channel@3.1"
                 },
                 {
                     "command": "pixi.systemRequirements",
@@ -860,6 +1020,11 @@
                     "command": "pixi.update",
                     "when": "view == pixi.views.projects && (viewItem == pixiEnvInstalled || viewItem == pixiEmpty)",
                     "group": "1_package@3"
+                },
+                {
+                    "command": "pixi.upgrade",
+                    "when": "view == pixi.views.projects && (viewItem == pixiEnvInstalled || viewItem == pixiEmpty)",
+                    "group": "1_package@3.5"
                 },
                 {
                     "command": "pixi.updatePackage",
@@ -925,6 +1090,11 @@
                     "command": "pixi.deleteEnvironment",
                     "when": "view == pixi.views.projects && (viewItem == pixiEnvInstalled || viewItem == pixiEnvUninstalled)",
                     "group": "2_manage@2"
+                },
+                {
+                    "command": "pixi.exportEnvironment",
+                    "when": "view == pixi.views.projects && (viewItem == pixiEnvInstalled || viewItem == pixiEnvUninstalled)",
+                    "group": "2_manage@3"
                 },
                 {
                     "command": "pixi.installEnvironment",

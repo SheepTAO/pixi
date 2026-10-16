@@ -252,9 +252,9 @@ export class PixiManifestSchemaProvider implements CompletionItemProvider, Hover
                     doc: 'Feature-specific dependency set or environment overlay',
                 },
                 {
-                    name: `${prefix}system-requirements`,
-                    snippet: `[${prefix}system-requirements]\nlinux = "\${1:5.10}"\ncuda = "\${2:12.0}"`,
-                    doc: 'System compatibility constraints (glibc, linux, cuda)',
+                    name: `${prefix}platforms`,
+                    snippet: `[${prefix}platforms]\n\${1:linux-64} = { cuda = "\${2:12.6}" }`,
+                    doc: 'Platform definitions and virtual package constraints (glibc, linux, cuda)',
                 },
                 {
                     name: `${prefix}build-dependencies`,
@@ -338,7 +338,7 @@ export class PixiManifestSchemaProvider implements CompletionItemProvider, Hover
             });
         }
 
-        if (normalizedSection === 'system-requirements') {
+        if (normalizedSection === 'system-requirements' || normalizedSection.endsWith('virtual-packages')) {
             return this.buildKeyCompletions(meta.systemRequirementProperties);
         }
 

@@ -1,54 +1,16 @@
 import { commands, Disposable, QuickPickItem, window } from 'vscode';
 
-import { getHostCondaPlatform, runPixi } from '../../cli/pixiCli';
+import { getHostCondaPlatform } from '../../cli/pixiCli';
 import { runPixiWithProgress } from '../../cli/workspaceCli';
-import { safeJsonParse } from '../../common/execUtils';
 import { CONDA_PLATFORM_PRESETS } from '../../core/presets';
 import { PixiProjectManager } from '../../core/projectManager';
+import { getWorkspacePlatforms, WorkspacePlatformEntry } from '../../core/systemRequirements';
 import { formatScope, pickPixiProject, resolveWorkspaceOrFeatureScope } from './common';
 
-interface RawPlatformListJson {
-    platforms?: Array<{
-        name: string;
-        subdir?: string;
-        virtual_packages?: string[];
-        features?: string[];
-        environments?: string[];
-        is_autodetected?: boolean;
-    }>;
-}
-
-export interface WorkspacePlatformEntry {
-    name: string;
-    subdir?: string;
-    virtualPackages: string[];
-    features: string[];
-    environments: string[];
-}
+export { getWorkspacePlatforms, WorkspacePlatformEntry };
 
 function isGlobalPlatform(p: WorkspacePlatformEntry): boolean {
     return p.features.length === 0 || p.environments.includes('default');
-}
-
-export async function getWorkspacePlatforms(projectPath: string): Promise<WorkspacePlatformEntry[]> {
-    try {
-        const jsonOut = await runPixi(['workspace', 'platform', 'list', '--json'], { cwd: projectPath });
-        const parsed = safeJsonParse<RawPlatformListJson>(jsonOut);
-        if (parsed?.platforms && Array.isArray(parsed.platforms)) {
-            return parsed.platforms
-                .filter((p) => !p.is_autodetected && Boolean(p.name))
-                .map((p) => ({
-                    name: p.name,
-                    subdir: p.subdir,
-                    virtualPackages: p.virtual_packages || [],
-                    features: p.features || [],
-                    environments: p.environments || [],
-                }));
-        }
-    } catch {
-        // Ignore CLI errors and return empty list
-    }
-    return [];
 }
 
 export function registerPlatformCommands(manager: PixiProjectManager): Disposable[] {
@@ -64,7 +26,7 @@ export function registerPlatformCommands(manager: PixiProjectManager): Disposabl
                 return;
             }
 
-            const platformsPromise = getWorkspacePlatforms(projectPath);
+            const platformsPromise = getWorkspacePlatforms(projectPath, manager);
             const targetFeature = await resolveWorkspaceOrFeatureScope(
                 projectPath,
                 {
@@ -125,6 +87,15 @@ export function registerPlatformCommands(manager: PixiProjectManager): Disposabl
                 });
             }
 
+            if (!targetFeature) {
+                items.unshift({
+                    label: '$(sparkle) Auto-detect Host Platform',
+                    description: 'Auto-detect host OS, architecture, and virtual packages (CUDA, glibc)',
+                    platform: '__auto_detect__',
+                    picked: false,
+                });
+            }
+
             const scopeLabel = formatScope(targetFeature);
             const selected = await window.showQuickPick(items, {
                 title: `Pixi: Configure Target Platforms (${scopeLabel})`,
@@ -135,23 +106,29 @@ export function registerPlatformCommands(manager: PixiProjectManager): Disposabl
                 return;
             }
 
-            if (!targetFeature && selected.length === 0) {
+            const selectedSet = new Set(selected.map((s) => s.platform));
+            const autoDetectRequested = selectedSet.has('__auto_detect__');
+            selectedSet.delete('__auto_detect__');
+
+            if (!targetFeature && selectedSet.size === 0 && !autoDetectRequested) {
                 window.showWarningMessage(
                     'Cannot remove all workspace platforms. A Pixi project must have at least one target platform.',
                 );
                 return;
             }
 
-            const selectedSet = new Set(selected.map((s) => s.platform));
             const toAdd = [...selectedSet].filter((name) => !activeInScope.has(name));
             const toRemove = [...activeInScope].filter((name) => !selectedSet.has(name));
 
-            if (toAdd.length === 0 && toRemove.length === 0) {
+            if (!autoDetectRequested && toAdd.length === 0 && toRemove.length === 0) {
                 return;
             }
 
             const scopeArgs = targetFeature ? ['-f', targetFeature] : [];
             const commandBatch: string[][] = [];
+            if (autoDetectRequested) {
+                commandBatch.push(['workspace', 'platform', 'add', ...scopeArgs, '--auto-detect']);
+            }
             if (toAdd.length > 0) {
                 commandBatch.push(['workspace', 'platform', 'add', ...scopeArgs, ...toAdd]);
             }
@@ -160,13 +137,41 @@ export function registerPlatformCommands(manager: PixiProjectManager): Disposabl
             }
 
             const projectName = manager.getProjectName(projectPath);
-            const summary = selectedSet.size > 0 ? [...selectedSet].join(', ') : 'inherited from workspace';
+            const summaryParts: string[] = [];
+            if (autoDetectRequested) {
+                summaryParts.push('auto-detected host');
+            }
+            if (selectedSet.size > 0) {
+                summaryParts.push([...selectedSet].join(', '));
+            }
+            const summary = summaryParts.length > 0 ? summaryParts.join(', ') : 'inherited from workspace';
             await runPixiWithProgress(
                 `Pixi: Updating target platforms for ${scopeLabel} in '${projectName}'...`,
                 commandBatch,
                 projectPath,
                 manager,
                 `Pixi: Updated target platforms for ${scopeLabel} in '${projectName}' (${summary}).`,
+            );
+        }),
+
+        // Pixi: Auto-detect & Add Host Platform
+        commands.registerCommand('pixi.platform.autoDetect', async (targetItem?: unknown) => {
+            const projectPath = await pickPixiProject(
+                manager,
+                'Select Pixi project to add detected host platform to',
+                targetItem,
+            );
+            if (!projectPath) {
+                return;
+            }
+
+            const projectName = manager.getProjectName(projectPath);
+            await runPixiWithProgress(
+                `Pixi: Auto-detecting host platform for '${projectName}'...`,
+                [['workspace', 'platform', 'add', '--auto-detect']],
+                projectPath,
+                manager,
+                `Pixi: Successfully added detected host platform to '${projectName}'.`,
             );
         }),
     ];

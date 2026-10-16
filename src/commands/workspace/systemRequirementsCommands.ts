@@ -1,15 +1,16 @@
-import * as path from 'path';
 import { commands, Disposable, QuickPickItem, QuickPickItemKind, Uri, window } from 'vscode';
 
+import { getHostDetectedVirtualPackageValue } from '../../cli/pixiCli';
+import { runPixiWithProgress } from '../../cli/workspaceCli';
 import { revealDefinitionInManifest, unquoteString } from '../../common/execUtils';
-import { findManifestPath } from '../../core/projectDiscovery';
 import { PixiProjectManager } from '../../core/projectManager';
 import {
     getProjectSystemRequirements,
+    getWorkspacePlatforms,
     SYSTEM_REQUIREMENT_DESCRIPTORS,
     SystemRequirementDescriptor,
     SystemRequirementsRecord,
-    updateProjectSystemRequirements,
+    WorkspacePlatformEntry,
 } from '../../core/systemRequirements';
 import { extractCommandContext, pickPixiProject } from './common';
 
@@ -21,6 +22,7 @@ interface SystemRequirementItem extends QuickPickItem {
 async function promptForPropertyValue(
     descriptor: SystemRequirementDescriptor,
     currentValue?: string,
+    projectPath?: string,
 ): Promise<string | null | undefined> {
     interface ValuePickItem extends QuickPickItem {
         value?: string;
@@ -28,13 +30,36 @@ async function promptForPropertyValue(
         isRemove?: boolean;
     }
 
-    const items: ValuePickItem[] = descriptor.presets.map((p) => ({
-        label: p === currentValue ? `$(check) ${p}` : p,
-        description: p === currentValue ? '(Current)' : undefined,
-        value: p,
-    }));
+    const hostDetectedValue = await getHostDetectedVirtualPackageValue(descriptor.id, projectPath);
 
-    if (currentValue && !descriptor.presets.includes(currentValue)) {
+    const items: ValuePickItem[] = [];
+
+    if (hostDetectedValue) {
+        items.push({
+            label:
+                hostDetectedValue === currentValue
+                    ? `$(check) $(chip) ${hostDetectedValue}`
+                    : `$(chip) ${hostDetectedValue}`,
+            description:
+                hostDetectedValue === currentValue
+                    ? '(Current & Detected on Host Machine)'
+                    : '(Detected on Host Machine)',
+            value: hostDetectedValue,
+        });
+    }
+
+    for (const p of descriptor.presets) {
+        if (p === hostDetectedValue) {
+            continue;
+        }
+        items.push({
+            label: p === currentValue ? `$(check) ${p}` : p,
+            description: p === currentValue ? '(Current)' : undefined,
+            value: p,
+        });
+    }
+
+    if (currentValue && currentValue !== hostDetectedValue && !descriptor.presets.includes(currentValue)) {
         items.unshift({
             label: `$(check) ${currentValue}`,
             description: '(Current custom value)',
@@ -55,7 +80,7 @@ async function promptForPropertyValue(
         });
         items.push({
             label: `$(trash) Remove '${descriptor.id}'`,
-            description: `Delete this requirement from manifest`,
+            description: `Delete this requirement from project platforms`,
             isRemove: true,
         });
     }
@@ -99,22 +124,93 @@ async function promptForPropertyValue(
 
 async function applyRequirementUpdate(
     projectPath: string,
-    manifestPath: string,
     manager: PixiProjectManager,
-    propId: string,
+    descriptor: SystemRequirementDescriptor,
     newVal: string | null,
 ): Promise<void> {
-    await updateProjectSystemRequirements(projectPath, { [propId]: newVal });
-    await manager.refresh(Uri.file(projectPath));
-
-    const manifestName = path.basename(manifestPath);
-    const action = await window.showInformationMessage(
-        `Pixi: Updated '${propId}' in ${manifestName} (${newVal ? `${propId} = "${newVal}"` : 'removed'}).`,
-        'Install / Sync Environments',
-    );
-    if (action === 'Install / Sync Environments') {
-        await commands.executeCommand('pixi.install', Uri.file(projectPath));
+    const existingPlatforms = await getWorkspacePlatforms(projectPath, manager);
+    if (existingPlatforms.length === 0) {
+        window.showWarningMessage('No platforms found in workspace. Please add a target platform first.');
+        return;
     }
+
+    let compatiblePlatforms = existingPlatforms.filter((p) => {
+        const sub = (p.subdir || p.name).toLowerCase();
+        if (descriptor.id === 'linux' || descriptor.id === 'libc') {
+            return sub.startsWith('linux');
+        }
+        if (descriptor.id === 'macos') {
+            return sub.startsWith('osx');
+        }
+        if (descriptor.id === 'windows') {
+            return sub.startsWith('win');
+        }
+        return true;
+    });
+
+    if (compatiblePlatforms.length === 0) {
+        compatiblePlatforms = existingPlatforms;
+    }
+
+    let targetPlatforms: WorkspacePlatformEntry[] = [];
+    if (compatiblePlatforms.length === 1) {
+        targetPlatforms = compatiblePlatforms;
+    } else {
+        interface PlatformPickItem extends QuickPickItem {
+            platforms: WorkspacePlatformEntry[];
+        }
+        const pickItems: PlatformPickItem[] = [
+            {
+                label: '$(globe) All Compatible Platforms',
+                description: compatiblePlatforms.map((p) => p.name).join(', '),
+                platforms: compatiblePlatforms,
+            },
+            ...compatiblePlatforms.map((p) => ({
+                label: `$(device-desktop) ${p.name}`,
+                description: p.subdir ? `subdir: ${p.subdir}` : undefined,
+                platforms: [p],
+            })),
+        ];
+
+        const picked = await window.showQuickPick(pickItems, {
+            title: `Pixi: Select Platform for ${descriptor.label}`,
+            placeHolder: `Select target platform to apply ${descriptor.label} = "${newVal ?? 'removed'}"`,
+        });
+        if (!picked) {
+            return;
+        }
+        targetPlatforms = picked.platforms;
+    }
+
+    const commandBatch: string[][] = [];
+    for (const p of targetPlatforms) {
+        if (newVal === null) {
+            const removeName = descriptor.virtualPackageName || `__${descriptor.id}`;
+            commandBatch.push(['workspace', 'platform', 'edit', p.name, '--remove-virtual-package', removeName]);
+        } else if (descriptor.cliFlag) {
+            commandBatch.push(['workspace', 'platform', 'edit', p.name, descriptor.cliFlag, newVal]);
+        } else if (descriptor.id === 'unix') {
+            if (newVal === 'true') {
+                commandBatch.push(['workspace', 'platform', 'edit', p.name, '__unix=0=0']);
+            } else {
+                commandBatch.push(['workspace', 'platform', 'edit', p.name, '--remove-virtual-package', '__unix']);
+            }
+        }
+    }
+
+    if (commandBatch.length === 0) {
+        return;
+    }
+
+    const projectName = manager.getProjectName(projectPath);
+    const targetNames = targetPlatforms.map((p) => p.name).join(', ');
+    await runPixiWithProgress(
+        `Pixi: Updating '${descriptor.label}' for [${targetNames}] in '${projectName}'...`,
+        commandBatch,
+        projectPath,
+        manager,
+        `Pixi: Updated '${descriptor.label}' (${newVal ? `${descriptor.id} = "${newVal}"` : 'removed'}) for [${targetNames}].`,
+    );
 }
 
 export function registerSystemRequirementsCommands(manager: PixiProjectManager): Disposable[] {
@@ -134,7 +230,7 @@ export function registerSystemRequirementsCommands(manager: PixiProjectManager):
                 return;
             }
 
-            const manifestPath = findManifestPath(projectPath);
+            const manifestPath = manager.getManifestPath(projectPath);
             if (!manifestPath) {
                 window.showErrorMessage('No pixi.toml or pyproject.toml found in this project.');
                 return;
@@ -149,18 +245,20 @@ export function registerSystemRequirementsCommands(manager: PixiProjectManager):
                     icon: 'symbol-property',
                     presets: [],
                     placeholder: `Enter value for '${targetProp}'`,
+                    virtualPackageName: `__${targetProp}`,
                 };
-                const currentReqs = getProjectSystemRequirements(projectPath) ?? {};
-                const newVal = await promptForPropertyValue(descriptor, currentReqs[descriptor.id]);
+                const currentReqs = (await getProjectSystemRequirements(projectPath, manager)) ?? {};
+                const newVal = await promptForPropertyValue(descriptor, currentReqs[descriptor.id], projectPath);
                 if (newVal === undefined) {
                     return;
                 }
-                await applyRequirementUpdate(projectPath, manifestPath, manager, descriptor.id, newVal);
+                await applyRequirementUpdate(projectPath, manager, descriptor, newVal);
                 return;
             }
 
             // Main QuickPick flow
-            const currentReqs: SystemRequirementsRecord = getProjectSystemRequirements(projectPath) ?? {};
+            const currentReqs: SystemRequirementsRecord =
+                (await getProjectSystemRequirements(projectPath, manager)) ?? {};
             const items: SystemRequirementItem[] = SYSTEM_REQUIREMENT_DESCRIPTORS.map((desc) => {
                 const val = currentReqs[desc.id];
                 return {
@@ -179,12 +277,12 @@ export function registerSystemRequirementsCommands(manager: PixiProjectManager):
                 });
                 items.push({
                     label: '$(go-to-file) Reveal in Manifest',
-                    description: 'Jump to [system-requirements] in manifest file',
+                    description: 'Jump to platforms in manifest file',
                     action: 'reveal',
                 });
                 items.push({
                     label: '$(trash) Remove All System Requirements',
-                    description: 'Delete entire [system-requirements] section',
+                    description: 'Clear virtual package requirements across all platforms',
                     action: 'clear',
                 });
             }
@@ -204,8 +302,8 @@ export function registerSystemRequirementsCommands(manager: PixiProjectManager):
             if (picked.action === 'reveal') {
                 await revealDefinitionInManifest({
                     manifestPath,
-                    targetName: 'system-requirements',
-                    kind: 'system-requirements',
+                    targetName: 'platforms',
+                    kind: 'platforms',
                 });
                 return;
             }
@@ -219,23 +317,36 @@ export function registerSystemRequirementsCommands(manager: PixiProjectManager):
                 if (confirm !== 'Remove All') {
                     return;
                 }
-                const nullUpdates: Record<string, string | null> = {};
-                for (const k of Object.keys(currentReqs)) {
-                    nullUpdates[k] = null;
+
+                const existingPlatforms = await getWorkspacePlatforms(projectPath, manager);
+                const platformsWithVp = existingPlatforms.filter((p) => p.virtualPackages.length > 0);
+                const commandBatch: string[][] = [];
+                for (const p of platformsWithVp) {
+                    commandBatch.push(['workspace', 'platform', 'edit', p.name, '--clear-virtual-packages']);
                 }
-                await updateProjectSystemRequirements(projectPath, nullUpdates);
-                await manager.refresh(Uri.file(projectPath));
-                window.showInformationMessage(`Pixi: Removed all system requirements from '${projectName}'.`);
+
+                if (commandBatch.length > 0) {
+                    await runPixiWithProgress(
+                        `Pixi: Clearing system requirements in '${projectName}'...`,
+                        commandBatch,
+                        projectPath,
+                        manager,
+                        `Pixi: Cleared all system requirements from '${projectName}'.`,
+                    );
+                } else {
+                    await manager.refresh(Uri.file(projectPath));
+                    window.showInformationMessage(`Pixi: Removed all system requirements from '${projectName}'.`);
+                }
                 return;
             }
 
             if (picked.descriptor) {
                 const desc = picked.descriptor;
-                const newVal = await promptForPropertyValue(desc, currentReqs[desc.id]);
+                const newVal = await promptForPropertyValue(desc, currentReqs[desc.id], projectPath);
                 if (newVal === undefined) {
                     return;
                 }
-                await applyRequirementUpdate(projectPath, manifestPath, manager, desc.id, newVal);
+                await applyRequirementUpdate(projectPath, manager, desc, newVal);
             }
         },
     );
@@ -249,7 +360,7 @@ export function registerSystemRequirementsCommands(manager: PixiProjectManager):
         if (!projectPath) {
             return;
         }
-        const manifestPath = findManifestPath(projectPath);
+        const manifestPath = manager.getManifestPath(projectPath);
         if (!manifestPath) {
             window.showErrorMessage('No manifest file found for this project.');
             return;
@@ -257,8 +368,8 @@ export function registerSystemRequirementsCommands(manager: PixiProjectManager):
 
         await revealDefinitionInManifest({
             manifestPath,
-            targetName: ctx.propertyName || 'system-requirements',
-            kind: 'system-requirements',
+            targetName: ctx.propertyName || 'platforms',
+            kind: 'platforms',
         });
     });
 
@@ -293,9 +404,16 @@ export function registerSystemRequirementsCommands(manager: PixiProjectManager):
                 return;
             }
 
-            await updateProjectSystemRequirements(projectPath, { [targetProp]: null });
-            await manager.refresh(Uri.file(projectPath));
-            window.showInformationMessage(`Pixi: Removed '${targetProp}' system requirement.`);
+            const descriptor = SYSTEM_REQUIREMENT_DESCRIPTORS.find((d) => d.id === targetProp) || {
+                id: targetProp,
+                label: targetProp,
+                description: `System requirement '${targetProp}'`,
+                icon: 'symbol-property',
+                presets: [],
+                placeholder: '',
+                virtualPackageName: `__${targetProp}`,
+            };
+            await applyRequirementUpdate(projectPath, manager, descriptor, null);
         },
     );
 

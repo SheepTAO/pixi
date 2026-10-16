@@ -13,12 +13,7 @@ import {
     workspace,
 } from 'vscode';
 
-import {
-    getReferencingEnvs,
-    getWorkspaceEnvironments,
-    getWorkspaceFeatures,
-    WorkspaceListEntry,
-} from '../commands/workspace/common';
+import { getReferencingEnvs, getWorkspaceFeatures, WorkspaceListEntry } from '../commands/workspace/common';
 import { enrichLocalPackages, normalizePkgName, sortPixiPackages, splitPackageSpec } from '../core/packageManager';
 import { getProjectKey } from '../core/projectDiscovery';
 import { PixiProjectManager } from '../core/projectManager';
@@ -190,9 +185,12 @@ export class PixiEnvironmentTreeItem extends TreeItem {
             lines.push(`Reason: ${env.statusReason}`);
         }
         lines.push(...toolchainLines);
+        if (env.resolvedPlatform) {
+            lines.push(`Resolved Platform: ${env.resolvedPlatform}`);
+        }
         if (env.platforms && env.platforms.length > 0) {
             const platformNames = env.platforms.map((p) => (typeof p === 'string' ? p : p.name));
-            lines.push(`Platforms: ${platformNames.join(', ')}`);
+            lines.push(`Configured Platforms: ${platformNames.join(', ')}`);
         }
         this.tooltip = lines.join('\n');
     }
@@ -232,7 +230,7 @@ export class PixiFeatureTreeItem extends TreeItem {
                 : usedByEnvs.length > 0
                   ? `Used by: ${usedByEnvs.join(', ')}`
                   : '(Unused)';
-            this.tooltip = [
+            const tooltipLines = [
                 `Feature: ${feature.name}`,
                 `Project: ${project.name}`,
                 isDefault
@@ -240,7 +238,11 @@ export class PixiFeatureTreeItem extends TreeItem {
                     : `Used by: ${usedByEnvs.length > 0 ? usedByEnvs.join(', ') : 'None'}`,
                 `Conda Dependencies: ${feature.dependencies.length}`,
                 `PyPI Dependencies: ${feature.pypiDependencies.length}`,
-            ].join('\n');
+            ];
+            if (feature.tasks && feature.tasks.length > 0) {
+                tooltipLines.push(`Tasks: ${feature.tasks.join(', ')}`);
+            }
+            this.tooltip = tooltipLines.join('\n');
         }
     }
 }
@@ -304,7 +306,6 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
     private treeView?: TreeView<PixiProjectsTreeItem>;
     private currentViewMode: ProjectsViewMode = 'environment';
     private readonly featuresCache = new Map<string, Promise<WorkspaceListEntry[]>>();
-    private readonly envsCache = new Map<string, Promise<WorkspaceListEntry[]>>();
 
     constructor(private readonly projectManager: PixiProjectManager) {
         const config = workspace.getConfiguration('pixi.environments');
@@ -339,7 +340,6 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
 
     public refresh(): void {
         this.featuresCache.clear();
-        this.envsCache.clear();
         this.updateViewDescription();
         this._onDidChangeTreeData.fire();
     }
@@ -352,7 +352,6 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
 
     public dispose(): void {
         this.featuresCache.clear();
-        this.envsCache.clear();
         this._onDidChangeTreeData.dispose();
         Disposable.from(...this.disposables).dispose();
     }
@@ -367,16 +366,6 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
         if (!promise) {
             promise = getWorkspaceFeatures(projectPath);
             this.featuresCache.set(key, promise);
-        }
-        return promise;
-    }
-
-    private getProjectWorkspaceEnvs(projectPath: string): Promise<WorkspaceListEntry[]> {
-        const key = getProjectKey(projectPath);
-        let promise = this.envsCache.get(key);
-        if (!promise) {
-            promise = getWorkspaceEnvironments(projectPath);
-            this.envsCache.set(key, promise);
         }
         return promise;
     }
@@ -427,16 +416,13 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
     }
 
     private async getFeatureItemsForProject(project: PixiProject): Promise<PixiProjectsTreeItem[]> {
-        const [features, wsEnvs] = await Promise.all([
-            this.getProjectFeatures(project.projectPath),
-            this.getProjectWorkspaceEnvs(project.projectPath),
-        ]);
+        const features = await this.getProjectFeatures(project.projectPath);
         if (features.length === 0) {
             return [new PixiEmptyTreeItem('No features declared in project', project)];
         }
         const projectEnvs = this.projectManager.getEnvironmentsForProject(project.projectPath);
         return features.map((f) => {
-            const usedByEnvs = getReferencingEnvs(wsEnvs, f.name);
+            const usedByEnvs = getReferencingEnvs(projectEnvs, f.name);
             const candidateEnvNames =
                 f.name === 'default' ? ['default', ...projectEnvs.map((e) => e.pixiEnvName)] : usedByEnvs;
             const targetEnv =
@@ -448,14 +434,7 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
 
     private async getEnvironmentItemsForProject(project: PixiProject): Promise<PixiProjectsTreeItem[]> {
         const envs = this.projectManager.getEnvironmentsForProject(project.projectPath);
-        const wsEnvs = await this.getProjectWorkspaceEnvs(project.projectPath);
-        const envFeaturesMap = new Map<string, string[]>();
-        for (const we of wsEnvs) {
-            if (we.features) {
-                envFeaturesMap.set(we.name, we.features);
-            }
-        }
-        return envs.map((e) => new PixiEnvironmentTreeItem(e, project, envFeaturesMap.get(e.pixiEnvName)));
+        return envs.map((e) => new PixiEnvironmentTreeItem(e, project, e.features));
     }
 
     private async getProjectChildren(project: PixiProject): Promise<PixiProjectsTreeItem[]> {
@@ -468,7 +447,7 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
         const position = config.get<'bottom' | 'top' | 'hidden'>('systemRequirementsPosition', 'bottom');
 
         if (position !== 'hidden') {
-            const reqs = getProjectSystemRequirements(project.projectPath);
+            const reqs = await getProjectSystemRequirements(project.projectPath, this.projectManager);
             if (reqs) {
                 const reqItem = new PixiSystemRequirementsTreeItem(project, reqs);
                 if (position === 'top') {

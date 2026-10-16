@@ -13,12 +13,12 @@ import {
 } from 'vscode';
 
 import { runPixi } from '../../cli/pixiCli';
-import { normalizeFolderPath } from '../../common/execUtils';
+import { normalizeFolderPath, safeJsonParse } from '../../common/execUtils';
 import { ensureEnvironmentReady, getEnvironmentStatusBadge, sortPixiEnvironments } from '../../core/environmentRules';
 import { normalizePkgName } from '../../core/packageManager';
 import { PIXI_MANIFEST_NAME, PYPROJECT_MANIFEST_NAME } from '../../core/projectDiscovery';
 import { PixiProjectManager } from '../../core/projectManager';
-import { PixiEnvironmentInfo, PixiPackage } from '../../core/types';
+import { PixiEnvironmentInfo, PixiInfo, PixiPackage } from '../../core/types';
 import type { PixiTask } from '../../providers/taskProvider';
 
 export interface ProjectQuickPickItem extends QuickPickItem {
@@ -109,6 +109,7 @@ export interface WorkspaceListEntry {
     features?: string[];
     dependencies: string[];
     pypiDependencies: string[];
+    tasks?: string[];
 }
 
 export function parseWorkspaceListOutput(text: string): WorkspaceListEntry[] {
@@ -153,6 +154,14 @@ export function parseWorkspaceListOutput(text: string): WorkspaceListEntry[] {
                 .filter(Boolean);
             continue;
         }
+        const tasksMatch = line.match(/^\s+tasks:\s*(.+)$/);
+        if (tasksMatch) {
+            current.tasks = tasksMatch[1]
+                .split(',')
+                .map((s) => s.trim())
+                .filter(Boolean);
+            continue;
+        }
     }
     return entries;
 }
@@ -182,8 +191,14 @@ export function sortPixiFeatures<T extends { name: string }>(features: T[]): T[]
     });
 }
 
-export function getReferencingEnvs(envs: WorkspaceListEntry[], featureName: string): string[] {
-    return envs.filter((e) => e.features?.includes(featureName)).map((e) => e.name);
+export function getReferencingEnvs(
+    envs: Array<{ name?: string; pixiEnvName?: string; features?: string[] }>,
+    featureName: string,
+): string[] {
+    return envs
+        .filter((e) => e.features?.includes(featureName))
+        .map((e) => e.name ?? e.pixiEnvName ?? '')
+        .filter(Boolean);
 }
 
 export interface FeatureQuickPickItem extends QuickPickItem {
@@ -254,13 +269,36 @@ export function validatePixiIdentifier(value: string | undefined, options?: Vali
     return null;
 }
 
-export async function getWorkspaceEnvironments(projectPath: string): Promise<WorkspaceListEntry[]> {
-    try {
-        const out = await runPixi(['workspace', 'environment', 'list'], { cwd: projectPath });
-        return parseWorkspaceListOutput(out);
-    } catch {
-        return [];
+export async function getWorkspaceEnvironments(
+    projectPath: string,
+    manager?: PixiProjectManager,
+): Promise<WorkspaceListEntry[]> {
+    if (manager) {
+        const envs = manager.getEnvironmentsForProject(projectPath);
+        if (envs.length > 0) {
+            return envs.map((e) => ({
+                name: e.pixiEnvName,
+                features: e.features || ['default'],
+                dependencies: [],
+                pypiDependencies: [],
+            }));
+        }
     }
+    try {
+        const stdout = await runPixi(['info', '--json'], { cwd: projectPath });
+        const info = safeJsonParse<PixiInfo>(stdout, {} as PixiInfo);
+        if (info.environments_info && Array.isArray(info.environments_info)) {
+            return info.environments_info.map((e) => ({
+                name: e.name,
+                features: e.features || ['default'],
+                dependencies: [],
+                pypiDependencies: [],
+            }));
+        }
+    } catch {
+        // Fallback to empty
+    }
+    return [];
 }
 
 export async function findPackageScope(
@@ -268,11 +306,12 @@ export async function findPackageScope(
     packageName: string,
     preferredEnv?: string,
     cachedWorkspaceData?: { features: WorkspaceListEntry[]; envs: WorkspaceListEntry[] },
+    manager?: PixiProjectManager,
 ): Promise<PackageScopeResult | undefined> {
     const norm = normalizePkgName(packageName);
     const [features, envs] = cachedWorkspaceData
         ? [cachedWorkspaceData.features, cachedWorkspaceData.envs]
-        : await Promise.all([getWorkspaceFeatures(projectPath), getWorkspaceEnvironments(projectPath)]);
+        : await Promise.all([getWorkspaceFeatures(projectPath), getWorkspaceEnvironments(projectPath, manager)]);
 
     const featureMap = new Map(features.map((f) => [f.name, f]));
 
@@ -584,11 +623,17 @@ export async function resolveTargetFolder(targetItem?: unknown, placeHolder?: st
 
 /**
  * Ensures at least one Pixi project exists in the workspace.
- * Displays a standardized warning notification if none are found.
+ * Displays a standardized prompt guiding the user to initialize or open project root if none are found.
  */
-export function ensureHasPixiProjects(manager: PixiProjectManager): boolean {
+export async function ensureHasPixiProjects(manager: PixiProjectManager): Promise<boolean> {
     if (manager.getProjectPaths().length === 0) {
-        window.showWarningMessage('No Pixi projects found in the current workspace.');
+        const choice = await window.showWarningMessage(
+            'No Pixi workspace found. Please initialize a Pixi project or open VS Code from the project root directory.',
+            'Initialize Pixi Project',
+        );
+        if (choice === 'Initialize Pixi Project') {
+            await commands.executeCommand('pixi.init');
+        }
         return false;
     }
     return true;
@@ -608,7 +653,7 @@ export async function pickPixiProject(
         }
     }
 
-    if (!ensureHasPixiProjects(manager)) {
+    if (!(await ensureHasPixiProjects(manager))) {
         return undefined;
     }
 

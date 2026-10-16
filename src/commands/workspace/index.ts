@@ -9,6 +9,7 @@ import { registerPlatformCommands } from './platformCommands';
 import { registerSystemRequirementsCommands } from './systemRequirementsCommands';
 import { registerTaskCommands } from './taskCommands';
 import { registerUpdateCommands } from './updateCommands';
+import { registerVersionCommands } from './versionCommands';
 
 export function registerWorkspaceCommands(manager: PixiProjectManager, taskProvider: PixiTaskProvider): Disposable {
     return Disposable.from(
@@ -18,6 +19,7 @@ export function registerWorkspaceCommands(manager: PixiProjectManager, taskProvi
         ...registerPlatformCommands(manager),
         ...registerSystemRequirementsCommands(manager),
         ...registerUpdateCommands(manager),
+        ...registerVersionCommands(manager),
         ...registerTaskCommands(manager, taskProvider),
     );
 }

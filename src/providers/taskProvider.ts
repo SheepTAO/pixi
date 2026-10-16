@@ -264,7 +264,7 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
     }
 
     public async pickTask(options: PickTaskOptions): Promise<PixiTask | undefined> {
-        if (!ensureHasPixiProjects(this.projectManager)) {
+        if (!(await ensureHasPixiProjects(this.projectManager))) {
             return undefined;
         }
 

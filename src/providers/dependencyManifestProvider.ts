@@ -372,15 +372,37 @@ export class PixiDependencyManifestProvider
 
         // Fallback for dependencies not present in active environment (e.g. feature-specific dependencies)
         if (missingDeps.length > 0 && !token.isCancellationRequested) {
-            // Fast in-memory path: check pixi.lock directly without spawning child processes
-            const lockPath = getLockfilePath(projectPath);
-            const lockLines = await getLockfileLines(lockPath);
+            const envs = this.projectManager.getEnvironmentsForProject(projectPath);
+            const otherEnvs = envs.filter((e) => e.pixiEnvName !== activeEnvName && e.pixiStatus !== 'incompatible');
 
-            if (lockLines) {
-                for (const dep of missingDeps) {
-                    const lockedVer = getLockedVersionFromLines(lockLines, dep.name);
-                    if (lockedVer) {
-                        hints.push(this.createInlayHint(dep, { version: lockedVer } as PixiPackage));
+            for (const env of otherEnvs) {
+                if (missingDeps.length === 0 || token.isCancellationRequested) {
+                    break;
+                }
+                const envPackages = await this.projectManager.getPackagesForEnvironment(env.pixiEnvName, projectPath);
+                const envMap = this.createPackageMap(envPackages);
+
+                for (let i = missingDeps.length - 1; i >= 0; i--) {
+                    const dep = missingDeps[i];
+                    const pkg = envMap.get(normalizePkgName(dep.name));
+                    if (pkg && pkg.version) {
+                        hints.push(this.createInlayHint(dep, pkg));
+                        missingDeps.splice(i, 1);
+                    }
+                }
+            }
+
+            // Fast in-memory path: check pixi.lock directly without spawning child processes
+            if (missingDeps.length > 0 && !token.isCancellationRequested) {
+                const lockPath = getLockfilePath(projectPath);
+                const lockLines = await getLockfileLines(lockPath);
+
+                if (lockLines) {
+                    for (const dep of missingDeps) {
+                        const lockedVer = getLockedVersionFromLines(lockLines, dep.name);
+                        if (lockedVer) {
+                            hints.push(this.createInlayHint(dep, { version: lockedVer } as PixiPackage));
+                        }
                     }
                 }
             }

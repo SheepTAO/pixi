@@ -33,8 +33,17 @@ const MANIFEST_CANDIDATES: readonly ManifestCandidate[] = [
  * Enriches local/editable subpackages with version and manifest path from their local directories.
  */
 export async function enrichLocalPackages(packages: PixiPackage[], projectPath: string): Promise<PixiPackage[]> {
+    const candidates = packages.filter(
+        (pkg) =>
+            (pkg.source && (pkg.source.startsWith('.') || path.isAbsolute(pkg.source))) ||
+            (pkg.requested_spec && /path\s*=/.test(pkg.requested_spec)),
+    );
+    if (candidates.length === 0) {
+        return packages;
+    }
+
     await Promise.all(
-        packages.map(async (pkg) => {
+        candidates.map(async (pkg) => {
             try {
                 let candidateDir: string | undefined;
 
