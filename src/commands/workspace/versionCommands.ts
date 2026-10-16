@@ -599,7 +599,8 @@ export function registerVersionCommands(manager: PixiProjectManager): Disposable
         commands.registerCommand('pixi.workspaceDependencies', async (targetItem?: unknown) => {
             const ctx = extractCommandContext(targetItem);
             const projectPath =
-                ctx.projectPath || (await pickPixiProject(manager, 'Select Pixi project to manage workspace dependencies for'));
+                ctx.projectPath ||
+                (await pickPixiProject(manager, 'Select Pixi project to manage workspace dependencies for'));
             if (!projectPath) {
                 return;
             }
@@ -762,7 +763,9 @@ export function registerVersionCommands(manager: PixiProjectManager): Disposable
 
             const projectPath =
                 ctx.projectPath ||
-                (targetFilePath ? (manager.findProjectForUri(Uri.file(targetFilePath)) || path.dirname(targetFilePath)) : undefined) ||
+                (targetFilePath
+                    ? manager.findProjectForUri(Uri.file(targetFilePath)) || path.dirname(targetFilePath)
+                    : undefined) ||
                 (await pickPixiProject(manager, 'Select Pixi project to import environment into')) ||
                 workspace.workspaceFolders?.[0]?.uri.fsPath;
 

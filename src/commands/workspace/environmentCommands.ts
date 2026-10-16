@@ -252,7 +252,15 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                     await runPixiWithProgress(
                         `Pixi: Creating environment '${trimmedName}' with feature '${trimmedName}'...`,
                         [
-                            ['workspace', 'environment', 'add', trimmedName, '--feature', trimmedName, ...solveGroupArgs],
+                            [
+                                'workspace',
+                                'environment',
+                                'add',
+                                trimmedName,
+                                '--feature',
+                                trimmedName,
+                                ...solveGroupArgs,
+                            ],
                             ['install', '-e', trimmedName],
                         ],
                         projectPath,
