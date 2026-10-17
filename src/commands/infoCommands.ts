@@ -12,20 +12,18 @@ export async function openLocation(target?: unknown): Promise<void> {
     if (!targetPath) {
         return;
     }
-    if (!fs.existsSync(targetPath)) {
+    let isDirectory = false;
+    try {
+        isDirectory = fs.statSync(targetPath).isDirectory();
+    } catch {
         window.showWarningMessage(`Path does not exist: ${targetPath}`);
         return;
     }
 
-    try {
-        const stat = fs.statSync(targetPath);
-        if (!stat.isDirectory()) {
-            const doc = await workspace.openTextDocument(Uri.file(targetPath));
-            await window.showTextDocument(doc);
-            return;
-        }
-    } catch {
-        // Ignore stat error and continue
+    if (!isDirectory) {
+        const doc = await workspace.openTextDocument(Uri.file(targetPath));
+        await window.showTextDocument(doc);
+        return;
     }
 
     const isRemote = !!vscodeEnv.remoteName;

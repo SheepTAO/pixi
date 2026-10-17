@@ -146,12 +146,8 @@ export async function handleConfigList(manager: PixiProjectManager, targetItem?:
     }
 
     const args = ['config', 'list'];
-    if (scope === 'local') {
-        args.push('--local');
-    } else if (scope === 'global') {
-        args.push('--global');
-    } else if (scope === 'system') {
-        args.push('--system');
+    if (scope !== 'merged') {
+        args.push(`--${scope}`);
     }
 
     if (targetKey) {
@@ -302,12 +298,8 @@ export async function handleConfigSet(manager: PixiProjectManager, targetItem?: 
     }
 
     const args = ['config', 'set'];
-    if (scope === 'local') {
-        args.push('--local');
-    } else if (scope === 'global') {
-        args.push('--global');
-    } else if (scope === 'system') {
-        args.push('--system');
+    if (scope !== 'merged') {
+        args.push(`--${scope}`);
     }
     args.push(targetKey, valueInput.trim());
 
@@ -371,12 +363,8 @@ export async function handleConfigUnset(manager: PixiProjectManager, targetItem?
     }
 
     const args = ['config', 'unset'];
-    if (scope === 'local') {
-        args.push('--local');
-    } else if (scope === 'global') {
-        args.push('--global');
-    } else if (scope === 'system') {
-        args.push('--system');
+    if (scope !== 'merged') {
+        args.push(`--${scope}`);
     }
     args.push(targetKey);
 
@@ -427,12 +415,8 @@ export async function handleConfigListMutation(
     }
 
     const args = ['config', action];
-    if (scope === 'local') {
-        args.push('--local');
-    } else if (scope === 'global') {
-        args.push('--global');
-    } else if (scope === 'system') {
-        args.push('--system');
+    if (scope !== 'merged') {
+        args.push(`--${scope}`);
     }
     args.push(key.trim(), val.trim());
 
