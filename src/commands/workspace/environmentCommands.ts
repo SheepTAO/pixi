@@ -4,7 +4,7 @@ import { commands, Disposable, ProgressLocation, QuickPickItem, Uri, window, wor
 
 import { runPixi } from '../../cli/pixiCli';
 import { runPixiWithProgress } from '../../cli/workspaceCli';
-import { revealDefinitionInManifest, runWithProgressNotification, safeJsonParse } from '../../common/execUtils';
+import { revealDefinitionInManifest } from '../../common/execUtils';
 import { PixiProjectManager } from '../../core/projectManager';
 import {
     extractCommandContext,
@@ -1338,77 +1338,6 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
             if (selected) {
                 await updateConfigurationValue(config, 'viewMode', selected.value);
             }
-        }),
-
-        // Pixi: Register Workspace in Machine Registry...
-        commands.registerCommand('pixi.workspace.register', async (targetItem?: unknown) => {
-            const projectPath = await pickPixiProject(
-                manager,
-                'Select Pixi project to register machine-wide',
-                targetItem,
-            );
-            if (!projectPath) {
-                return;
-            }
-
-            const projectName = manager.getProjectName(projectPath);
-            await runPixiWithProgress(
-                `Pixi: Registering workspace '${projectName}' machine-wide...`,
-                ['workspace', 'register', '--path', projectPath],
-                projectPath,
-                manager,
-                `Pixi: Workspace '${projectName}' registered successfully in machine registry.`,
-            );
-        }),
-
-        // Pixi: Unregister Workspace from Machine Registry...
-        commands.registerCommand('pixi.workspace.unregister', async (_targetItem?: unknown) => {
-            let registered: Record<string, string> = {};
-            try {
-                const regOut = await runPixi(['workspace', 'register', 'list', '--json']);
-                registered = safeJsonParse<Record<string, string>>(regOut, {});
-            } catch (err) {
-                window.showErrorMessage(
-                    `Failed to list registered workspaces: ${err instanceof Error ? err.message : String(err)}`,
-                );
-                return;
-            }
-
-            const entries = Object.entries(registered);
-            if (entries.length === 0) {
-                window.showInformationMessage('No workspaces currently registered on this machine.');
-                return;
-            }
-
-            const picked = await window.showQuickPick(
-                entries.map(([name, wsPath]) => ({
-                    label: `$(archive) ${name}`,
-                    description: wsPath,
-                    workspaceName: name,
-                })),
-                {
-                    title: 'Pixi: Unregister Workspace',
-                    placeHolder: 'Select registered workspace to remove from machine registry',
-                },
-            );
-
-            if (!picked) {
-                return;
-            }
-
-            await runWithProgressNotification(
-                `Pixi: Unregistering workspace '${picked.workspaceName}'...`,
-                async (token) => {
-                    const out = await runPixi(
-                        ['workspace', 'register', 'remove', picked.workspaceName],
-                        { includeStderr: true },
-                        token,
-                    );
-                    await manager.refreshAll();
-                    return out;
-                },
-                `Pixi: Workspace '${picked.workspaceName}' removed from registry.`,
-            );
         }),
     ];
 }

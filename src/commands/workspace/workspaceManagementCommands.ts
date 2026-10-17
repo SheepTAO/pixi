@@ -5,18 +5,22 @@ import { commands, Disposable, OutputChannel, QuickPickItem, ThemeIcon, window, 
 
 import { getPixi, runPixi } from '../../cli/pixiCli';
 import { runPixiWithProgress } from '../../cli/workspaceCli';
+import { runWithProgressNotification, safeJsonParse } from '../../common/execUtils';
 import { PixiProjectManager } from '../../core/projectManager';
-import { extractCommandContext, getWorkspaceDependencies, pickPixiProject, pickProjectEnvironmentName } from './common';
+import {
+    extractEnvironmentName,
+    getWorkspaceDependencies,
+    pickPixiProject,
+    pickProjectEnvironmentName,
+} from './common';
 
 let activationChannel: OutputChannel | undefined;
 
-export function registerVersionCommands(manager: PixiProjectManager): Disposable[] {
+export function registerWorkspaceManagementCommands(manager: PixiProjectManager): Disposable[] {
     return [
         // Pixi: Bump Workspace Version...
         commands.registerCommand('pixi.bumpVersion', async (targetItem?: unknown) => {
-            const ctx = extractCommandContext(targetItem);
-            const projectPath =
-                ctx.projectPath || (await pickPixiProject(manager, 'Select Pixi project to manage version for'));
+            const projectPath = await pickPixiProject(manager, 'Select Pixi project to manage version for', targetItem);
             if (!projectPath) {
                 return;
             }
@@ -105,17 +109,18 @@ export function registerVersionCommands(manager: PixiProjectManager): Disposable
 
         // Pixi: Export Environment (Conda YAML or Explicit Spec)...
         commands.registerCommand('pixi.exportEnvironment', async (targetItem?: unknown, envName?: string) => {
-            const ctx = extractCommandContext(targetItem);
-            const projectPath =
-                ctx.projectPath || (await pickPixiProject(manager, 'Select Pixi project to export environment from'));
+            const projectPath = await pickPixiProject(
+                manager,
+                'Select Pixi project to export environment from',
+                targetItem,
+            );
             if (!projectPath) {
                 return;
             }
 
             const projectName = manager.getProjectName(projectPath);
             const targetEnv =
-                envName ||
-                ctx.env?.pixiEnvName ||
+                extractEnvironmentName(targetItem, envName) ||
                 (await pickProjectEnvironmentName(manager, projectPath, {
                     title: `Pixi: Select Environment to Export (${projectName})`,
                     placeHolder: 'Select environment to export',
@@ -219,9 +224,11 @@ export function registerVersionCommands(manager: PixiProjectManager): Disposable
 
         // Pixi: Set Workspace Description...
         commands.registerCommand('pixi.setDescription', async (targetItem?: unknown) => {
-            const ctx = extractCommandContext(targetItem);
-            const projectPath =
-                ctx.projectPath || (await pickPixiProject(manager, 'Select Pixi project to manage description for'));
+            const projectPath = await pickPixiProject(
+                manager,
+                'Select Pixi project to manage description for',
+                targetItem,
+            );
             if (!projectPath) {
                 return;
             }
@@ -282,9 +289,11 @@ export function registerVersionCommands(manager: PixiProjectManager): Disposable
 
         // Pixi: Configure Requires-Pixi Version...
         commands.registerCommand('pixi.setRequiresPixi', async (targetItem?: unknown) => {
-            const ctx = extractCommandContext(targetItem);
-            const projectPath =
-                ctx.projectPath || (await pickPixiProject(manager, 'Select Pixi project to manage requires-pixi for'));
+            const projectPath = await pickPixiProject(
+                manager,
+                'Select Pixi project to manage requires-pixi for',
+                targetItem,
+            );
             if (!projectPath) {
                 return;
             }
@@ -382,8 +391,7 @@ export function registerVersionCommands(manager: PixiProjectManager): Disposable
 
         // Pixi: Set Workspace Name...
         commands.registerCommand('pixi.setProjectName', async (targetItem?: unknown) => {
-            const ctx = extractCommandContext(targetItem);
-            const projectPath = ctx.projectPath || (await pickPixiProject(manager, 'Select Pixi project to rename'));
+            const projectPath = await pickPixiProject(manager, 'Select Pixi project to rename', targetItem);
             if (!projectPath) {
                 return;
             }
@@ -416,9 +424,11 @@ export function registerVersionCommands(manager: PixiProjectManager): Disposable
 
         // Pixi: Manage Preview Flags...
         commands.registerCommand('pixi.managePreviewFlags', async (targetItem?: unknown) => {
-            const ctx = extractCommandContext(targetItem);
-            const projectPath =
-                ctx.projectPath || (await pickPixiProject(manager, 'Select Pixi project to manage preview flags for'));
+            const projectPath = await pickPixiProject(
+                manager,
+                'Select Pixi project to manage preview flags for',
+                targetItem,
+            );
             if (!projectPath) {
                 return;
             }
@@ -492,9 +502,11 @@ export function registerVersionCommands(manager: PixiProjectManager): Disposable
 
         // Pixi: Manage Environment Activation...
         commands.registerCommand('pixi.manageActivation', async (targetItem?: unknown) => {
-            const ctx = extractCommandContext(targetItem);
-            const projectPath =
-                ctx.projectPath || (await pickPixiProject(manager, 'Select Pixi project to manage activation for'));
+            const projectPath = await pickPixiProject(
+                manager,
+                'Select Pixi project to manage activation for',
+                targetItem,
+            );
             if (!projectPath) {
                 return;
             }
@@ -634,10 +646,8 @@ export function registerVersionCommands(manager: PixiProjectManager): Disposable
 
         // Pixi: Run in Temporary Environment (Exec)...
         commands.registerCommand('pixi.exec', async (targetItem?: unknown) => {
-            const ctx = extractCommandContext(targetItem);
             const projectPath =
-                ctx.projectPath ||
-                (await pickPixiProject(manager, 'Select working directory for temporary execution')) ||
+                (await pickPixiProject(manager, 'Select working directory for temporary execution', targetItem)) ||
                 workspace.workspaceFolders?.[0]?.uri.fsPath;
             if (!projectPath) {
                 return;
@@ -667,10 +677,11 @@ export function registerVersionCommands(manager: PixiProjectManager): Disposable
 
         // Pixi: Manage Workspace Dependencies ([workspace.dependencies])...
         commands.registerCommand('pixi.workspaceDependencies', async (targetItem?: unknown) => {
-            const ctx = extractCommandContext(targetItem);
-            const projectPath =
-                ctx.projectPath ||
-                (await pickPixiProject(manager, 'Select Pixi project to manage workspace dependencies for'));
+            const projectPath = await pickPixiProject(
+                manager,
+                'Select Pixi project to manage workspace dependencies for',
+                targetItem,
+            );
             if (!projectPath) {
                 return;
             }
@@ -820,9 +831,11 @@ export function registerVersionCommands(manager: PixiProjectManager): Disposable
 
         // Pixi: Workspace ... (Unified Workspace Hub)
         commands.registerCommand('pixi.workspace', async (targetItem?: unknown) => {
-            const ctx = extractCommandContext(targetItem);
-            const projectPath =
-                ctx.projectPath || (await pickPixiProject(manager, 'Select Pixi project to manage workspace for'));
+            const projectPath = await pickPixiProject(
+                manager,
+                'Select Pixi project to manage workspace for',
+                targetItem,
+            );
             if (!projectPath) {
                 return;
             }
@@ -889,7 +902,78 @@ export function registerVersionCommands(manager: PixiProjectManager): Disposable
                 return;
             }
 
-            await commands.executeCommand(picked.command, ctx.projectPath ? targetItem : projectPath);
+            await commands.executeCommand(picked.command, targetItem || projectPath);
+        }),
+
+        // Pixi: Register Workspace in Machine Registry...
+        commands.registerCommand('pixi.workspace.register', async (targetItem?: unknown) => {
+            const projectPath = await pickPixiProject(
+                manager,
+                'Select Pixi project to register machine-wide',
+                targetItem,
+            );
+            if (!projectPath) {
+                return;
+            }
+
+            const projectName = manager.getProjectName(projectPath);
+            await runPixiWithProgress(
+                `Pixi: Registering workspace '${projectName}' machine-wide...`,
+                ['workspace', 'register', '--path', projectPath],
+                projectPath,
+                manager,
+                `Pixi: Workspace '${projectName}' registered successfully in machine registry.`,
+            );
+        }),
+
+        // Pixi: Unregister Workspace from Machine Registry...
+        commands.registerCommand('pixi.workspace.unregister', async (_targetItem?: unknown) => {
+            let registered: Record<string, string> = {};
+            try {
+                const regOut = await runPixi(['workspace', 'register', 'list', '--json']);
+                registered = safeJsonParse<Record<string, string>>(regOut, {});
+            } catch (err) {
+                window.showErrorMessage(
+                    `Failed to list registered workspaces: ${err instanceof Error ? err.message : String(err)}`,
+                );
+                return;
+            }
+
+            const entries = Object.entries(registered);
+            if (entries.length === 0) {
+                window.showInformationMessage('No workspaces currently registered on this machine.');
+                return;
+            }
+
+            const picked = await window.showQuickPick(
+                entries.map(([name, wsPath]) => ({
+                    label: `$(archive) ${name}`,
+                    description: wsPath,
+                    workspaceName: name,
+                })),
+                {
+                    title: 'Pixi: Unregister Workspace',
+                    placeHolder: 'Select registered workspace to remove from machine registry',
+                },
+            );
+
+            if (!picked) {
+                return;
+            }
+
+            await runWithProgressNotification(
+                `Pixi: Unregistering workspace '${picked.workspaceName}'...`,
+                async (token) => {
+                    const out = await runPixi(
+                        ['workspace', 'register', 'remove', picked.workspaceName],
+                        { includeStderr: true },
+                        token,
+                    );
+                    await manager.refreshAll();
+                    return out;
+                },
+                `Pixi: Workspace '${picked.workspaceName}' removed from registry.`,
+            );
         }),
     ];
 }

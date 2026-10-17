@@ -508,14 +508,12 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
         }),
 
         // Pixi: Show Dependency Tree ...
-        commands.registerCommand('pixi.showDependencyTree', async (targetItem?: unknown) => {
-            await showDependencyTreeCommand(manager, targetItem);
-        }),
+        commands.registerCommand('pixi.showDependencyTree', (targetItem?: unknown) =>
+            showDependencyTreeCommand(manager, targetItem),
+        ),
 
         // Pixi: Why is This Package Installed? (Reverse Tree)
-        commands.registerCommand('pixi.whyPackage', async (targetItem?: unknown) => {
-            await whyPackageCommand(manager, targetItem);
-        }),
+        commands.registerCommand('pixi.whyPackage', (targetItem?: unknown) => whyPackageCommand(manager, targetItem)),
 
         // Pixi: Update Package
         commands.registerCommand('pixi.updatePackage', async (targetItem?: unknown) => {

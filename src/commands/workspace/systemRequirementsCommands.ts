@@ -219,13 +219,11 @@ export function registerSystemRequirementsCommands(manager: PixiProjectManager):
         'pixi.systemRequirements',
         async (targetItem?: unknown, preselectedProp?: string) => {
             const ctx = extractCommandContext(targetItem);
-            const projectPath =
-                ctx.projectPath ||
-                (await pickPixiProject(
-                    manager,
-                    'Select Pixi project to configure system requirements for',
-                    targetItem,
-                ));
+            const projectPath = await pickPixiProject(
+                manager,
+                'Select Pixi project to configure system requirements for',
+                targetItem,
+            );
             if (!projectPath) {
                 return;
             }
@@ -354,9 +352,11 @@ export function registerSystemRequirementsCommands(manager: PixiProjectManager):
     // 2. Reveal in Manifest
     const revealCommand = commands.registerCommand('pixi.systemRequirements.reveal', async (targetItem?: unknown) => {
         const ctx = extractCommandContext(targetItem);
-        const projectPath =
-            ctx.projectPath ||
-            (await pickPixiProject(manager, 'Select Pixi project to reveal system requirements for', targetItem));
+        const projectPath = await pickPixiProject(
+            manager,
+            'Select Pixi project to reveal system requirements for',
+            targetItem,
+        );
         if (!projectPath) {
             return;
         }
@@ -389,9 +389,11 @@ export function registerSystemRequirementsCommands(manager: PixiProjectManager):
         async (targetItem?: unknown, propName?: string) => {
             const ctx = extractCommandContext(targetItem);
             const targetProp = propName || ctx.propertyName;
-            const projectPath =
-                ctx.projectPath ||
-                (await pickPixiProject(manager, 'Select Pixi project to remove system requirement from', targetItem));
+            const projectPath = await pickPixiProject(
+                manager,
+                'Select Pixi project to remove system requirement from',
+                targetItem,
+            );
             if (!projectPath || !targetProp) {
                 return;
             }
