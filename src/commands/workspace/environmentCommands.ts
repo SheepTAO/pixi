@@ -1,8 +1,9 @@
 import * as path from 'path';
-import { commands, Disposable, QuickPickItem, Uri, window, workspace } from 'vscode';
+import { commands, Disposable, ProgressLocation, QuickPickItem, Uri, window, workspace } from 'vscode';
 
+import { runPixi } from '../../cli/pixiCli';
 import { runPixiWithProgress } from '../../cli/workspaceCli';
-import { revealDefinitionInManifest } from '../../common/execUtils';
+import { revealDefinitionInManifest, runWithProgressNotification, safeJsonParse } from '../../common/execUtils';
 import { PixiProjectManager } from '../../core/projectManager';
 import {
     extractCommandContext,
@@ -86,18 +87,65 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                 return;
             }
 
+            const initMode = await window.showQuickPick(
+                [
+                    {
+                        label: '$(file-code) Standard Workspace',
+                        description: 'Initialize a standard empty Pixi workspace',
+                        mode: 'standard' as const,
+                    },
+                    {
+                        label: '$(cloud-download) Import Conda Environment File...',
+                        description: 'Bootstrap workspace from an existing environment.yml file (--import)',
+                        mode: 'import' as const,
+                    },
+                ],
+                {
+                    title: 'Pixi: Initialize Workspace',
+                    placeHolder: 'Select initialization mode',
+                },
+            );
+            if (!initMode) {
+                return;
+            }
+
+            let importFilePath: string | undefined;
+            if (initMode.mode === 'import') {
+                const pickedUris = await window.showOpenDialog({
+                    canSelectMany: false,
+                    openLabel: 'Import Conda Environment',
+                    title: 'Select environment.yml to import',
+                    filters: {
+                        'Conda Environment': ['yml', 'yaml'],
+                        'All Files': ['*'],
+                    },
+                    defaultUri: Uri.file(targetFolder),
+                });
+                if (!pickedUris || pickedUris.length === 0) {
+                    return;
+                }
+                importFilePath = pickedUris[0].fsPath;
+            }
+
             const format = await pickManifestFormat(targetFolder);
             if (!format) {
                 return;
             }
 
-            await runPixiWithProgress(
-                'Pixi: Initializing project...',
-                ['init', '--format', format, '.'],
-                targetFolder,
-                manager,
-                'Pixi: Project initialized successfully.',
-            );
+            const initArgs = ['init', '--format', format];
+            if (importFilePath) {
+                initArgs.push('--import', importFilePath);
+            }
+            initArgs.push('.');
+
+            const title = importFilePath
+                ? `Pixi: Initializing project from ${path.basename(importFilePath)}...`
+                : 'Pixi: Initializing project...';
+            const successMsg = importFilePath
+                ? `Pixi: Project initialized successfully from ${path.basename(importFilePath)}.`
+                : 'Pixi: Project initialized successfully.';
+
+            await runPixiWithProgress(title, initArgs, targetFolder, manager, successMsg);
 
             await openDocumentIfExists(getManifestPathForFormat(targetFolder, format));
         }),
@@ -461,6 +509,12 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                         action: 'build-cache',
                     },
                     {
+                        label: '$(archive) Clean Disassociated Workspace Registries',
+                        description:
+                            'Remove stale project paths from machine registry (pixi clean --workspaces-registry)',
+                        action: 'workspaces-registry',
+                    },
+                    {
                         label: '$(database) Clean Global Package Cache...',
                         description: 'Clean downloaded package cache in ~/.cache/rattler (pixi clean cache)',
                         action: 'cache',
@@ -486,6 +540,18 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
             }
 
             const projectName = manager.getProjectName(projectPath);
+
+            if (choice.action === 'workspaces-registry') {
+                await runPixiWithProgress(
+                    `Pixi: Cleaning disassociated workspace registries for ${projectName}...`,
+                    ['clean', '--workspaces-registry'],
+                    projectPath,
+                    manager,
+                    `Pixi: Disassociated workspace registries cleaned for ${projectName}.`,
+                );
+                await manager.refreshAll();
+                return;
+            }
 
             if (choice.action === 'activation-cache') {
                 await runPixiWithProgress(
@@ -569,6 +635,37 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                 projectPath,
                 manager,
                 `Pixi: Lockfile (pixi.lock) updated successfully for ${projectName}.`,
+            );
+        }),
+
+        // Pixi: Check Lockfile Drift
+        commands.registerCommand('pixi.checkLockfile', async (targetItem?: unknown) => {
+            const projectPath = await pickPixiProject(manager, 'Select Pixi project to check lockfile', targetItem);
+            if (!projectPath) {
+                return;
+            }
+
+            const projectName = manager.getProjectName(projectPath);
+            await window.withProgress(
+                {
+                    location: ProgressLocation.Notification,
+                    title: `Pixi: Checking lockfile for ${projectName}...`,
+                    cancellable: false,
+                },
+                async () => {
+                    try {
+                        await runPixi(['lock', '--check'], { cwd: projectPath });
+                        window.showInformationMessage(`Pixi: Lockfile (pixi.lock) is up-to-date for ${projectName}.`);
+                    } catch {
+                        const action = await window.showWarningMessage(
+                            `Pixi: Lockfile (pixi.lock) is out of sync with manifest for ${projectName}.`,
+                            'Update Lockfile Now',
+                        );
+                        if (action === 'Update Lockfile Now') {
+                            await commands.executeCommand('pixi.lock', Uri.file(projectPath));
+                        }
+                    }
+                },
             );
         }),
 
@@ -1008,6 +1105,77 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
             if (selected) {
                 await updateConfigurationValue(config, 'viewMode', selected.value);
             }
+        }),
+
+        // Pixi: Register Workspace in Machine Registry...
+        commands.registerCommand('pixi.workspace.register', async (targetItem?: unknown) => {
+            const projectPath = await pickPixiProject(
+                manager,
+                'Select Pixi project to register machine-wide',
+                targetItem,
+            );
+            if (!projectPath) {
+                return;
+            }
+
+            const projectName = manager.getProjectName(projectPath);
+            await runPixiWithProgress(
+                `Pixi: Registering workspace '${projectName}' machine-wide...`,
+                ['workspace', 'register', '--path', projectPath],
+                projectPath,
+                manager,
+                `Pixi: Workspace '${projectName}' registered successfully in machine registry.`,
+            );
+        }),
+
+        // Pixi: Unregister Workspace from Machine Registry...
+        commands.registerCommand('pixi.workspace.unregister', async (_targetItem?: unknown) => {
+            let registered: Record<string, string> = {};
+            try {
+                const regOut = await runPixi(['workspace', 'register', 'list', '--json']);
+                registered = safeJsonParse<Record<string, string>>(regOut, {});
+            } catch (err) {
+                window.showErrorMessage(
+                    `Failed to list registered workspaces: ${err instanceof Error ? err.message : String(err)}`,
+                );
+                return;
+            }
+
+            const entries = Object.entries(registered);
+            if (entries.length === 0) {
+                window.showInformationMessage('No workspaces currently registered on this machine.');
+                return;
+            }
+
+            const picked = await window.showQuickPick(
+                entries.map(([name, wsPath]) => ({
+                    label: `$(archive) ${name}`,
+                    description: wsPath,
+                    workspaceName: name,
+                })),
+                {
+                    title: 'Pixi: Unregister Workspace',
+                    placeHolder: 'Select registered workspace to remove from machine registry',
+                },
+            );
+
+            if (!picked) {
+                return;
+            }
+
+            await runWithProgressNotification(
+                `Pixi: Unregistering workspace '${picked.workspaceName}'...`,
+                async (token) => {
+                    const out = await runPixi(
+                        ['workspace', 'register', 'remove', picked.workspaceName],
+                        { includeStderr: true },
+                        token,
+                    );
+                    await manager.refreshAll();
+                    return out;
+                },
+                `Pixi: Workspace '${picked.workspaceName}' removed from registry.`,
+            );
         }),
     ];
 }

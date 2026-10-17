@@ -24,6 +24,8 @@ export interface PixiRawEnvironmentInfo {
     tasks?: string[];
     solve_group?: string | null;
     environment_size?: string | null;
+    dependencies?: string[];
+    pypi_dependencies?: string[];
 }
 
 export interface PixiInfo {
@@ -70,6 +72,8 @@ export interface PixiEnvironmentInfo {
     solveGroup?: string | null;
     environmentSize?: string | null;
     toolchains?: EnvironmentToolchains;
+    dependencies?: string[];
+    pypiDependencies?: string[];
 }
 
 export interface PixiProject {

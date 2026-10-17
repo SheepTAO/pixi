@@ -312,6 +312,12 @@
                 "icon": "$(lock)"
             },
             {
+                "command": "pixi.checkLockfile",
+                "title": "Check Lockfile Drift",
+                "category": "Pixi",
+                "icon": "$(pass)"
+            },
+            {
                 "command": "pixi.reinstall",
                 "title": "Reinstall ...",
                 "category": "Pixi",
@@ -354,6 +360,12 @@
                 "icon": "$(repo-sync)"
             },
             {
+                "command": "pixi.global.tree",
+                "title": "View Global Tool Dependency Tree",
+                "category": "Pixi",
+                "icon": "$(graph)"
+            },
+            {
                 "command": "pixi.global.updateTool",
                 "title": "Update Global Tool",
                 "category": "Pixi",
@@ -370,6 +382,24 @@
                 "title": "Open Global Manifest",
                 "category": "Pixi",
                 "icon": "$(edit)"
+            },
+            {
+                "command": "pixi.global.addDependency",
+                "title": "Add Dependency to Global Tool ...",
+                "category": "Pixi",
+                "icon": "$(plus)"
+            },
+            {
+                "command": "pixi.global.removeDependency",
+                "title": "Remove Dependency from Global Tool ...",
+                "category": "Pixi",
+                "icon": "$(trash)"
+            },
+            {
+                "command": "pixi.global.expose",
+                "title": "Expose Binary Mapping for Global Tool ...",
+                "category": "Pixi",
+                "icon": "$(symbol-event)"
             },
             {
                 "command": "pixi.selfUpdate",
@@ -431,6 +461,48 @@
                 "icon": "$(info)"
             },
             {
+                "command": "pixi.config",
+                "title": "Configuration Management ...",
+                "category": "Pixi",
+                "icon": "$(gear)"
+            },
+            {
+                "command": "pixi.config.list",
+                "title": "List Configuration Values",
+                "category": "Pixi",
+                "icon": "$(list-unordered)"
+            },
+            {
+                "command": "pixi.config.edit",
+                "title": "Edit Configuration File ...",
+                "category": "Pixi",
+                "icon": "$(edit)"
+            },
+            {
+                "command": "pixi.config.set",
+                "title": "Set Configuration Value ...",
+                "category": "Pixi",
+                "icon": "$(gear)"
+            },
+            {
+                "command": "pixi.config.unset",
+                "title": "Unset Configuration Value ...",
+                "category": "Pixi",
+                "icon": "$(trash)"
+            },
+            {
+                "command": "pixi.workspace.register",
+                "title": "Register Workspace in Machine Registry ...",
+                "category": "Pixi",
+                "icon": "$(bookmark)"
+            },
+            {
+                "command": "pixi.workspace.unregister",
+                "title": "Unregister Workspace from Machine Registry ...",
+                "category": "Pixi",
+                "icon": "$(trash)"
+            },
+            {
                 "command": "pixi.showDependencyTree",
                 "title": "Show Dependency Tree",
                 "category": "Pixi",
@@ -477,6 +549,12 @@
                 "title": "Add Task ...",
                 "category": "Pixi",
                 "icon": "$(plus)"
+            },
+            {
+                "command": "pixi.tasks.addAlias",
+                "title": "Add Task Alias (Composite Task) ...",
+                "category": "Pixi",
+                "icon": "$(layers)"
             },
             {
                 "command": "pixi.tasks.removeTask",
@@ -569,8 +647,22 @@
                     "when": "pixi.hasPixiProject"
                 },
                 {
+                    "command": "pixi.checkLockfile",
+                    "when": "pixi.hasPixiProject"
+                },
+                {
                     "command": "pixi.clean",
                     "when": "pixi.hasPixiProject"
+                },
+                {
+                    "command": "pixi.config"
+                },
+                {
+                    "command": "pixi.workspace.register",
+                    "when": "pixi.hasPixiProject"
+                },
+                {
+                    "command": "pixi.workspace.unregister"
                 },
                 {
                     "command": "pixi.environment",
@@ -614,6 +706,10 @@
                 },
                 {
                     "command": "pixi.tasks.addTask",
+                    "when": "pixi.hasPixiProject"
+                },
+                {
+                    "command": "pixi.tasks.addAlias",
                     "when": "pixi.hasPixiProject"
                 },
                 {
@@ -669,6 +765,10 @@
                     "when": "false"
                 },
                 {
+                    "command": "pixi.global.tree",
+                    "when": "false"
+                },
+                {
                     "command": "pixi.global.updateTool",
                     "when": "false"
                 },
@@ -678,6 +778,34 @@
                 },
                 {
                     "command": "pixi.global.openManifest",
+                    "when": "false"
+                },
+                {
+                    "command": "pixi.config.list",
+                    "when": "false"
+                },
+                {
+                    "command": "pixi.config.edit",
+                    "when": "false"
+                },
+                {
+                    "command": "pixi.config.set",
+                    "when": "false"
+                },
+                {
+                    "command": "pixi.config.unset",
+                    "when": "false"
+                },
+                {
+                    "command": "pixi.global.addDependency",
+                    "when": "false"
+                },
+                {
+                    "command": "pixi.global.removeDependency",
+                    "when": "false"
+                },
+                {
+                    "command": "pixi.global.expose",
                     "when": "false"
                 },
                 {
@@ -840,6 +968,11 @@
                     "group": "1_manage@4"
                 },
                 {
+                    "command": "pixi.checkLockfile",
+                    "when": "view == pixi.views.projects && pixi.hasPixiProject",
+                    "group": "1_manage@4.05"
+                },
+                {
                     "command": "pixi.update",
                     "when": "view == pixi.views.projects && pixi.hasPixiProject",
                     "group": "1_manage@5"
@@ -903,6 +1036,11 @@
                     "command": "pixi.refreshInfo",
                     "when": "view == pixi.views.info",
                     "group": "navigation@2"
+                },
+                {
+                    "command": "pixi.config",
+                    "when": "view == pixi.views.info",
+                    "group": "1_tools@1"
                 },
                 {
                     "command": "pixi.tasks.addTask",
@@ -977,9 +1115,24 @@
                     "group": "1_manage@2.9"
                 },
                 {
+                    "command": "pixi.workspace.register",
+                    "when": "view == pixi.views.projects && viewItem == pixiProject",
+                    "group": "1_manage@2.95"
+                },
+                {
+                    "command": "pixi.config",
+                    "when": "view == pixi.views.projects && viewItem == pixiProject",
+                    "group": "1_manage@2.96"
+                },
+                {
                     "command": "pixi.lock",
                     "when": "view == pixi.views.projects && viewItem == pixiProject",
                     "group": "1_manage@3"
+                },
+                {
+                    "command": "pixi.checkLockfile",
+                    "when": "view == pixi.views.projects && viewItem == pixiProject",
+                    "group": "1_manage@3.05"
                 },
                 {
                     "command": "pixi.exec",
@@ -1197,6 +1350,16 @@
                     "group": "2_danger@1"
                 },
                 {
+                    "command": "pixi.global.tree",
+                    "when": "view == pixi.views.global && viewItem == pixiGlobalTool",
+                    "group": "inline@0"
+                },
+                {
+                    "command": "pixi.global.tree",
+                    "when": "view == pixi.views.global && viewItem == pixiGlobalTool",
+                    "group": "1_view@1"
+                },
+                {
                     "command": "pixi.global.updateTool",
                     "when": "view == pixi.views.global && viewItem == pixiGlobalTool",
                     "group": "inline@1"
@@ -1205,6 +1368,21 @@
                     "command": "pixi.global.uninstallTool",
                     "when": "view == pixi.views.global && viewItem == pixiGlobalTool",
                     "group": "inline@2"
+                },
+                {
+                    "command": "pixi.global.addDependency",
+                    "when": "view == pixi.views.global && viewItem == pixiGlobalTool",
+                    "group": "1_manage@1"
+                },
+                {
+                    "command": "pixi.global.removeDependency",
+                    "when": "view == pixi.views.global && viewItem == pixiGlobalTool",
+                    "group": "1_manage@2"
+                },
+                {
+                    "command": "pixi.global.expose",
+                    "when": "view == pixi.views.global && viewItem == pixiGlobalTool",
+                    "group": "1_manage@3"
                 },
                 {
                     "command": "pixi.cleanCache",
@@ -1317,6 +1495,11 @@
                     "group": "1_task@1"
                 },
                 {
+                    "command": "pixi.tasks.addAlias",
+                    "when": "view == pixi.views.tasks && viewItem == pixiProject",
+                    "group": "1_task@2"
+                },
+                {
                     "command": "pixi.runTask",
                     "when": "view == pixi.views.tasks && viewItem == pixiProject",
                     "group": "2_run@1"
@@ -1345,6 +1528,11 @@
                     "command": "pixi.tasks.addTask",
                     "when": "view == pixi.views.tasks && (viewItem == pixiTaskGroup || viewItem == pixiTaskEmpty)",
                     "group": "1_task@1"
+                },
+                {
+                    "command": "pixi.tasks.addAlias",
+                    "when": "view == pixi.views.tasks && (viewItem == pixiTaskGroup || viewItem == pixiTaskEmpty)",
+                    "group": "1_task@2"
                 }
             ]
         },
@@ -1513,6 +1701,20 @@
                     "type": "string",
                     "default": "",
                     "description": "Default environment name to activate when opening a Pixi terminal (e.g. 'default' or 'dev'). If empty, prompts for selection when multiple environments exist.",
+                    "scope": "resource"
+                },
+                "pixi.terminal.activationMode": {
+                    "type": "string",
+                    "enum": [
+                        "shellHook",
+                        "shell"
+                    ],
+                    "enumDescriptions": [
+                        "Inject activated environment variables into the user's default shell via 'pixi shell-hook' (clean native prompt, avoids subshell nesting)",
+                        "Launch 'pixi shell' as a subshell process inside the terminal"
+                    ],
+                    "default": "shellHook",
+                    "description": "Mechanism used to activate the Pixi environment when opening an integrated terminal.",
                     "scope": "resource"
                 },
                 "pixi.packageSearch.maxResults": {

@@ -225,7 +225,7 @@ export function registerTaskCommands(manager: PixiProjectManager, taskProvider: 
 
             // Step 1: Prompt for task name
             const taskName = await window.showInputBox({
-                title: `Pixi: Add Task (1/3) - [${projectName}]`,
+                title: `Pixi: Add Task - Name [${projectName}]`,
                 prompt: 'Enter task name (e.g. test, build, serve, lint)',
                 value: defaultTaskName,
                 valueSelection: defaultTaskName ? [defaultTaskName.length, defaultTaskName.length] : undefined,
@@ -259,7 +259,7 @@ export function registerTaskCommands(manager: PixiProjectManager, taskProvider: 
 
             // Step 2: Prompt for command
             const taskCmd = await window.showInputBox({
-                title: `Pixi: Add Task (2/3) - Command for '${taskName}'`,
+                title: `Pixi: Add Task - Command for '${taskName}'`,
                 prompt: `Enter command line to execute when running '${taskName}'`,
                 placeHolder: 'e.g. pytest -v, uvicorn app:main --reload, cmake --build .',
                 validateInput: (value) => {
@@ -325,7 +325,17 @@ export function registerTaskCommands(manager: PixiProjectManager, taskProvider: 
                 taskScope = pickedScope.scope;
             }
 
-            // Step 4: Optional Dependencies (--depends-on) if other tasks exist
+            // Step 4: Optional Description (--description)
+            const taskDescription = await window.showInputBox({
+                title: `Pixi: Add Task (Optional) - Description for '${taskName}'`,
+                prompt: 'Enter a brief description for this task (Press Enter to skip)',
+                placeHolder: 'e.g. Run unit tests with pytest, build production bundle',
+            });
+            if (taskDescription === undefined) {
+                return;
+            }
+
+            // Step 5: Optional Dependencies (--depends-on) if other tasks exist
             let selectedDependsOn: string[] = [];
             if (existingTasks.length > 0) {
                 const availableDepTasks = existingTasks.filter((t) => t.name.toLowerCase() !== taskName.toLowerCase());
@@ -358,6 +368,9 @@ export function registerTaskCommands(manager: PixiProjectManager, taskProvider: 
             } else if (taskScope.kind === 'feature' && taskScope.name) {
                 args.push('--feature', taskScope.name);
             }
+            if (taskDescription.trim()) {
+                args.push('--description', taskDescription.trim());
+            }
             for (const dep of selectedDependsOn) {
                 args.push('--depends-on', dep);
             }
@@ -375,6 +388,101 @@ export function registerTaskCommands(manager: PixiProjectManager, taskProvider: 
                 await revealDefinitionInManifest({
                     manifestPath: manager.getManifestPath(projectPath),
                     targetName: taskName,
+                    kind: 'task',
+                });
+            }
+        }),
+
+        // Pixi: Add Task Alias (Composite Task)
+        commands.registerCommand('pixi.tasks.addAlias', async (targetItem?: unknown) => {
+            const projectPath = await pickPixiProject(manager, 'Select Pixi project to add task alias to', targetItem);
+            if (!projectPath) {
+                return;
+            }
+
+            const projectName = manager.getProjectName(projectPath);
+            const existingTasks = await taskProvider.getTasksForProject(projectPath);
+            if (existingTasks.length === 0) {
+                window.showWarningMessage(
+                    `No existing tasks found in ${projectName} to create an alias for. Add a task first.`,
+                );
+                return;
+            }
+
+            // Step 1: Prompt for alias name
+            const aliasName = await window.showInputBox({
+                title: `Pixi: Add Task Alias - Name [${projectName}]`,
+                prompt: 'Enter task alias name (composite task)',
+                placeHolder: 'e.g. all, ci, check, build-all',
+                validateInput: (value) => {
+                    const trimmed = value.trim();
+                    if (!trimmed) {
+                        return 'Alias name cannot be empty';
+                    }
+                    if (/\s/.test(trimmed)) {
+                        return 'Alias name cannot contain spaces';
+                    }
+                    if (existingTasks.some((t) => t.name.toLowerCase() === trimmed.toLowerCase())) {
+                        return `A task or alias named '${trimmed}' already exists`;
+                    }
+                    return null;
+                },
+            });
+            if (!aliasName) {
+                return;
+            }
+
+            // Step 2: Select dependent tasks
+            interface AliasTaskQuickPickItem extends QuickPickItem {
+                taskName: string;
+            }
+            const depItems: AliasTaskQuickPickItem[] = existingTasks.map((t) => ({
+                label: `$(play) ${t.name}`,
+                description: t.default_environment ? `[${t.default_environment}] ${t.cmd || ''}` : t.cmd,
+                taskName: t.name,
+            }));
+
+            const pickedDeps = await window.showQuickPick(depItems, {
+                title: `Pixi: Add Task Alias - Select Tasks for '${aliasName}'`,
+                placeHolder: 'Select tasks that this alias will run (check all that apply)',
+                canPickMany: true,
+            });
+            if (!pickedDeps) {
+                return;
+            }
+            if (pickedDeps.length === 0) {
+                window.showWarningMessage('A task alias must depend on at least one task.');
+                return;
+            }
+
+            // Step 3: Optional description
+            const aliasDescription = await window.showInputBox({
+                title: `Pixi: Add Task Alias (Optional) - Description for '${aliasName}'`,
+                prompt: 'Enter a brief description for this task alias (Press Enter to skip)',
+                placeHolder: 'e.g. Run all lint, typecheck, and test tasks sequentially',
+            });
+            if (aliasDescription === undefined) {
+                return;
+            }
+
+            const args = ['task', 'alias'];
+            if (aliasDescription.trim()) {
+                args.push('--description', aliasDescription.trim());
+            }
+            args.push(aliasName, ...pickedDeps.map((d) => d.taskName));
+
+            const success = await runPixiWithProgress(
+                `Pixi: Adding task alias '${aliasName}' to ${projectName}...`,
+                args,
+                projectPath,
+                manager,
+                `Pixi: Task alias '${aliasName}' added successfully to ${projectName}.`,
+            );
+
+            if (success) {
+                await revealDefinitionInManifest({
+                    manifestPath: manager.getManifestPath(projectPath),
+                    targetName: aliasName,
                     kind: 'task',
                 });
             }

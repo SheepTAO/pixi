@@ -115,3 +115,43 @@ export async function syncGlobalEnvironments(token?: CancellationToken): Promise
     refreshGlobalEnvironments();
     return output;
 }
+
+export async function addGlobalDependency(
+    toolName: string,
+    packages: string[],
+    token?: CancellationToken,
+): Promise<string> {
+    const args = ['global', 'add', '-e', toolName, ...packages];
+    const output = await runPixi(args, undefined, token);
+    refreshGlobalEnvironments();
+    return output;
+}
+
+export async function removeGlobalDependency(
+    toolName: string,
+    packages: string[],
+    token?: CancellationToken,
+): Promise<string> {
+    const args = ['global', 'remove', '-e', toolName, ...packages];
+    const output = await runPixi(args, undefined, token);
+    refreshGlobalEnvironments();
+    return output;
+}
+
+export async function exposeGlobalBinary(
+    toolName: string,
+    mapping: string,
+    token?: CancellationToken,
+): Promise<string> {
+    const args = ['global', 'expose', 'add', mapping, '-e', toolName];
+    const output = await runPixi(args, undefined, token);
+    refreshGlobalEnvironments();
+    return output;
+}
+
+export async function unexposeGlobalBinary(exposedNames: string[], token?: CancellationToken): Promise<string> {
+    const args = ['global', 'expose', 'remove', ...exposedNames];
+    const output = await runPixi(args, undefined, token);
+    refreshGlobalEnvironments();
+    return output;
+}

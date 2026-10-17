@@ -202,11 +202,13 @@ export async function executeRemovePackage(
     pkgName: string,
     scope: PackageScopeResult,
 ): Promise<void> {
-    const args = ['remove'];
-    if (scope.isPypi) {
-        args.push('--pypi');
+    const args = scope.kind === 'workspace-dependency' ? ['workspace', 'dependencies', 'remove', pkgName] : ['remove'];
+    if (scope.kind !== 'workspace-dependency') {
+        if (scope.isPypi) {
+            args.push('--pypi');
+        }
+        args.push(...getScopeArgs(scope), pkgName);
     }
-    args.push(...getScopeArgs(scope), pkgName);
 
     const projectName = manager.getProjectName(projectPath);
     const scopeLabel = formatScope(scope);
@@ -375,11 +377,13 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
             if (ctx.pkg && ctx.projectPath) {
                 const { pkg, projectPath } = ctx;
 
-                const scope: PackageScopeResult | undefined = ctx.featureName
-                    ? ctx.featureName === 'default'
-                        ? { kind: 'global', isPypi: pkg.kind === 'pypi' }
-                        : { kind: 'feature', name: ctx.featureName, isPypi: pkg.kind === 'pypi' }
-                    : await findPackageScope(projectPath, pkg.name, ctx.envName, undefined, manager);
+                const scope: PackageScopeResult | undefined = ctx.scope
+                    ? ctx.scope
+                    : ctx.featureName
+                      ? ctx.featureName === 'default'
+                          ? { kind: 'global', isPypi: pkg.kind === 'pypi' }
+                          : { kind: 'feature', name: ctx.featureName, isPypi: pkg.kind === 'pypi' }
+                      : await findPackageScope(projectPath, pkg.name, ctx.envName, undefined, manager);
                 if (!scope) {
                     window
                         .showWarningMessage(

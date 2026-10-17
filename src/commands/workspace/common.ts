@@ -69,7 +69,7 @@ export function getManifestPathForFormat(folder: string, format: 'pixi' | 'pypro
 }
 
 export interface TargetScope {
-    kind: 'global' | 'feature' | 'environment';
+    kind: 'global' | 'feature' | 'environment' | 'workspace-dependency';
     name?: string;
 }
 
@@ -95,6 +95,9 @@ export function formatScope(scope?: TargetScope | string): string {
         const trimmed = scope.trim();
         return !trimmed || trimmed === 'default' ? 'workspace' : `feature '${trimmed}'`;
     }
+    if (scope.kind === 'workspace-dependency') {
+        return 'shared workspace dependencies ([workspace.dependencies])';
+    }
     if (scope.kind === 'feature' && scope.name) {
         return `feature '${scope.name}'`;
     }
@@ -110,6 +113,8 @@ export interface WorkspaceListEntry {
     dependencies: string[];
     pypiDependencies: string[];
     tasks?: string[];
+    channels?: string[];
+    platforms?: string[];
 }
 
 export function parseWorkspaceListOutput(text: string): WorkspaceListEntry[] {
@@ -157,6 +162,22 @@ export function parseWorkspaceListOutput(text: string): WorkspaceListEntry[] {
         const tasksMatch = line.match(/^\s+tasks:\s*(.+)$/);
         if (tasksMatch) {
             current.tasks = tasksMatch[1]
+                .split(',')
+                .map((s) => s.trim())
+                .filter(Boolean);
+            continue;
+        }
+        const chanMatch = line.match(/^\s+channels:\s*(.+)$/);
+        if (chanMatch) {
+            current.channels = chanMatch[1]
+                .split(',')
+                .map((s) => s.trim())
+                .filter(Boolean);
+            continue;
+        }
+        const platMatch = line.match(/^\s+platforms:\s*(.+)$/);
+        if (platMatch) {
+            current.platforms = platMatch[1]
                 .split(',')
                 .map((s) => s.trim())
                 .filter(Boolean);
@@ -279,8 +300,9 @@ export async function getWorkspaceEnvironments(
             return envs.map((e) => ({
                 name: e.pixiEnvName,
                 features: e.features || ['default'],
-                dependencies: [],
-                pypiDependencies: [],
+                dependencies: e.dependencies || [],
+                pypiDependencies: e.pypiDependencies || [],
+                channels: e.channels,
             }));
         }
     }
@@ -291,8 +313,9 @@ export async function getWorkspaceEnvironments(
             return info.environments_info.map((e) => ({
                 name: e.name,
                 features: e.features || ['default'],
-                dependencies: [],
-                pypiDependencies: [],
+                dependencies: e.dependencies || [],
+                pypiDependencies: e.pypi_dependencies || [],
+                channels: e.channels,
             }));
         }
     } catch {
@@ -517,6 +540,7 @@ export interface ExtractedCommandContext {
     featureName?: string;
     task?: PixiTask;
     propertyName?: string;
+    scope?: PackageScopeResult;
 }
 
 export function extractCommandContext(target?: unknown): ExtractedCommandContext {
@@ -537,6 +561,7 @@ export function extractCommandContext(target?: unknown): ExtractedCommandContext
         task?: PixiTask;
         name?: string;
         propertyName?: string;
+        scope?: PackageScopeResult;
     };
 
     const task =
@@ -554,6 +579,7 @@ export function extractCommandContext(target?: unknown): ExtractedCommandContext
         featureName: item.featureName || item.feature?.name,
         task,
         propertyName: item.propertyName,
+        scope: item.scope,
     };
 }
 

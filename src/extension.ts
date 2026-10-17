@@ -3,6 +3,7 @@ import { ExtensionContext, window, workspace } from 'vscode';
 import { createPixiApi, PixiExtensionApi } from './api';
 import { clearPixiCache, validatePixiCli } from './cli/pixiCli';
 import { registerAuthCommands } from './commands/authCommands';
+import { registerConfigCommands } from './commands/configCommands';
 import { registerGlobalCommands } from './commands/globalCommands';
 import { registerInfoCommands } from './commands/infoCommands';
 import { registerWorkspaceCommands } from './commands/workspace';
@@ -55,6 +56,9 @@ export async function activate(context: ExtensionContext): Promise<PixiExtension
 
     const globalCommands = registerGlobalCommands();
     context.subscriptions.push(globalCommands);
+
+    const configCommands = registerConfigCommands(projectManager);
+    context.subscriptions.push(configCommands);
 
     // 2. Register Tree Views
     const projectsTreeDataProvider = new PixiProjectsTreeDataProvider(projectManager);

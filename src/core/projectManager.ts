@@ -277,7 +277,7 @@ export class PixiProjectManager implements Disposable {
         await this.refreshAll();
     }
 
-    private async refreshAll(): Promise<void> {
+    public async refreshAll(): Promise<void> {
         const workspaceFolders = workspace.workspaceFolders || [];
         const detectedPaths: string[] = [];
 
@@ -297,6 +297,38 @@ export class PixiProjectManager implements Disposable {
                             }
                         }),
                     );
+
+                    // Check for registered sub-workspaces within open workspace folders (Pixi 0.80+)
+                    try {
+                        const isWindows = process.platform === 'win32';
+                        const regOutput = await runPixi(['workspace', 'register', 'list', '--json']);
+                        const regWorkspaces = safeJsonParse<Record<string, string>>(regOutput, {});
+                        for (const regPath of Object.values(regWorkspaces)) {
+                            if (typeof regPath === 'string' && fs.existsSync(regPath)) {
+                                const normReg = path.normalize(regPath);
+                                const isInsideWorkspace = workspaceFolders.some((wf) => {
+                                    const normWf = path.normalize(wf.uri.fsPath);
+                                    if (isWindows) {
+                                        const lowerReg = normReg.toLowerCase();
+                                        const lowerWf = normWf.toLowerCase();
+                                        return lowerReg === lowerWf || lowerReg.startsWith(lowerWf + path.sep);
+                                    }
+                                    return normReg === normWf || normReg.startsWith(normWf + path.sep);
+                                });
+                                const alreadyDetected = detectedPaths.some((dp) =>
+                                    isWindows ? dp.toLowerCase() === normReg.toLowerCase() : dp === normReg,
+                                );
+                                if (isInsideWorkspace && !alreadyDetected) {
+                                    const isProject = await this.refreshProject(normReg);
+                                    if (isProject) {
+                                        detectedPaths.push(normReg);
+                                    }
+                                }
+                            }
+                        }
+                    } catch {
+                        // Ignore registry discovery errors
+                    }
                 },
             );
         }
@@ -437,6 +469,8 @@ export class PixiProjectManager implements Disposable {
                         features: rawEnv.features,
                         solveGroup: rawEnv.solve_group || null,
                         environmentSize: rawEnv.environment_size || null,
+                        dependencies: Array.isArray(rawEnv.dependencies) ? rawEnv.dependencies : [],
+                        pypiDependencies: Array.isArray(rawEnv.pypi_dependencies) ? rawEnv.pypi_dependencies : [],
                     };
 
                     if (status === 'installed') {

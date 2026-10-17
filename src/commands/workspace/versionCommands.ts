@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import { commands, Disposable, OutputChannel, QuickPickItem, ThemeIcon, Uri, window, workspace } from 'vscode';
 
@@ -102,7 +103,7 @@ export function registerVersionCommands(manager: PixiProjectManager): Disposable
             );
         }),
 
-        // Pixi: Export Environment as Conda YAML...
+        // Pixi: Export Environment (Conda YAML or Explicit Spec)...
         commands.registerCommand('pixi.exportEnvironment', async (targetItem?: unknown, envName?: string) => {
             const ctx = extractCommandContext(targetItem);
             const projectPath =
@@ -117,34 +118,103 @@ export function registerVersionCommands(manager: PixiProjectManager): Disposable
                 ctx.env?.pixiEnvName ||
                 (await pickProjectEnvironmentName(manager, projectPath, {
                     title: `Pixi: Select Environment to Export (${projectName})`,
-                    placeHolder: 'Select environment to export as Conda YAML',
+                    placeHolder: 'Select environment to export',
                 }));
 
             if (!targetEnv) {
                 return;
             }
 
-            const args = ['workspace', 'export', 'conda-environment'];
-            if (targetEnv !== 'default') {
-                args.push('-e', targetEnv);
+            interface ExportChoice extends QuickPickItem {
+                format: 'yaml' | 'explicit';
             }
 
-            let yamlContent = '';
-            try {
-                yamlContent = await runPixi(args, { cwd: projectPath, includeStderr: false });
-            } catch (err: unknown) {
-                window.showErrorMessage(
-                    `Failed to export environment '${targetEnv}': ${err instanceof Error ? err.message : String(err)}`,
-                );
+            const formatChoice = await window.showQuickPick<ExportChoice>(
+                [
+                    {
+                        label: '$(file-code) Conda Environment YAML (environment.yaml)',
+                        description: 'pixi workspace export conda-environment',
+                        detail: 'Standard Conda environment file with dependencies and channels',
+                        format: 'yaml',
+                    },
+                    {
+                        label: '$(lock) Conda Explicit Specification (@EXPLICIT)',
+                        description: 'pixi workspace export conda-explicit-spec',
+                        detail: 'Fully locked package URLs and checksums for instant, solver-less deployment',
+                        format: 'explicit',
+                    },
+                ],
+                {
+                    title: `Pixi: Export Environment - ${targetEnv} (${projectName})`,
+                    placeHolder: 'Select environment export format',
+                },
+            );
+
+            if (!formatChoice) {
                 return;
             }
 
-            const doc = await workspace.openTextDocument({
-                content: yamlContent,
-                language: 'yaml',
-            });
-            await window.showTextDocument(doc, { preview: true });
-            window.showInformationMessage(`Pixi: Exported environment '${targetEnv}' (${projectName}) as Conda YAML.`);
+            if (formatChoice.format === 'yaml') {
+                const args = ['workspace', 'export', 'conda-environment'];
+                if (targetEnv !== 'default') {
+                    args.push('-e', targetEnv);
+                }
+
+                let yamlContent = '';
+                try {
+                    yamlContent = await runPixi(args, { cwd: projectPath, includeStderr: false });
+                } catch (err: unknown) {
+                    window.showErrorMessage(
+                        `Failed to export environment '${targetEnv}': ${err instanceof Error ? err.message : String(err)}`,
+                    );
+                    return;
+                }
+
+                const doc = await workspace.openTextDocument({
+                    content: yamlContent,
+                    language: 'yaml',
+                });
+                await window.showTextDocument(doc, { preview: true });
+                window.showInformationMessage(
+                    `Pixi: Exported environment '${targetEnv}' (${projectName}) as Conda YAML.`,
+                );
+            } else {
+                const tempDir = path.join(os.tmpdir(), `pixi-export-${Date.now()}`);
+                await fs.promises.mkdir(tempDir, { recursive: true });
+                const args = ['workspace', 'export', 'conda-explicit-spec', tempDir];
+                if (targetEnv !== 'default') {
+                    args.push('-e', targetEnv);
+                }
+
+                try {
+                    await runPixi(args, { cwd: projectPath, includeStderr: true });
+                    const files = await fs.promises.readdir(tempDir);
+                    const specFiles = files.filter((f) => f.endsWith('.txt') || f.includes('conda_spec'));
+                    if (specFiles.length === 0) {
+                        window.showWarningMessage('No explicit specification files were generated.');
+                        return;
+                    }
+
+                    for (const file of specFiles) {
+                        const fullPath = path.join(tempDir, file);
+                        const content = await fs.promises.readFile(fullPath, 'utf8');
+                        const doc = await workspace.openTextDocument({
+                            content,
+                            language: 'text',
+                        });
+                        await window.showTextDocument(doc, { preview: true });
+                    }
+                    window.showInformationMessage(
+                        `Pixi: Exported explicit specification for '${targetEnv}' (${projectName}).`,
+                    );
+                } catch (err: unknown) {
+                    window.showErrorMessage(
+                        `Failed to export explicit specification: ${err instanceof Error ? err.message : String(err)}`,
+                    );
+                } finally {
+                    await fs.promises.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+                }
+            }
         }),
 
         // Pixi: Set Workspace Description...

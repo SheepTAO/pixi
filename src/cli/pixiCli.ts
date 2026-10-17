@@ -391,10 +391,22 @@ export async function searchPixiPackages(
             }
         }
 
+        // Note: 'pixi search --json' conflicts with -n/--limit-packages and -l/--limit in Pixi CLI,
+        // so package limit slicing and version sorting are performed in JS.
+        const semverCache = new Map<string, semver.SemVer | null>();
+        const getCoercedSemver = (v: string): semver.SemVer | null => {
+            let parsed = semverCache.get(v);
+            if (parsed === undefined) {
+                parsed = semver.coerce(v);
+                semverCache.set(v, parsed);
+            }
+            return parsed;
+        };
+
         for (const item of pkgMap.values()) {
             const sortedVersions = Array.from(item.versions).sort((a, b) => {
-                const sA = semver.coerce(a);
-                const sB = semver.coerce(b);
+                const sA = getCoercedSemver(a);
+                const sB = getCoercedSemver(b);
                 if (sA && sB) {
                     return semver.rcompare(sA, sB);
                 }

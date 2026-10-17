@@ -2,6 +2,8 @@ import * as path from 'path';
 import { commands, Disposable, QuickPickItem, Uri, window, workspace } from 'vscode';
 
 import {
+    addGlobalDependency,
+    exposeGlobalBinary,
     extractToolName,
     getGlobalManifestPath,
     getToolVersion,
@@ -9,16 +11,39 @@ import {
     listGlobalEnvironments,
     PixiGlobalEnvironment,
     refreshGlobalEnvironments,
+    removeGlobalDependency,
     syncGlobalEnvironments,
+    unexposeGlobalBinary,
     uninstallGlobalTool,
     updateGlobalTool,
 } from '../cli/globalCli';
 import { runWithProgressNotification } from '../common/execUtils';
 import { DEFAULT_CONDA_CHANNEL } from '../core/projectDiscovery';
 import { promptCondaChannel } from './workspace/channelCommands';
+import { displayTreeOutput } from './workspace/packageTreeViewer';
 
 interface GlobalActionQuickPickItem extends QuickPickItem {
-    action: 'install' | 'list' | 'sync' | 'update' | 'uninstall' | 'edit';
+    action:
+        | 'install'
+        | 'list'
+        | 'sync'
+        | 'update'
+        | 'uninstall'
+        | 'edit'
+        | 'tree'
+        | 'add-dep'
+        | 'remove-dep'
+        | 'expose';
+}
+
+export async function executeGlobalTree(toolName: string): Promise<void> {
+    const globalManifestPath = await getGlobalManifestPath();
+    const manifestDir = path.dirname(globalManifestPath);
+    await displayTreeOutput(
+        `Global tool '${toolName}'`,
+        ['global', 'tree', '--color', 'never', '-e', toolName],
+        manifestDir,
+    );
 }
 
 export async function executeGlobalUpdate(toolName?: string): Promise<boolean> {
@@ -128,6 +153,11 @@ export async function handleGlobalList(): Promise<void> {
     const toolAction = await window.showQuickPick(
         [
             {
+                label: '$(graph) View Dependency Tree',
+                description: `Show dependency tree for '${picked.tool.name}' (pixi global tree)`,
+                action: 'tree' as const,
+            },
+            {
                 label: '$(refresh) Update Tool',
                 description: `Update '${picked.tool.name}' to latest version`,
                 action: 'update' as const,
@@ -143,7 +173,9 @@ export async function handleGlobalList(): Promise<void> {
         },
     );
 
-    if (toolAction?.action === 'update') {
+    if (toolAction?.action === 'tree') {
+        await executeGlobalTree(picked.tool.name);
+    } else if (toolAction?.action === 'update') {
         await executeGlobalUpdate(picked.tool.name);
     } else if (toolAction?.action === 'uninstall') {
         await executeGlobalUninstall(picked.tool.name);
@@ -226,6 +258,198 @@ export async function handleOpenGlobalManifest(): Promise<void> {
     await window.showTextDocument(doc);
 }
 
+export async function handleGlobalAddDependency(initialTool?: string): Promise<void> {
+    let toolName = initialTool;
+    if (!toolName) {
+        const tools = await listGlobalEnvironments();
+        if (!tools || tools.length === 0) {
+            window.showInformationMessage('No global tools installed to add dependencies to.');
+            return;
+        }
+        const picked = await window.showQuickPick(
+            tools.map((t) => ({
+                label: `$(tools) ${t.name}`,
+                description: getToolVersion(t),
+                toolName: t.name,
+            })),
+            {
+                title: 'Pixi Global: Add Dependency to Tool Environment',
+                placeHolder: 'Select a global tool environment to add dependencies to',
+            },
+        );
+        if (!picked) {
+            return;
+        }
+        toolName = picked.toolName;
+    }
+
+    const input = await window.showInputBox({
+        title: `Pixi Global: Add Dependency to '${toolName}'`,
+        prompt: 'Enter package name(s) to add to this global environment (separated by space)',
+        placeHolder: 'e.g. pytest-cov pytest-xdist',
+    });
+    const trimmed = input?.trim();
+    if (!trimmed) {
+        return;
+    }
+
+    const packages = trimmed.split(/\s+/);
+    await runWithProgressNotification(
+        `Pixi Global: Adding '${packages.join(', ')}' to '${toolName}'...`,
+        (token) => addGlobalDependency(toolName!, packages, token),
+        `Pixi Global: Successfully added dependencies to '${toolName}'.`,
+    );
+}
+
+export async function handleGlobalRemoveDependency(initialTool?: string): Promise<void> {
+    const tools = await listGlobalEnvironments();
+    if (!tools || tools.length === 0) {
+        window.showInformationMessage('No global tools installed.');
+        return;
+    }
+
+    let targetTool = tools.find((t) => t.name === initialTool);
+    if (!targetTool) {
+        const pickedTool = await window.showQuickPick(
+            tools.map((t) => ({
+                label: `$(tools) ${t.name}`,
+                description: getToolVersion(t),
+                tool: t,
+            })),
+            {
+                title: 'Pixi Global: Remove Dependency from Tool Environment',
+                placeHolder: 'Select global tool environment',
+            },
+        );
+        if (!pickedTool) {
+            return;
+        }
+        targetTool = pickedTool.tool;
+    }
+
+    const deps = targetTool.dependencies || [];
+    if (deps.length <= 1) {
+        window.showInformationMessage(
+            `'${targetTool.name}' has no extra dependencies to remove (use Uninstall Tool to remove the tool entirely).`,
+        );
+        return;
+    }
+
+    const pickedDep = await window.showQuickPick(
+        deps.map((d) => ({
+            label: `$(trash) ${d.name}`,
+            description: `v${d.version}`,
+            depName: d.name,
+        })),
+        {
+            title: `Pixi Global: Remove Dependency from '${targetTool.name}'`,
+            placeHolder: 'Select dependency to remove',
+        },
+    );
+    if (!pickedDep) {
+        return;
+    }
+
+    await runWithProgressNotification(
+        `Pixi Global: Removing '${pickedDep.depName}' from '${targetTool.name}'...`,
+        (token) => removeGlobalDependency(targetTool!.name, [pickedDep.depName], token),
+        `Pixi Global: Successfully removed '${pickedDep.depName}' from '${targetTool.name}'.`,
+    );
+}
+
+export async function handleGlobalExpose(initialTool?: string): Promise<void> {
+    const tools = await listGlobalEnvironments();
+    if (!tools || tools.length === 0) {
+        window.showInformationMessage('No global tools installed.');
+        return;
+    }
+
+    let targetTool = tools.find((t) => t.name === initialTool);
+    if (!targetTool) {
+        const picked = await window.showQuickPick(
+            tools.map((t) => ({
+                label: `$(tools) ${t.name}`,
+                description: getToolVersion(t),
+                tool: t,
+            })),
+            {
+                title: 'Pixi Global: Manage Exposed Binaries',
+                placeHolder: 'Select global tool environment to manage exposed binaries for',
+            },
+        );
+        if (!picked) {
+            return;
+        }
+        targetTool = picked.tool;
+    }
+
+    const toolName = targetTool.name;
+    const exposedList = targetTool.exposed || [];
+
+    if (exposedList.length > 0) {
+        const action = await window.showQuickPick(
+            [
+                {
+                    label: '$(plus) Add Exposed Binary...',
+                    description: `Expose an executable or alias from '${toolName}' (pixi global expose add)`,
+                    action: 'add',
+                },
+                {
+                    label: '$(trash) Remove Exposed Binary...',
+                    description: `Remove an exposed executable alias for '${toolName}' (pixi global expose remove)`,
+                    action: 'remove',
+                },
+            ],
+            {
+                title: `Pixi Global: Manage Exposed Binaries for '${toolName}'`,
+                placeHolder: 'Choose whether to expose a new executable or remove an existing one',
+            },
+        );
+        if (!action) {
+            return;
+        }
+
+        if (action.action === 'remove') {
+            const pickedExp = await window.showQuickPick(
+                exposedList.map((e) => ({
+                    label: `$(trash) ${e.exposed_name}`,
+                    description: e.executable ? `-> ${e.executable}` : '',
+                    exposedName: e.exposed_name,
+                })),
+                {
+                    title: `Pixi Global: Remove Exposed Binary from '${toolName}'`,
+                    placeHolder: 'Select exposed binary to remove',
+                },
+            );
+            if (!pickedExp) {
+                return;
+            }
+
+            await runWithProgressNotification(
+                `Pixi Global: Removing exposed binary '${pickedExp.exposedName}'...`,
+                (token) => unexposeGlobalBinary([pickedExp.exposedName], token),
+                `Pixi Global: Successfully removed exposed binary '${pickedExp.exposedName}'.`,
+            );
+            return;
+        }
+    }
+
+    const mapping = await window.showInputBox({
+        title: `Pixi Global: Expose Binary Mapping for '${toolName}'`,
+        prompt: 'Enter binary mapping in exposed_name=executable_name format or executable_name',
+        placeHolder: 'e.g. pytest or python310=python3.10',
+    });
+    if (!mapping || !mapping.trim()) {
+        return;
+    }
+
+    await runWithProgressNotification(
+        `Pixi Global: Exposing binary '${mapping.trim()}' for '${toolName}'...`,
+        (token) => exposeGlobalBinary(toolName, mapping.trim(), token),
+        `Pixi Global: Successfully exposed binary '${mapping.trim()}'.`,
+    );
+}
+
 export function registerGlobalCommands(): Disposable {
     return Disposable.from(
         commands.registerCommand('pixi.refreshGlobal', () => {
@@ -249,6 +473,34 @@ export function registerGlobalCommands(): Disposable {
                 await handleGlobalUninstall();
             }
         }),
+        commands.registerCommand('pixi.global.addDependency', async (item?: unknown) => {
+            await handleGlobalAddDependency(extractToolName(item));
+        }),
+        commands.registerCommand('pixi.global.removeDependency', async (item?: unknown) => {
+            await handleGlobalRemoveDependency(extractToolName(item));
+        }),
+        commands.registerCommand('pixi.global.expose', async (item?: unknown) => {
+            await handleGlobalExpose(extractToolName(item));
+        }),
+        commands.registerCommand('pixi.global.tree', async (item?: unknown) => {
+            let toolName = extractToolName(item);
+            if (!toolName) {
+                const tools = await listGlobalEnvironments();
+                if (!tools || tools.length === 0) {
+                    window.showInformationMessage('No global tools installed to view dependency tree for.');
+                    return;
+                }
+                const picked = await window.showQuickPick(tools.map(toGlobalToolItem), {
+                    title: 'Pixi Global: View Dependency Tree',
+                    placeHolder: 'Select a tool to view its dependency tree',
+                });
+                if (!picked) {
+                    return;
+                }
+                toolName = picked.tool.name;
+            }
+            await executeGlobalTree(toolName);
+        }),
         commands.registerCommand('pixi.global.openManifest', async () => {
             await handleOpenGlobalManifest();
         }),
@@ -264,6 +516,26 @@ export function registerGlobalCommands(): Disposable {
                     label: '$(list-unordered) List Global Tools',
                     description: 'Inspect installed global tools, versions, and exposed commands',
                     action: 'list',
+                },
+                {
+                    label: '$(add) Add Dependency to Global Tool...',
+                    description: 'Add extra packages to an existing global tool environment (pixi global add)',
+                    action: 'add-dep',
+                },
+                {
+                    label: '$(trash) Remove Dependency from Global Tool...',
+                    description: 'Remove an extra package from a global tool environment (pixi global remove)',
+                    action: 'remove-dep',
+                },
+                {
+                    label: '$(symbol-event) Expose Binary Mapping...',
+                    description: 'Expose or alias an executable from a global environment (pixi global expose)',
+                    action: 'expose',
+                },
+                {
+                    label: '$(graph) View Dependency Tree...',
+                    description: 'Display dependency tree for a globally installed tool (pixi global tree)',
+                    action: 'tree',
                 },
                 {
                     label: '$(repo-sync) Sync Global Environments',
@@ -301,6 +573,18 @@ export function registerGlobalCommands(): Disposable {
                     break;
                 case 'list':
                     await handleGlobalList();
+                    break;
+                case 'add-dep':
+                    await handleGlobalAddDependency();
+                    break;
+                case 'remove-dep':
+                    await handleGlobalRemoveDependency();
+                    break;
+                case 'expose':
+                    await handleGlobalExpose();
+                    break;
+                case 'tree':
+                    await commands.executeCommand('pixi.global.tree');
                     break;
                 case 'sync':
                     await executeGlobalSync();

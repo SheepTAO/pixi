@@ -1,5 +1,3 @@
-import * as ch from 'child_process';
-import * as fs from 'fs';
 import * as path from 'path';
 import {
     Disposable,
@@ -17,56 +15,6 @@ import { isTokenAuthMethod, readStoredCredentials, setCachedAuthDir } from '../c
 import { runPixi } from '../cli/pixiCli';
 import { safeJsonParse } from '../common/execUtils';
 import { traceError } from '../common/logging';
-
-const BYTE_UNITS = ['KB', 'MB', 'GB', 'TB'] as const;
-
-function formatBytes(bytes: number): string {
-    if (bytes < 1024) {
-        return `${bytes} B`;
-    }
-    let u = -1;
-    let size = bytes;
-    do {
-        size /= 1024;
-        u++;
-    } while (size >= 1024 && u < BYTE_UNITS.length - 1);
-    return `${size.toFixed(1)} ${BYTE_UNITS[u]}`;
-}
-
-export async function computeDirectorySize(dirPath: string): Promise<number | null> {
-    if (!fs.existsSync(dirPath)) {
-        return null;
-    }
-    if (process.platform !== 'win32') {
-        return new Promise<number | null>((resolve) => {
-            ch.execFile('du', ['-sk', dirPath], { timeout: 15000 }, (err, stdout) => {
-                if (err || !stdout) {
-                    return resolve(null);
-                }
-                const match = stdout.trim().match(/^(\d+)/);
-                resolve(match ? parseInt(match[1], 10) * 1024 : null);
-            });
-        });
-    }
-
-    // Windows support via robocopy (orders of magnitude faster than PowerShell on large directories)
-    return new Promise<number | null>((resolve) => {
-        const normalizedPath = dirPath.replace(/[/\\]+$/, '');
-        ch.execFile(
-            'robocopy',
-            [normalizedPath, normalizedPath, '/L', '/E', '/BYTES', '/NFL', '/NDL', '/NJH', '/XJ', '/R:0', '/W:0'],
-            { timeout: 30000, windowsHide: true },
-            (_err, stdout) => {
-                if (!stdout) {
-                    return resolve(null);
-                }
-                // robocopy returns exit code 1 when files are found; match Bytes in summary table
-                const match = stdout.match(/Bytes\s*:\s*(\d+)/i);
-                resolve(match ? parseInt(match[1], 10) : null);
-            },
-        );
-    });
-}
 
 export interface PixiSystemInfo {
     platform?: string;
@@ -129,16 +77,13 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
         }
         this.cacheSizeStatus = 'idle';
         try {
-            const info = await this.getSystemInfo();
-            if (info.cache_dir) {
-                await this.calculateCacheSize(info.cache_dir, true);
-            }
+            await this.calculateCacheSize(true);
         } catch {
             // ignore
         }
     }
 
-    private async calculateCacheSize(cacheDir: string, notifyStart = false): Promise<void> {
+    private async calculateCacheSize(notifyStart = false): Promise<void> {
         if (this.cacheSizeStatus === 'calculating') {
             return;
         }
@@ -148,29 +93,16 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
         }
         const currentEpoch = this.cacheCalculationEpoch;
         try {
-            // 1. First attempt native Pixi CLI extended calculation (Pixi 0.80+)
-            try {
-                const extendedJson = await runPixi(['info', '--json', '--extended']);
-                const extendedInfo = safeJsonParse<PixiSystemInfo>(extendedJson);
-                if (extendedInfo?.cache_size && this.cacheCalculationEpoch === currentEpoch) {
-                    this.cachedCacheSize = String(extendedInfo.cache_size);
-                    if (this.cachedSystemInfo) {
-                        this.cachedSystemInfo.cache_size = extendedInfo.cache_size;
-                    }
-                    return;
+            const extendedJson = await runPixi(['info', '--json', '--extended']);
+            const extendedInfo = safeJsonParse<PixiSystemInfo>(extendedJson);
+            if (extendedInfo?.cache_size && this.cacheCalculationEpoch === currentEpoch) {
+                this.cachedCacheSize = String(extendedInfo.cache_size);
+                if (this.cachedSystemInfo) {
+                    this.cachedSystemInfo.cache_size = extendedInfo.cache_size;
                 }
-            } catch {
-                // Fall back to du / robocopy if extended flag fails or is unsupported
             }
-
-            // 2. Fallback to du / robocopy if native calculation returned empty
-            const bytes = await computeDirectorySize(cacheDir);
-            if (this.cacheCalculationEpoch !== currentEpoch) {
-                return;
-            }
-            if (bytes !== null) {
-                this.cachedCacheSize = formatBytes(bytes);
-            }
+        } catch {
+            // Ignore failure if pixi info calculation is interrupted
         } finally {
             if (this.cacheCalculationEpoch === currentEpoch) {
                 this.cacheSizeStatus = 'done';
@@ -231,7 +163,7 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
         if (info.cache_dir) {
             const autoMeasure = workspace.getConfiguration('pixi').get<boolean>('cache.autoMeasureSize', true);
             if (!this.cachedCacheSize && this.cacheSizeStatus === 'idle' && autoMeasure) {
-                void this.calculateCacheSize(info.cache_dir, false);
+                void this.calculateCacheSize(false);
             }
 
             const isCalculating = this.cacheSizeStatus === 'calculating';
