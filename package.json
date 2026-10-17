@@ -504,13 +504,13 @@
             },
             {
                 "command": "pixi.showDependencyTree",
-                "title": "Show Dependency Tree",
+                "title": "Show Dependency Tree ...",
                 "category": "Pixi",
                 "icon": "$(list-tree)"
             },
             {
                 "command": "pixi.whyPackage",
-                "title": "Why is This Installed? (Reverse Tree)",
+                "title": "Why is This Package Installed? ...",
                 "category": "Pixi",
                 "icon": "$(type-hierarchy-sub)"
             },
@@ -601,6 +601,10 @@
                     "when": "false"
                 },
                 {
+                    "command": "pixi.reinstallPackage",
+                    "when": "false"
+                },
+                {
                     "command": "pixi.update",
                     "when": "pixi.hasPixiProject"
                 },
@@ -664,6 +668,9 @@
                     "command": "pixi.config"
                 },
                 {
+                    "command": "pixi.auth"
+                },
+                {
                     "command": "pixi.workspace.register",
                     "when": "pixi.hasPixiProject"
                 },
@@ -688,7 +695,7 @@
                 },
                 {
                     "command": "pixi.platform.autoDetect",
-                    "when": "pixi.hasPixiProject"
+                    "when": "false"
                 },
                 {
                     "command": "pixi.systemRequirements",
@@ -800,6 +807,22 @@
                 },
                 {
                     "command": "pixi.config.unset",
+                    "when": "false"
+                },
+                {
+                    "command": "pixi.auth.login",
+                    "when": "false"
+                },
+                {
+                    "command": "pixi.auth.logout",
+                    "when": "false"
+                },
+                {
+                    "command": "pixi.auth.copyToken",
+                    "when": "false"
+                },
+                {
+                    "command": "pixi.auth.status",
                     "when": "false"
                 },
                 {

@@ -507,7 +507,7 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
             return executeRemovePackage(manager, projectPath, picked.pkgName, picked.scope);
         }),
 
-        // Pixi: Show Dependency Tree
+        // Pixi: Show Dependency Tree ...
         commands.registerCommand('pixi.showDependencyTree', async (targetItem?: unknown) => {
             await showDependencyTreeCommand(manager, targetItem);
         }),
