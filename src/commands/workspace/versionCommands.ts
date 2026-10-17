@@ -817,5 +817,79 @@ export function registerVersionCommands(manager: PixiProjectManager): Disposable
                 );
             }
         }),
+
+        // Pixi: Workspace ... (Unified Workspace Hub)
+        commands.registerCommand('pixi.workspace', async (targetItem?: unknown) => {
+            const ctx = extractCommandContext(targetItem);
+            const projectPath =
+                ctx.projectPath || (await pickPixiProject(manager, 'Select Pixi project to manage workspace for'));
+            if (!projectPath) {
+                return;
+            }
+
+            const projectName = manager.getProjectName(projectPath);
+
+            interface WorkspaceActionItem extends QuickPickItem {
+                command: string;
+            }
+
+            const items: WorkspaceActionItem[] = [
+                {
+                    label: '$(tag) Bump / Set Version ...',
+                    description: 'Bump patch, minor, major, or set custom version in [workspace.version]',
+                    command: 'pixi.bumpVersion',
+                },
+                {
+                    label: '$(layers) Manage Workspace Dependencies ...',
+                    description: 'Add, remove, or view shared dependencies in [workspace.dependencies]',
+                    command: 'pixi.workspaceDependencies',
+                },
+                {
+                    label: '$(edit) Rename Workspace ...',
+                    description: 'Get or update workspace name via pixi workspace name',
+                    command: 'pixi.setProjectName',
+                },
+                {
+                    label: '$(note) Set Workspace Description ...',
+                    description: 'Get or update workspace description via pixi workspace description',
+                    command: 'pixi.setDescription',
+                },
+                {
+                    label: '$(verified) Set Minimum Pixi Requirement ...',
+                    description: 'Configure requires-pixi constraint via pixi workspace requires-pixi',
+                    command: 'pixi.setRequiresPixi',
+                },
+                {
+                    label: '$(beaker) Manage Workspace Preview Flags ...',
+                    description: 'Inspect, enable, or disable workspace preview flags (e.g. pixi-build)',
+                    command: 'pixi.managePreviewFlags',
+                },
+                {
+                    label: '$(play) Manage Environment Activation ...',
+                    description: 'Configure environment activation scripts and environment variables',
+                    command: 'pixi.manageActivation',
+                },
+                {
+                    label: '$(bookmark) Register in Machine Registry ...',
+                    description: 'Register project path in machine-wide workspace registry',
+                    command: 'pixi.workspace.register',
+                },
+                {
+                    label: '$(archive) Unregister from Machine Registry ...',
+                    description: 'Remove a workspace from machine-wide registry',
+                    command: 'pixi.workspace.unregister',
+                },
+            ];
+
+            const picked = await window.showQuickPick(items, {
+                title: `Pixi: Workspace Management [${projectName}]`,
+                placeHolder: 'Select a workspace configuration operation',
+            });
+            if (!picked) {
+                return;
+            }
+
+            await commands.executeCommand(picked.command, ctx.projectPath ? targetItem : projectPath);
+        }),
     ];
 }

@@ -66,6 +66,12 @@
                 "icon": "$(rocket)"
             },
             {
+                "command": "pixi.workspace",
+                "title": "Workspace ...",
+                "category": "Pixi",
+                "icon": "$(root-folder)"
+            },
+            {
                 "command": "pixi.bumpVersion",
                 "title": "Bump / Set Workspace Version ...",
                 "category": "Pixi",
@@ -610,6 +616,10 @@
                 },
                 {
                     "command": "pixi.upgrade",
+                    "when": "false"
+                },
+                {
+                    "command": "pixi.workspace",
                     "when": "pixi.hasPixiProject"
                 },
                 {
@@ -622,23 +632,23 @@
                 },
                 {
                     "command": "pixi.setDescription",
-                    "when": "pixi.hasPixiProject"
+                    "when": "false"
                 },
                 {
                     "command": "pixi.setRequiresPixi",
-                    "when": "pixi.hasPixiProject"
+                    "when": "false"
                 },
                 {
                     "command": "pixi.setProjectName",
-                    "when": "pixi.hasPixiProject"
+                    "when": "false"
                 },
                 {
                     "command": "pixi.managePreviewFlags",
-                    "when": "pixi.hasPixiProject"
+                    "when": "false"
                 },
                 {
                     "command": "pixi.manageActivation",
-                    "when": "pixi.hasPixiProject"
+                    "when": "false"
                 },
                 {
                     "command": "pixi.exec",
@@ -672,10 +682,11 @@
                 },
                 {
                     "command": "pixi.workspace.register",
-                    "when": "pixi.hasPixiProject"
+                    "when": "false"
                 },
                 {
-                    "command": "pixi.workspace.unregister"
+                    "command": "pixi.workspace.unregister",
+                    "when": "false"
                 },
                 {
                     "command": "pixi.environment",
@@ -723,7 +734,7 @@
                 },
                 {
                     "command": "pixi.tasks.addAlias",
-                    "when": "pixi.hasPixiProject"
+                    "when": "false"
                 },
                 {
                     "command": "pixi.openTerminal",
