@@ -148,17 +148,22 @@ export class PixiPythonPackageManager implements PackageManager, Disposable {
                         isPypi = cachedPkgs.find((p) => normalizePkgName(p.name) === normPkg)?.kind === 'pypi';
                     }
 
-                    const args = ['remove'];
-                    if (isPypi) {
-                        args.push('--pypi');
+                    let args: string[];
+                    if (scope?.kind === 'workspace-dependency') {
+                        args = ['workspace', 'dependencies', 'remove', pkg];
+                    } else {
+                        args = ['remove'];
+                        if (isPypi) {
+                            args.push('--pypi');
+                        }
+                        const scopeArgs = getScopeArgs(scope);
+                        if (scopeArgs.length > 0) {
+                            args.push(...scopeArgs);
+                        } else if (!scope && details.envName !== 'default') {
+                            args.push('-e', details.envName);
+                        }
+                        args.push(pkg);
                     }
-                    const scopeArgs = getScopeArgs(scope);
-                    if (scopeArgs.length > 0) {
-                        args.push(...scopeArgs);
-                    } else if (!scope && details.envName !== 'default') {
-                        args.push('-e', details.envName);
-                    }
-                    args.push(pkg);
 
                     await runPixi(args, { cwd: details.projectPath }, token);
                 }

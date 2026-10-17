@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import * as path from 'path';
 import { commands, Disposable, ProgressLocation, QuickPickItem, Uri, window, workspace } from 'vscode';
 
@@ -148,6 +149,228 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
             await runPixiWithProgress(title, initArgs, targetFolder, manager, successMsg);
 
             await openDocumentIfExists(getManifestPathForFormat(targetFolder, format));
+        }),
+
+        // Pixi: Import Dependencies / Environment File...
+        commands.registerCommand('pixi.import', async (targetItem?: unknown) => {
+            // 1. Resolve candidate file
+            let filePath: string | undefined;
+            if (targetItem instanceof Uri) {
+                try {
+                    const stat = await workspace.fs.stat(targetItem);
+                    if (stat.type === 1) {
+                        filePath = targetItem.fsPath;
+                    }
+                } catch {
+                    // Ignore
+                }
+            } else if (typeof targetItem === 'string' && fs.existsSync(targetItem)) {
+                filePath = targetItem;
+            }
+
+            if (!filePath) {
+                const defaultUri =
+                    targetItem instanceof Uri ? targetItem : (workspace.workspaceFolders?.[0]?.uri ?? undefined);
+                const pickedUris = await window.showOpenDialog({
+                    canSelectMany: false,
+                    canSelectFolders: false,
+                    canSelectFiles: true,
+                    openLabel: 'Import into Pixi',
+                    title: 'Select Environment or Requirements File to Import',
+                    defaultUri,
+                    filters: {
+                        'Dependency Files (*.txt, *.in, *.yml, *.yaml)': ['txt', 'in', 'yml', 'yaml'],
+                        'PyPI Requirements (*.txt, *.in)': ['txt', 'in'],
+                        'Conda Environment (*.yml, *.yaml)': ['yml', 'yaml'],
+                        'All Files': ['*'],
+                    },
+                });
+                if (!pickedUris || pickedUris.length === 0) {
+                    return;
+                }
+                filePath = pickedUris[0].fsPath;
+            }
+
+            // 2. Resolve Pixi project
+            let projectPath = manager.findProjectForUri(Uri.file(filePath));
+            if (!projectPath) {
+                projectPath = await pickPixiProject(
+                    manager,
+                    'Select Pixi project to import dependencies into',
+                    targetItem,
+                );
+            }
+            if (!projectPath) {
+                return;
+            }
+
+            const projectName = manager.getProjectName(projectPath);
+
+            // 3. Determine format
+            const ext = path.extname(filePath).toLowerCase();
+            let format: 'conda-env' | 'pypi-txt' | undefined;
+            if (ext === '.txt' || ext === '.in') {
+                format = 'pypi-txt';
+            } else if (ext === '.yml' || ext === '.yaml') {
+                format = 'conda-env';
+            } else {
+                interface FormatPickItem extends QuickPickItem {
+                    format?: 'pypi-txt' | 'conda-env';
+                }
+                const formatPick = await window.showQuickPick<FormatPickItem>(
+                    [
+                        {
+                            label: '$(symbol-keyword) PyPI Requirements (requirements.txt / .in)',
+                            description: 'Interpret as Python package requirements (--format pypi-txt)',
+                            format: 'pypi-txt',
+                        },
+                        {
+                            label: '$(package) Conda Environment (environment.yml)',
+                            description: 'Interpret as Conda environment definition (--format conda-env)',
+                            format: 'conda-env',
+                        },
+                        {
+                            label: '$(sparkle) Auto-detect Format',
+                            description: 'Let Pixi test both formats automatically',
+                            format: undefined,
+                        },
+                    ],
+                    {
+                        title: `Pixi: Select Import Format for '${path.basename(filePath)}'`,
+                        placeHolder: 'Select the file format to interpret dependencies as',
+                    },
+                );
+                if (!formatPick) {
+                    return;
+                }
+                format = formatPick.format;
+            }
+
+            // 4. Resolve Target Scope (default / feature / environment)
+            const features = await getWorkspaceFeatures(projectPath);
+            const envs = manager.getEnvironmentsForProject(projectPath);
+
+            interface ScopePickItem extends QuickPickItem {
+                action: 'default' | 'feature' | 'environment';
+            }
+
+            const scopeChoices: ScopePickItem[] = [
+                {
+                    label: '$(globe) Default / Main Environment',
+                    description: 'Import dependencies directly into default workspace scope',
+                    action: 'default',
+                },
+                {
+                    label: '$(symbol-namespace) Import as Feature...',
+                    description: 'Import dependencies into a named feature (-f, --feature)',
+                    action: 'feature',
+                },
+                {
+                    label: '$(server-environment) Import as Environment...',
+                    description: 'Import dependencies into an isolated environment (-e, --environment)',
+                    action: 'environment',
+                },
+            ];
+
+            const chosenScope = await window.showQuickPick(scopeChoices, {
+                title: `Pixi: Import Target Scope (${projectName})`,
+                placeHolder: `Select where to import dependencies from '${path.basename(filePath)}'`,
+            });
+            if (!chosenScope) {
+                return;
+            }
+
+            const args = ['import', filePath];
+            if (format) {
+                args.push('--format', format);
+            }
+
+            interface TargetEntityPickItem extends QuickPickItem {
+                name?: string;
+                isNew?: boolean;
+            }
+
+            let scopeDesc = 'default environment';
+            if (chosenScope.action === 'default') {
+                args.push('-f', 'default');
+            } else if (chosenScope.action === 'feature') {
+                const featureItems: TargetEntityPickItem[] = [
+                    ...features
+                        .filter((f) => f.name !== 'default')
+                        .map((f) => ({
+                            label: `$(symbol-namespace) ${f.name}`,
+                            name: f.name,
+                        })),
+                    {
+                        label: '$(plus) Create New Feature...',
+                        isNew: true,
+                    },
+                ];
+                const pick = await window.showQuickPick(featureItems, {
+                    title: `Pixi: Select Target Feature (${projectName})`,
+                    placeHolder: 'Select an existing feature or create a new one',
+                });
+                if (!pick) {
+                    return;
+                }
+                let featName = pick.name;
+                if (pick.isNew) {
+                    featName = (await promptNewFeatureName(features)) || undefined;
+                    if (!featName) {
+                        return;
+                    }
+                }
+                args.push('-f', featName!);
+                scopeDesc = `feature '${featName}'`;
+            } else if (chosenScope.action === 'environment') {
+                const envItems: TargetEntityPickItem[] = [
+                    ...envs
+                        .filter((e) => e.pixiEnvName !== 'default')
+                        .map((e) => ({
+                            label: `$(server-environment) ${e.pixiEnvName}`,
+                            name: e.pixiEnvName,
+                        })),
+                    {
+                        label: '$(plus) Create New Environment...',
+                        isNew: true,
+                    },
+                ];
+                const pick = await window.showQuickPick(envItems, {
+                    title: `Pixi: Select Target Environment (${projectName})`,
+                    placeHolder: 'Select an existing environment or create a new one',
+                });
+                if (!pick) {
+                    return;
+                }
+                let envTargetName = pick.name;
+                if (pick.isNew) {
+                    const input = await window.showInputBox({
+                        title: 'Pixi: Enter New Environment Name',
+                        prompt: 'Enter name for the imported environment',
+                        placeHolder: 'e.g. dev, test, ml',
+                        validateInput: (v) =>
+                            validatePixiIdentifier(v, {
+                                entityName: 'Environment',
+                                existingNames: envs.map((e) => e.pixiEnvName),
+                            }),
+                    });
+                    if (!input || !input.trim()) {
+                        return;
+                    }
+                    envTargetName = input.trim();
+                }
+                args.push('-e', envTargetName!);
+                scopeDesc = `environment '${envTargetName}'`;
+            }
+
+            const fileName = path.basename(filePath);
+            await runPixiWithProgress(
+                `Pixi: Importing '${fileName}' into ${scopeDesc} (${projectName})...`,
+                args,
+                projectPath,
+                manager,
+                `Pixi: Successfully imported '${fileName}' into ${scopeDesc} (${projectName}).`,
+            );
         }),
 
         // Pixi: Create Feature...

@@ -13,6 +13,7 @@ import {
     findPackageScope,
     formatScope,
     getScopeArgs,
+    getWorkspaceDependencies,
     getWorkspaceEnvironments,
     getWorkspaceFeatures,
     PackageScopeResult,
@@ -140,6 +141,19 @@ export async function buildDeclaredPackageQuickPickItems(
 
             items.push(...toQuickPickItems(e.dependencies, 'conda', envScope));
             items.push(...toQuickPickItems(e.pypiDependencies, 'pypi', envScope));
+        }
+    }
+
+    // Process shared workspace dependencies ([workspace.dependencies])
+    if (!options?.filterFeature && !options?.filterEnv) {
+        const wsDeps = await getWorkspaceDependencies(projectPath);
+        if (wsDeps.length > 0) {
+            items.push({
+                label: 'Shared Workspace Dependencies ([workspace.dependencies])',
+                kind: QuickPickItemKind.Separator,
+            });
+            const wsScope: PackageScopeResult = { kind: 'workspace-dependency', isPypi: false };
+            items.push(...toQuickPickItems(wsDeps, 'conda', wsScope));
         }
     }
 

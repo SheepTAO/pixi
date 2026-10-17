@@ -121,9 +121,9 @@
             },
             {
                 "command": "pixi.import",
-                "title": "Import Environment File ...",
+                "title": "Import Dependencies / Environment File ...",
                 "category": "Pixi",
-                "icon": "$(cloud-upload)"
+                "icon": "$(cloud-download)"
             },
             {
                 "command": "pixi.searchPackages",
@@ -920,6 +920,13 @@
                     "command": "pixi.reinstall",
                     "when": "resourceExtname == .toml && (resourceFilename == pixi.toml || resourceFilename == pyproject.toml) && pixi.hasPixiProject",
                     "group": "navigation@4"
+                }
+            ],
+            "explorer/context": [
+                {
+                    "command": "pixi.import",
+                    "when": "pixi.hasPixiProject && (resourceExtname == .txt || resourceExtname == .in || resourceExtname == .yml || resourceExtname == .yaml)",
+                    "group": "7_modification@2"
                 }
             ],
             "view/title": [
