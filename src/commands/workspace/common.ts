@@ -430,6 +430,14 @@ export async function pickTargetScope(
         if (presetScopeName === 'default') {
             return { kind: 'global' };
         }
+        if (
+            presetScopeName === 'workspace' ||
+            presetScopeName === 'workspace.dependencies' ||
+            presetScopeName === 'workspace-dependencies' ||
+            presetScopeName === 'workspace-dependency'
+        ) {
+            return { kind: 'workspace-dependency' };
+        }
         const existingFeatures = await getWorkspaceFeatures(projectPath);
         if (existingFeatures.some((f) => f.name === presetScopeName)) {
             return { kind: 'feature', name: presetScopeName };
@@ -450,6 +458,11 @@ export async function pickTargetScope(
                 description: 'Available to all environments',
                 scope: { kind: 'global' },
             },
+            {
+                label: '$(library) Shared Workspace Dependencies ([workspace.dependencies])',
+                description: 'Shared across workspace features (pixi workspace dependencies add)',
+                scope: { kind: 'workspace-dependency' },
+            },
         ];
         const selected = await window.showQuickPick(items, {
             title: 'Pixi: Select Target Scope',
@@ -461,20 +474,26 @@ export async function pickTargetScope(
     const features = await getWorkspaceFeatures(projectPath);
     const namedFeatures = filterNamedFeatures(features);
     const namedEnvs = envs.filter((e) => e.pixiEnvName !== 'default');
+    const wsDeps = await getWorkspaceDependencies(projectPath);
 
-    if (namedFeatures.length === 0 && namedEnvs.length === 0) {
+    if (namedFeatures.length === 0 && namedEnvs.length === 0 && wsDeps.length === 0) {
         return { kind: 'global' };
     }
 
     const items: ScopeQuickPickItem[] = [
         {
-            label: 'Global Dependencies',
+            label: 'Global & Shared Dependencies',
             kind: QuickPickItemKind.Separator,
         },
         {
             label: '$(globe) [default] (Global Dependencies)',
             description: 'Shared across all environments',
             scope: { kind: 'global' },
+        },
+        {
+            label: '$(library) Shared Workspace Dependencies ([workspace.dependencies])',
+            description: 'Shared across workspace features (pixi workspace dependencies add)',
+            scope: { kind: 'workspace-dependency' },
         },
     ];
 

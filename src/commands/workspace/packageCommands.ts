@@ -378,6 +378,19 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
                     const spec = promptResult.spec;
                     const isPypi = pkg.sourceType === 'pypi';
 
+                    if (targetScope.kind === 'workspace-dependency') {
+                        if (isPypi) {
+                            window.showWarningMessage(
+                                'Pixi shared workspace dependencies ([workspace.dependencies]) only support Conda packages.',
+                            );
+                            return;
+                        }
+                        const args = ['workspace', 'dependencies', 'add', spec];
+                        const sourceLabel = `Conda (${pkg.channel || DEFAULT_CONDA_CHANNEL})`;
+                        await executeAddPackage(manager, projectPath, args, spec, sourceLabel, scopeLabel);
+                        return;
+                    }
+
                     const args = ['add'];
                     if (isPypi) {
                         args.push('--pypi');
@@ -390,6 +403,12 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
                 }
 
                 const specs = promptResult.specs;
+                if (targetScope.kind === 'workspace-dependency') {
+                    const args = ['workspace', 'dependencies', 'add', ...specs];
+                    await executeAddPackage(manager, projectPath, args, specs.join(', '), 'Conda', scopeLabel);
+                    return;
+                }
+
                 const sourceConfig = await promptAddPackageSource(projectPath, specs, manager);
                 if (!sourceConfig) {
                     return;

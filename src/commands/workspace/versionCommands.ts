@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { commands, Disposable, OutputChannel, QuickPickItem, ThemeIcon, Uri, window, workspace } from 'vscode';
+import { commands, Disposable, OutputChannel, QuickPickItem, ThemeIcon, window, workspace } from 'vscode';
 
 import { getPixi, runPixi } from '../../cli/pixiCli';
 import { runPixiWithProgress } from '../../cli/workspaceCli';
@@ -816,69 +816,6 @@ export function registerVersionCommands(manager: PixiProjectManager): Disposable
                     `Pixi: Workspace dependency '${pkg.trim()}' removed from ${projectName}.`,
                 );
             }
-        }),
-
-        // Pixi: Import Environment File (environment.yml or requirements.txt)...
-        commands.registerCommand('pixi.import', async (targetItem?: unknown) => {
-            const ctx = extractCommandContext(targetItem);
-            let targetFilePath: string | undefined;
-            if (targetItem instanceof Uri && fs.existsSync(targetItem.fsPath)) {
-                targetFilePath = targetItem.fsPath;
-            }
-
-            const projectPath =
-                ctx.projectPath ||
-                (targetFilePath
-                    ? manager.findProjectForUri(Uri.file(targetFilePath)) || path.dirname(targetFilePath)
-                    : undefined) ||
-                (await pickPixiProject(manager, 'Select Pixi project to import environment into')) ||
-                workspace.workspaceFolders?.[0]?.uri.fsPath;
-
-            if (!projectPath) {
-                return;
-            }
-
-            const projectName = manager.getProjectName(projectPath);
-
-            if (!targetFilePath) {
-                const files = await window.showOpenDialog({
-                    canSelectFiles: true,
-                    canSelectFolders: false,
-                    canSelectMany: false,
-                    title: 'Select Environment File to Import',
-                    filters: {
-                        'Environment Files': ['yml', 'yaml', 'txt'],
-                        'All Files': ['*'],
-                    },
-                    defaultUri: Uri.file(projectPath),
-                });
-                if (!files || files.length === 0) {
-                    return;
-                }
-                targetFilePath = files[0].fsPath;
-            }
-
-            const targetEnv = await window.showInputBox({
-                title: `Pixi: Import '${path.basename(targetFilePath)}' (${projectName})`,
-                prompt: 'Enter target environment name to import into (optional, press Enter for default)',
-                placeHolder: 'e.g. imported-env or dev',
-            });
-            if (targetEnv === undefined) {
-                return;
-            }
-
-            const args = ['import', targetFilePath];
-            if (targetEnv.trim()) {
-                args.push('-e', targetEnv.trim());
-            }
-
-            await runPixiWithProgress(
-                `Pixi: Importing '${path.basename(targetFilePath)}' into ${projectName}...`,
-                args,
-                projectPath,
-                manager,
-                `Pixi: File '${path.basename(targetFilePath)}' successfully imported into ${projectName}.`,
-            );
         }),
     ];
 }
