@@ -6,6 +6,7 @@ import { normalizeFolderPath, revealDefinitionInManifest } from '../../common/ex
 import { getPackageKindBadge, sortPixiPackages, splitPackageSpec } from '../../core/packageManager';
 import { DEFAULT_CONDA_CHANNEL } from '../../core/projectDiscovery';
 import { PixiProjectManager } from '../../core/projectManager';
+import { PixiPackage } from '../../core/types';
 import {
     extractCommandContext,
     extractEnvironmentName,
@@ -280,6 +281,18 @@ export async function executeReinstallPackage(
     );
 }
 
+function toInstalledPackageQuickPickItem(p: PixiPackage): QuickPickItem & { pkgName: string } {
+    const channelBadge = getPackageKindBadge(p.kind);
+    const explicitBadge = p.is_explicit ? 'explicit' : 'transitive';
+    return {
+        label: `${p.is_explicit ? '$(package)' : '$(symbol-field)'} ${p.name}`,
+        description: p.version
+            ? `${channelBadge} v${p.version} (${explicitBadge})`
+            : `${channelBadge} (${explicitBadge})`,
+        pkgName: p.name,
+    };
+}
+
 export function registerPackageCommands(manager: PixiProjectManager): Disposable[] {
     async function resolveDeclaredPackageTarget(
         targetItem: unknown,
@@ -546,17 +559,7 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
                 return;
             }
 
-            const items = sortPixiPackages(updatablePackages).map((p) => {
-                const channelBadge = getPackageKindBadge(p.kind);
-                const explicitBadge = p.is_explicit ? 'explicit' : 'transitive';
-                return {
-                    label: `${p.is_explicit ? '$(package)' : '$(symbol-field)'} ${p.name}`,
-                    description: p.version
-                        ? `${channelBadge} v${p.version} (${explicitBadge})`
-                        : `${channelBadge} (${explicitBadge})`,
-                    pkgName: p.name,
-                };
-            });
+            const items = sortPixiPackages(updatablePackages).map(toInstalledPackageQuickPickItem);
 
             const picked = await window.showQuickPick(items, {
                 title: 'Pixi: Update Package',
@@ -600,17 +603,7 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
                 return;
             }
 
-            const items = sortPixiPackages(packages).map((p) => {
-                const channelBadge = getPackageKindBadge(p.kind);
-                const explicitBadge = p.is_explicit ? 'explicit' : 'transitive';
-                return {
-                    label: `${p.is_explicit ? '$(package)' : '$(symbol-field)'} ${p.name}`,
-                    description: p.version
-                        ? `${channelBadge} v${p.version} (${explicitBadge})`
-                        : `${channelBadge} (${explicitBadge})`,
-                    pkgName: p.name,
-                };
-            });
+            const items = sortPixiPackages(packages).map(toInstalledPackageQuickPickItem);
 
             const picked = await window.showQuickPick(items, {
                 title: 'Pixi: Reinstall Package',

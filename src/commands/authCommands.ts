@@ -361,105 +361,88 @@ export async function promptLogin(infoProvider: PixiInfoTreeDataProvider, defaul
 }
 
 export async function promptLogout(infoProvider: PixiInfoTreeDataProvider, targetItem?: unknown): Promise<void> {
-    const directHost = extractHostFromTarget(targetItem);
+    let targetHost = extractHostFromTarget(targetItem);
 
-    if (directHost) {
-        const confirm = await window.showWarningMessage(
-            `Are you sure you want to remove stored authentication for "${directHost}"?`,
-            { modal: true },
-            'Logout',
-        );
-        if (confirm !== 'Logout') {
+    if (!targetHost) {
+        const entries = await readStoredCredentials();
+        if (entries.length === 0) {
+            window.showInformationMessage('No stored authentication entries found.');
             return;
         }
 
-        await runWithProgressNotification(
-            `Pixi: Removing authentication for '${directHost}'...`,
-            async () => {
-                await logoutPixiHost(directHost);
-                infoProvider.refresh();
+        interface LogoutItem extends QuickPickItem {
+            host?: string;
+            isAll?: boolean;
+        }
+
+        const items: LogoutItem[] = [
+            ...entries.map((e) => ({
+                label: `$(shield) ${e.hostPattern}`,
+                description: `[${e.method}]${e.username ? ` (${e.username})` : ''}`,
+                host: e.hostPattern,
+            })),
+            {
+                label: '$(trash) Logout from All Hosts',
+                description: 'Remove all stored credentials (--all)',
+                isAll: true,
             },
-            `Pixi: Removed authentication for '${directHost}'.`,
-            { errorPrefix: `Failed to remove authentication for '${directHost}'` },
-        );
+        ];
+
+        const picked = await window.showQuickPick(items, {
+            title: 'Pixi: Logout from Host / Registry',
+            placeHolder: 'Select host to remove authentication for',
+        });
+        if (!picked) {
+            return;
+        }
+
+        if (picked.isAll) {
+            const confirmAll = await window.showWarningMessage(
+                'Are you sure you want to remove all stored authentication entries from Pixi?',
+                { modal: true },
+                'Logout All',
+            );
+            if (confirmAll !== 'Logout All') {
+                return;
+            }
+
+            await runWithProgressNotification(
+                'Pixi: Removing all stored authentication entries...',
+                async () => {
+                    await logoutPixiHost(undefined, true);
+                    infoProvider.refresh();
+                },
+                'Pixi: All authentication entries removed.',
+                { errorPrefix: 'Failed to logout from all hosts' },
+            );
+            return;
+        }
+
+        targetHost = picked.host;
+    }
+
+    if (!targetHost) {
         return;
     }
 
-    const entries = await readStoredCredentials();
-    if (entries.length === 0) {
-        window.showInformationMessage('No stored authentication entries found.');
+    const confirm = await window.showWarningMessage(
+        `Are you sure you want to remove stored authentication for "${targetHost}"?`,
+        { modal: true },
+        'Logout',
+    );
+    if (confirm !== 'Logout') {
         return;
     }
 
-    interface LogoutItem extends QuickPickItem {
-        host?: string;
-        isAll?: boolean;
-    }
-
-    const items: LogoutItem[] = [
-        ...entries.map((e) => ({
-            label: `$(shield) ${e.hostPattern}`,
-            description: `[${e.method}]${e.username ? ` (${e.username})` : ''}`,
-            host: e.hostPattern,
-        })),
-        {
-            label: '$(trash) Logout from All Hosts',
-            description: 'Remove all stored credentials (--all)',
-            isAll: true,
+    await runWithProgressNotification(
+        `Pixi: Removing authentication for '${targetHost}'...`,
+        async () => {
+            await logoutPixiHost(targetHost);
+            infoProvider.refresh();
         },
-    ];
-
-    const picked = await window.showQuickPick(items, {
-        title: 'Pixi: Logout from Host / Registry',
-        placeHolder: 'Select host to remove authentication for',
-    });
-    if (!picked) {
-        return;
-    }
-
-    if (picked.isAll) {
-        const confirmAll = await window.showWarningMessage(
-            'Are you sure you want to remove all stored authentication entries from Pixi?',
-            { modal: true },
-            'Logout All',
-        );
-        if (confirmAll !== 'Logout All') {
-            return;
-        }
-
-        await runWithProgressNotification(
-            'Pixi: Removing all stored authentication entries...',
-            async () => {
-                await logoutPixiHost(undefined, true);
-                infoProvider.refresh();
-            },
-            'Pixi: All authentication entries removed.',
-            { errorPrefix: 'Failed to logout from all hosts' },
-        );
-        return;
-    }
-
-    if (picked.host) {
-        const target = picked.host;
-        const confirm = await window.showWarningMessage(
-            `Are you sure you want to remove stored authentication for "${target}"?`,
-            { modal: true },
-            'Logout',
-        );
-        if (confirm !== 'Logout') {
-            return;
-        }
-
-        await runWithProgressNotification(
-            `Pixi: Removing authentication for '${target}'...`,
-            async () => {
-                await logoutPixiHost(target);
-                infoProvider.refresh();
-            },
-            `Pixi: Removed authentication for '${target}'.`,
-            { errorPrefix: `Failed to remove authentication for '${target}'` },
-        );
-    }
+        `Pixi: Removed authentication for '${targetHost}'.`,
+        { errorPrefix: `Failed to remove authentication for '${targetHost}'` },
+    );
 }
 
 export async function promptCopyToken(targetItem?: unknown): Promise<void> {

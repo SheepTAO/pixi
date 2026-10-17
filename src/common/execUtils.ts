@@ -146,7 +146,7 @@ export function normalizeFolderPath(target?: unknown): string | undefined {
         return undefined;
     }
     try {
-        if (fs.existsSync(p) && !fs.statSync(p).isDirectory()) {
+        if (!fs.statSync(p).isDirectory()) {
             return path.dirname(p);
         }
     } catch {

@@ -196,10 +196,7 @@ export async function handleConfigEdit(manager: PixiProjectManager, targetItem?:
 
     try {
         if (!fs.existsSync(configFilePath)) {
-            const dir = path.dirname(configFilePath);
-            if (!fs.existsSync(dir)) {
-                await fs.promises.mkdir(dir, { recursive: true });
-            }
+            await fs.promises.mkdir(path.dirname(configFilePath), { recursive: true });
             const header = `# Pixi Configuration (${scope})\n# See https://pixi.sh/latest/reference/pixi_configuration/\n\n`;
             await fs.promises.writeFile(configFilePath, header, 'utf8');
         }

@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { commands, Disposable, ProgressLocation, QuickPickItem, Uri, window, workspace } from 'vscode';
+import { commands, Disposable, FileType, ProgressLocation, QuickPickItem, Uri, window, workspace } from 'vscode';
 
 import { runPixi } from '../../cli/pixiCli';
 import { runPixiWithProgress } from '../../cli/workspaceCli';
@@ -158,7 +158,7 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
             if (targetItem instanceof Uri) {
                 try {
                     const stat = await workspace.fs.stat(targetItem);
-                    if (stat.type === 1) {
+                    if ((stat.type & FileType.File) !== 0) {
                         filePath = targetItem.fsPath;
                     }
                 } catch {
