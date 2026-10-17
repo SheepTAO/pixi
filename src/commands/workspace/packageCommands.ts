@@ -244,6 +244,28 @@ export async function executeUpdatePackage(
     );
 }
 
+export async function executeReinstallPackage(
+    manager: PixiProjectManager,
+    projectPath: string,
+    pkgName: string,
+    targetEnv?: string,
+): Promise<void> {
+    const projectName = manager.getProjectName(projectPath);
+    const args = ['reinstall'];
+    if (targetEnv && targetEnv !== 'default') {
+        args.push('-e', targetEnv);
+    }
+    args.push(pkgName);
+    const displayEnv = targetEnv || 'default';
+    await runPixiWithProgress(
+        `Pixi: Re-installing package '${pkgName}' in '${displayEnv}' (${projectName})...`,
+        args,
+        projectPath,
+        manager,
+        `Pixi: Package '${pkgName}' re-installed successfully in '${displayEnv}'.`,
+    );
+}
+
 export function registerPackageCommands(manager: PixiProjectManager): Disposable[] {
     async function resolveDeclaredPackageTarget(
         targetItem: unknown,
@@ -515,6 +537,60 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
             }
 
             return executeUpdatePackage(manager, projectPath, picked.pkgName, targetEnv);
+        }),
+
+        // Pixi: Reinstall Package (Single Package)
+        commands.registerCommand('pixi.reinstallPackage', async (targetItem?: unknown) => {
+            const ctx = extractCommandContext(targetItem);
+            if (ctx.pkg && ctx.projectPath) {
+                return executeReinstallPackage(manager, ctx.projectPath, ctx.pkg.name, ctx.envName);
+            }
+
+            const projectPath = await pickPixiProject(
+                manager,
+                'Select Pixi project to reinstall package in',
+                targetItem,
+            );
+            if (!projectPath) {
+                return;
+            }
+
+            const placeHolder = 'Select a package to reinstall';
+            const envs = manager.getEnvironmentsForProject(projectPath);
+            const targetEnv = await resolveTargetEnvironment(envs, targetItem, placeHolder);
+            if (targetEnv === null) {
+                return;
+            }
+
+            const envLabel = targetEnv || (envs.length > 0 ? envs[0].pixiEnvName : 'default');
+            const packages = await manager.getPackagesForEnvironment(envLabel, projectPath);
+            if (packages.length === 0) {
+                window.showInformationMessage(`No packages found in environment '${envLabel}'.`);
+                return;
+            }
+
+            const items = sortPixiPackages(packages).map((p) => {
+                const channelBadge = getPackageKindBadge(p.kind);
+                const explicitBadge = p.is_explicit ? 'explicit' : 'transitive';
+                return {
+                    label: `${p.is_explicit ? '$(package)' : '$(symbol-field)'} ${p.name}`,
+                    description: p.version
+                        ? `${channelBadge} v${p.version} (${explicitBadge})`
+                        : `${channelBadge} (${explicitBadge})`,
+                    pkgName: p.name,
+                };
+            });
+
+            const picked = await window.showQuickPick(items, {
+                title: 'Pixi: Reinstall Package',
+                placeHolder,
+                matchOnDescription: true,
+            });
+            if (!picked) {
+                return;
+            }
+
+            return executeReinstallPackage(manager, projectPath, picked.pkgName, targetEnv);
         }),
 
         // Pixi: Reveal Package in Manifest (pixi.toml / pyproject.toml)

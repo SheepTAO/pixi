@@ -521,6 +521,12 @@
                 "icon": "$(arrow-up)"
             },
             {
+                "command": "pixi.reinstallPackage",
+                "title": "Reinstall Package",
+                "category": "Pixi",
+                "icon": "$(debug-restart)"
+            },
+            {
                 "command": "pixi.revealPackageInManifest",
                 "title": "Go to Package Definition in Manifest",
                 "category": "Pixi",
@@ -1213,6 +1219,11 @@
                     "command": "pixi.updatePackage",
                     "when": "view == pixi.views.projects && (viewItem == pixiPackageExplicit || viewItem == pixiPackageTransitive)",
                     "group": "1_item@1"
+                },
+                {
+                    "command": "pixi.reinstallPackage",
+                    "when": "view == pixi.views.projects && (viewItem == pixiPackageExplicit || viewItem == pixiPackageTransitive || viewItem == pixiPackageLocalExplicit || viewItem == pixiPackageLocalTransitive)",
+                    "group": "1_item@1.5"
                 },
                 {
                     "command": "pixi.removePackage",

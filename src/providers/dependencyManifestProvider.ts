@@ -591,6 +591,7 @@ export class PixiDependencyManifestProvider
                 );
             }
             actions.push(
+                `[$(debug-restart) Reinstall](command:pixi.reinstallPackage?${pkgActionArg} "Reinstall '${targetPkg.name}' in '${foundEnvName}'")`,
                 `[$(question) Why](command:pixi.whyPackage?${pkgActionArg} "Show why '${targetPkg.name}' is installed in '${foundEnvName}'")`,
                 `[$(trash) Remove](command:pixi.removePackage?${removeActionArg} "Remove '${matched.name}' from manifest")`,
             );

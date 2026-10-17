@@ -88,40 +88,125 @@ export async function openLocation(target?: unknown): Promise<void> {
 }
 
 export function registerInfoCommands(infoProvider: PixiInfoTreeDataProvider): Disposable {
+    async function executeSelfUpdate(args: string[], title: string): Promise<void> {
+        await runWithProgressNotification(
+            title,
+            async () => {
+                traceVerbose(`Running pixi ${args.join(' ')}...`);
+                const output = await runPixi(args, { includeStderr: true });
+                clearPixiCache();
+                infoProvider.refresh();
+                return output;
+            },
+            (output) => {
+                const lines = output
+                    .trim()
+                    .split(/\r?\n/)
+                    .map((l) => l.trim())
+                    .filter(Boolean);
+                const lastLine = lines[lines.length - 1] || output.trim();
+                const cleanOutput = lastLine.replace(/^✔\s*/, '');
+                return cleanOutput.toLowerCase().includes('already up-to-date')
+                    ? cleanOutput
+                    : `Pixi update: ${cleanOutput}`;
+            },
+            { errorPrefix: 'Failed to update Pixi CLI', cancellable: false },
+        );
+    }
+
     const disposables: Disposable[] = [
         commands.registerCommand('pixi.selfUpdate', async () => {
-            const confirm = await window.showInformationMessage(
-                'Check for updates and update Pixi CLI to the latest version?',
-                { modal: true },
-                'Update Pixi CLI',
-            );
-            if (confirm !== 'Update Pixi CLI') {
+            interface SelfUpdateChoice extends QuickPickItem {
+                action: 'latest' | 'dry-run' | 'version';
+            }
+            const choices: SelfUpdateChoice[] = [
+                {
+                    label: '$(cloud-download) Update to Latest Release (Recommended)',
+                    description: 'pixi self-update',
+                    detail: 'Check for updates and install the newest release of Pixi CLI',
+                    action: 'latest',
+                },
+                {
+                    label: '$(file-text) Preview Updates & Release Notes (Dry Run)',
+                    description: 'pixi self-update --dry-run',
+                    detail: 'Check if a newer version is available and preview release notes without modifying binary',
+                    action: 'dry-run',
+                },
+                {
+                    label: '$(history) Install Specific Version...',
+                    description: 'pixi self-update --version <VERSION>',
+                    detail: 'Upgrade or downgrade Pixi CLI to a target version',
+                    action: 'version',
+                },
+            ];
+
+            const picked = await window.showQuickPick(choices, {
+                title: 'Pixi: Update CLI',
+                placeHolder: 'Select update mode for Pixi CLI',
+            });
+            if (!picked) {
                 return;
             }
 
-            await runWithProgressNotification(
-                'Updating Pixi CLI...',
-                async () => {
-                    traceVerbose('Running pixi self-update...');
-                    const output = await runPixi(['self-update'], { includeStderr: true });
-                    clearPixiCache();
-                    infoProvider.refresh();
-                    return output;
-                },
-                (output) => {
-                    const lines = output
-                        .trim()
-                        .split(/\r?\n/)
-                        .map((l) => l.trim())
-                        .filter(Boolean);
-                    const lastLine = lines[lines.length - 1] || output.trim();
-                    const cleanOutput = lastLine.replace(/^✔\s*/, '');
-                    return cleanOutput.toLowerCase().includes('already up-to-date')
-                        ? cleanOutput
-                        : `Pixi update: ${cleanOutput}`;
-                },
-                { errorPrefix: 'Failed to update Pixi CLI', cancellable: false },
-            );
+            let args = ['self-update'];
+            let title = 'Updating Pixi CLI...';
+
+            if (picked.action === 'dry-run') {
+                args = ['self-update', '--dry-run'];
+                title = 'Checking for Pixi CLI updates...';
+                let dryRunText = '';
+                await runWithProgressNotification(
+                    title,
+                    async () => {
+                        dryRunText = await runPixi(args, { includeStderr: true });
+                        return dryRunText;
+                    },
+                    (output) => {
+                        const trimmed = output.trim();
+                        if (trimmed.toLowerCase().includes('already up-to-date')) {
+                            return 'Pixi CLI is already up-to-date.';
+                        }
+                        return 'Pixi update check completed.';
+                    },
+                    { errorPrefix: 'Failed to check Pixi CLI updates', cancellable: false },
+                );
+
+                if (dryRunText && !dryRunText.toLowerCase().includes('already up-to-date')) {
+                    const lines = dryRunText.trim().split(/\r?\n/).filter(Boolean);
+                    if (lines.length > 3) {
+                        const doc = await workspace.openTextDocument({
+                            content: dryRunText,
+                            language: 'markdown',
+                        });
+                        await window.showTextDocument(doc, { preview: true });
+                    }
+                    const cleanNotice = (lines[0] || dryRunText).replace(/^[ℹ️✔\s]+/, '').trim();
+                    const action = await window.showInformationMessage(
+                        cleanNotice || 'A newer version of Pixi CLI is available.',
+                        'Update Now',
+                    );
+                    if (action === 'Update Now') {
+                        await executeSelfUpdate(['self-update'], 'Updating Pixi CLI to latest release...');
+                    }
+                }
+                return;
+            }
+
+            if (picked.action === 'version') {
+                const targetVer = await window.showInputBox({
+                    title: 'Pixi: Install Specific Version',
+                    prompt: 'Enter desired Pixi version',
+                    placeHolder: 'e.g. 0.81.0, 0.80.0',
+                    validateInput: (v) => (!v.trim() ? 'Version cannot be empty' : null),
+                });
+                if (!targetVer) {
+                    return;
+                }
+                args = ['self-update', '--version', targetVer.trim()];
+                title = `Updating Pixi CLI to v${targetVer.trim()}...`;
+            }
+
+            await executeSelfUpdate(args, title);
         }),
         commands.registerCommand('pixi.refreshInfo', () => {
             infoProvider.refresh();

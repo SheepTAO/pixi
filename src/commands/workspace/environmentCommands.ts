@@ -740,13 +740,23 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                             description: `Select a single environment to reinstall in ${projectName} (pixi reinstall -e <env>)`,
                             action: 'single' as const,
                         },
+                        {
+                            label: '$(package) Reinstall Specific Package...',
+                            description: `Select a package to reinstall in ${projectName} (pixi reinstall <pkg> -e <env>)`,
+                            action: 'package' as const,
+                        },
                     ],
                     {
-                        title: `Pixi: Reinstall Environments (${projectName})`,
+                        title: `Pixi: Reinstall (${projectName})`,
                         placeHolder: 'Select reinstall scope',
                     },
                 );
                 if (!choice) {
+                    return;
+                }
+
+                if (choice.action === 'package') {
+                    await commands.executeCommand('pixi.reinstallPackage', targetItem);
                     return;
                 }
 

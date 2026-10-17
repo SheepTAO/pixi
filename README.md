@@ -112,6 +112,7 @@ Launch any command via the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) by t
 | **Pixi: Remove Package ...**                     | `pixi.removePackage`           | Remove packages from manifest with automatic feature/environment scope resolution.                                      |
 | **Pixi: Install (Sync Environments)**            | `pixi.install`                 | Install dependencies and synchronize all project environments.                                                          |
 | **Pixi: Reinstall ...**                          | `pixi.reinstall`               | Interactive menu to rebuild all environments or a specific environment.                                                 |
+| **Pixi: Reinstall Package ...**                  | `pixi.reinstallPackage`        | Reinstall a specific package in an environment via `pixi reinstall <pkg> -e <env>`.                                     |
 | **Pixi: Update / Upgrade ...**                   | `pixi.update`                  | Unified menu to check outdated packages (dry-run), update dependencies, or upgrade manifest.                            |
 | **Pixi: Upgrade Dependencies ...**               | `pixi.upgrade`                 | Bump manifest version constraints for packages using configurable pinning strategies (`semver`, `minor`, etc.).         |
 | **Pixi: Rename Workspace ...**                   | `pixi.setProjectName`          | Get or update the workspace name in project manifest via `pixi workspace name`.                                         |
@@ -145,7 +146,7 @@ Launch any command via the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) by t
 | **Pixi: Remove Dependency from Global Tool ...** | `pixi.global.removeDependency` | Remove extra packages from a global tool environment (`pixi global remove -e <tool> <pkgs>`).                           |
 | **Pixi: Expose Binary Mapping ...**              | `pixi.global.expose`           | Expose or alias an executable from a global environment (`pixi global expose add`).                                     |
 | **Pixi: View Global Tool Dependency Tree**       | `pixi.global.tree`             | Inspect dependency hierarchy of a globally installed CLI tool (`pixi global tree <tool>`).                              |
-| **Pixi: Update Pixi CLI ...**                    | `pixi.selfUpdate`              | Update the Pixi CLI binary to the latest or a specific release version.                                                 |
+| **Pixi: Update Pixi CLI ...**                    | `pixi.selfUpdate`              | Check for updates, preview release notes (dry-run), or install target Pixi version.                                     |
 
 > [!TIP]
 > Contextual and view-specific actions (such as switching Environment/Feature or Task grouping modes via view title buttons, creating/removing features and environments, adding/removing tasks or packages, jumping to manifest declarations, and running tasks in custom environments) are also directly available via inline icon buttons and right-click context menus in the Pixi Explorer tree views and editor title bar.

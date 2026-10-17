@@ -196,6 +196,20 @@ export async function getWorkspaceFeatures(projectPath: string): Promise<Workspa
     }
 }
 
+export async function getWorkspaceDependencies(projectPath: string): Promise<string[]> {
+    try {
+        const out = await runPixi(['workspace', 'dependencies', 'list'], { cwd: projectPath });
+        const parsed = out
+            .split(/\r?\n/)
+            .map((l) => l.trim().replace(/^[-*•├│└─\s]+/, ''))
+            .map((l) => l.split(/[\s=:<>~]/)[0]?.trim())
+            .filter((n): n is string => Boolean(n && /^[a-zA-Z0-9_\-.]+$/.test(n)));
+        return Array.from(new Set(parsed));
+    } catch {
+        return [];
+    }
+}
+
 export function filterNamedFeatures(features: WorkspaceListEntry[]): WorkspaceListEntry[] {
     return features.filter((f) => f.name !== 'default');
 }
@@ -391,6 +405,12 @@ export async function findPackageScope(
         if (res) {
             return res;
         }
+    }
+
+    // 4. Check shared workspace dependencies ([workspace.dependencies])
+    const wsPkgs = await getWorkspaceDependencies(projectPath);
+    if (wsPkgs.some((p) => normalizePkgName(p) === norm)) {
+        return { kind: 'workspace-dependency', isPypi: false };
     }
 
     return undefined;

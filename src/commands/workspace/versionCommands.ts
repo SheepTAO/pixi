@@ -6,7 +6,7 @@ import { commands, Disposable, OutputChannel, QuickPickItem, ThemeIcon, Uri, win
 import { getPixi, runPixi } from '../../cli/pixiCli';
 import { runPixiWithProgress } from '../../cli/workspaceCli';
 import { PixiProjectManager } from '../../core/projectManager';
-import { extractCommandContext, pickPixiProject, pickProjectEnvironmentName } from './common';
+import { extractCommandContext, getWorkspaceDependencies, pickPixiProject, pickProjectEnvironmentName } from './common';
 
 let activationChannel: OutputChannel | undefined;
 
@@ -759,12 +759,7 @@ export function registerVersionCommands(manager: PixiProjectManager): Disposable
             }
 
             if (action.action === 'remove') {
-                const parsedPackages = currentListOutput
-                    .split(/\r?\n/)
-                    .map((l) => l.trim().replace(/^[-*•├│└─\s]+/, ''))
-                    .map((l) => l.split(/[\s=:<>~]/)[0]?.trim())
-                    .filter((n): n is string => Boolean(n && /^[a-zA-Z0-9_\-.]+$/.test(n)));
-                const uniquePackages = Array.from(new Set(parsedPackages));
+                const uniquePackages = await getWorkspaceDependencies(projectPath);
 
                 let pkg: string | undefined;
                 if (uniquePackages.length > 0) {
