@@ -16,6 +16,15 @@ import {
 
 let activationChannel: OutputChannel | undefined;
 
+async function getWorkspaceProperty(projectPath: string, prop: string): Promise<string | undefined> {
+    try {
+        const stdout = await runPixi(['workspace', prop, 'get'], { cwd: projectPath });
+        return stdout.trim() || undefined;
+    } catch {
+        return undefined;
+    }
+}
+
 async function handleBumpVersionCommand(manager: PixiProjectManager, targetItem?: unknown): Promise<void> {
     const projectPath = await pickPixiProject(manager, 'Select Pixi project to manage version for', targetItem);
     if (!projectPath) {
@@ -23,17 +32,7 @@ async function handleBumpVersionCommand(manager: PixiProjectManager, targetItem?
     }
 
     const projectName = manager.getProjectName(projectPath);
-
-    let currentVersion: string | undefined;
-    try {
-        const stdout = await runPixi(['workspace', 'version', 'get'], { cwd: projectPath });
-        const trimmed = stdout.trim();
-        if (trimmed) {
-            currentVersion = trimmed;
-        }
-    } catch {
-        // If not set, currentVersion remains undefined
-    }
+    const currentVersion = await getWorkspaceProperty(projectPath, 'version');
 
     interface VersionActionItem extends QuickPickItem {
         action: 'patch' | 'minor' | 'major' | 'set';
@@ -219,17 +218,7 @@ async function handleSetDescriptionCommand(manager: PixiProjectManager, targetIt
     }
 
     const projectName = manager.getProjectName(projectPath);
-
-    let currentDesc: string | undefined;
-    try {
-        const stdout = await runPixi(['workspace', 'description', 'get'], { cwd: projectPath });
-        const trimmed = stdout.trim();
-        if (trimmed) {
-            currentDesc = trimmed;
-        }
-    } catch {
-        // If not set, currentDesc remains undefined
-    }
+    const currentDesc = await getWorkspaceProperty(projectPath, 'description');
 
     const input = await window.showInputBox({
         title: `Pixi: Workspace Description - ${projectName}`,
@@ -279,17 +268,7 @@ async function handleSetRequiresPixiCommand(manager: PixiProjectManager, targetI
     }
 
     const projectName = manager.getProjectName(projectPath);
-
-    let currentReq: string | undefined;
-    try {
-        const stdout = await runPixi(['workspace', 'requires-pixi', 'get'], { cwd: projectPath });
-        const trimmed = stdout.trim();
-        if (trimmed) {
-            currentReq = trimmed;
-        }
-    } catch {
-        // If not set, currentReq remains undefined
-    }
+    const currentReq = await getWorkspaceProperty(projectPath, 'requires-pixi');
 
     interface RequiresPixiActionItem extends QuickPickItem {
         action: 'set' | 'unset' | 'verify';
