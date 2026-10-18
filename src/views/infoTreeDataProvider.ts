@@ -66,7 +66,7 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
     private async getSystemInfo(): Promise<PixiSystemInfo> {
         if (!this.cachedSystemInfo) {
             const rawJson = await runPixi(['info', '--json']);
-            this.cachedSystemInfo = safeJsonParse<PixiSystemInfo>(rawJson);
+            this.cachedSystemInfo = safeJsonParse<PixiSystemInfo>(rawJson, {});
         }
         return this.cachedSystemInfo;
     }

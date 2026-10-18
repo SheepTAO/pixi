@@ -59,7 +59,7 @@ export function resolveCredentialsPath(authDir?: string): string {
     const targetDir = authDir || _cachedAuthDir;
     if (targetDir) {
         try {
-            if (fs.existsSync(targetDir) && fs.statSync(targetDir).isDirectory()) {
+            if (fs.statSync(targetDir).isDirectory()) {
                 return path.join(targetDir, 'credentials.json');
             }
         } catch {
