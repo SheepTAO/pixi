@@ -679,7 +679,8 @@
                     "command": "pixi.config"
                 },
                 {
-                    "command": "pixi.auth"
+                    "command": "pixi.auth",
+                    "when": "false"
                 },
                 {
                     "command": "pixi.workspace.register",

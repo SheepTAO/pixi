@@ -435,7 +435,7 @@ export function registerConfigCommands(manager: PixiProjectManager): Disposable 
         commands.registerCommand('pixi.config.unset', (target?: unknown) => handleConfigUnset(manager, target)),
         commands.registerCommand('pixi.config', async (target?: unknown) => {
             interface ConfigActionItem extends QuickPickItem {
-                action: 'list' | 'edit' | 'set' | 'unset' | 'append' | 'prepend';
+                action: 'list' | 'edit' | 'set' | 'unset' | 'append' | 'prepend' | 'auth';
             }
 
             const items: ConfigActionItem[] = [
@@ -475,6 +475,12 @@ export function registerConfigCommands(manager: PixiProjectManager): Disposable 
                     detail: 'Prepend an entry to a list setting with highest priority',
                     action: 'prepend',
                 },
+                {
+                    label: '$(key) Authentication & Credentials (pixi auth)...',
+                    description: 'pixi auth',
+                    detail: 'Login, logout, copy tokens, or check authentication status for registries and hosts',
+                    action: 'auth',
+                },
             ];
 
             const picked = await window.showQuickPick(items, {
@@ -503,6 +509,9 @@ export function registerConfigCommands(manager: PixiProjectManager): Disposable 
                     break;
                 case 'prepend':
                     await handleConfigListMutation('prepend', manager, target);
+                    break;
+                case 'auth':
+                    await commands.executeCommand('pixi.auth');
                     break;
             }
         }),
