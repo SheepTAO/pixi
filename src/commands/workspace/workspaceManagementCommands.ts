@@ -858,6 +858,22 @@ export function registerWorkspaceManagementCommands(manager: PixiProjectManager)
                     command: 'pixi.workspaceDependencies',
                 },
                 {
+                    label: '$(plug) Configure Channels ...',
+                    description: 'Add Conda presets/mirrors or remove channels at workspace or feature scope',
+                    command: 'pixi.channel',
+                },
+                {
+                    label: '$(device-desktop) Configure Platforms ...',
+                    description:
+                        'Configure target platforms or auto-detect host platform at workspace or feature scope',
+                    command: 'pixi.platform',
+                },
+                {
+                    label: '$(server-process) Configure System Requirements ...',
+                    description: 'Configure project hardware & OS requirements (CUDA, libc, Linux, macOS, archspec)',
+                    command: 'pixi.systemRequirements',
+                },
+                {
                     label: '$(export) Export Environment ...',
                     description: 'Export environment as Conda environment.yml or explicit specification',
                     command: 'pixi.exportEnvironment',

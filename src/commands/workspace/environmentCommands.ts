@@ -1068,6 +1068,11 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                     command: 'pixi.configureEnvironmentFeatures',
                 },
                 {
+                    label: '$(trash) Remove Feature from Manifest...',
+                    description: 'Remove a feature from the project manifest (pixi workspace feature remove)',
+                    command: 'pixi.removeFeature',
+                },
+                {
                     label: '$(cloud-download) Install Environment...',
                     description: 'Install or synchronize dependencies for a specific environment',
                     command: 'pixi.installEnvironment',

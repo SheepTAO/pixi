@@ -695,15 +695,15 @@
                 },
                 {
                     "command": "pixi.feature",
-                    "when": "pixi.hasPixiProject"
+                    "when": "false"
                 },
                 {
                     "command": "pixi.channel",
-                    "when": "pixi.hasPixiProject"
+                    "when": "false"
                 },
                 {
                     "command": "pixi.platform",
-                    "when": "pixi.hasPixiProject"
+                    "when": "false"
                 },
                 {
                     "command": "pixi.platform.autoDetect",
@@ -711,7 +711,7 @@
                 },
                 {
                     "command": "pixi.systemRequirements",
-                    "when": "pixi.hasPixiProject"
+                    "when": "false"
                 },
                 {
                     "command": "pixi.addPackage",
