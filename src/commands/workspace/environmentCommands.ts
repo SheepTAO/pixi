@@ -1103,6 +1103,11 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                     command: 'pixi.import',
                 },
                 {
+                    label: '$(terminal) Run in Temporary Environment (Exec)...',
+                    description: 'Execute ad-hoc commands in a temporary environment (pixi exec)',
+                    command: 'pixi.exec',
+                },
+                {
                     label: '$(trash) Delete Environment...',
                     description: 'Clean an installed environment prefix on disk',
                     command: 'pixi.deleteEnvironment',

@@ -878,6 +878,11 @@ export function registerWorkspaceManagementCommands(manager: PixiProjectManager)
                     command: 'pixi.checkLockfile',
                 },
                 {
+                    label: '$(terminal) Run in Temporary Environment (Exec) ...',
+                    description: 'Run arbitrary tools inside a temporary disposable environment (pixi exec)',
+                    command: 'pixi.exec',
+                },
+                {
                     label: '$(edit) Rename Workspace ...',
                     description: 'Get or update workspace name via pixi workspace name',
                     command: 'pixi.setProjectName',

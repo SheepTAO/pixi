@@ -588,7 +588,8 @@
                     "command": "pixi.global"
                 },
                 {
-                    "command": "pixi.selfUpdate"
+                    "command": "pixi.selfUpdate",
+                    "when": "false"
                 },
                 {
                     "command": "pixi.install",
@@ -652,7 +653,7 @@
                 },
                 {
                     "command": "pixi.exec",
-                    "when": "pixi.hasPixiProject"
+                    "when": "false"
                 },
                 {
                     "command": "pixi.workspaceDependencies",
@@ -754,7 +755,7 @@
                 },
                 {
                     "command": "pixi.whyPackage",
-                    "when": "pixi.hasPixiProject"
+                    "when": "false"
                 },
                 {
                     "command": "pixi.cleanCache",

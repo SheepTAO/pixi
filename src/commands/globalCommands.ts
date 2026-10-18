@@ -33,7 +33,8 @@ interface GlobalActionQuickPickItem extends QuickPickItem {
         | 'tree'
         | 'add-dep'
         | 'remove-dep'
-        | 'expose';
+        | 'expose'
+        | 'self-update';
 }
 
 export async function executeGlobalTree(toolName: string): Promise<void> {
@@ -557,6 +558,11 @@ export function registerGlobalCommands(): Disposable {
                     description: 'Open pixi-global.toml in editor',
                     action: 'edit',
                 },
+                {
+                    label: '$(arrow-up) Update Pixi CLI (Self-Update)...',
+                    description: 'Check for updates or update the Pixi CLI binary (pixi self-update)',
+                    action: 'self-update',
+                },
             ];
 
             const selected = await window.showQuickPick(menuItems, {
@@ -597,6 +603,9 @@ export function registerGlobalCommands(): Disposable {
                     break;
                 case 'edit':
                     await handleOpenGlobalManifest();
+                    break;
+                case 'self-update':
+                    await commands.executeCommand('pixi.selfUpdate');
                     break;
             }
         }),

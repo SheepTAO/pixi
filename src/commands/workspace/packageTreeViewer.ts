@@ -191,6 +191,11 @@ export async function showDependencyTreeCommand(manager: PixiProjectManager, tar
                 mode: 'full' as const,
             },
             {
+                label: '$(type-hierarchy-sub) Why is This Package Installed? (Reverse Tree)...',
+                description: `Trace reverse dependency chains explaining why a package is needed in '${envLabel}'`,
+                mode: 'why' as const,
+            },
+            {
                 label: '$(filter) Filter by Package Name / Regex...',
                 description: `Show dependency tree for a specific package in '${envLabel}'`,
                 mode: 'filter' as const,
@@ -202,6 +207,11 @@ export async function showDependencyTreeCommand(manager: PixiProjectManager, tar
         },
     );
     if (!action) {
+        return;
+    }
+
+    if (action.mode === 'why') {
+        await whyPackageCommand(manager, targetItem || projectPath, targetEnv || 'default');
         return;
     }
 
@@ -223,7 +233,11 @@ export async function showDependencyTreeCommand(manager: PixiProjectManager, tar
     }
 }
 
-export async function whyPackageCommand(manager: PixiProjectManager, targetItem?: unknown): Promise<void> {
+export async function whyPackageCommand(
+    manager: PixiProjectManager,
+    targetItem?: unknown,
+    presetEnv?: string,
+): Promise<void> {
     if (await runTargetPackageTree(manager, targetItem, true)) {
         return;
     }
@@ -237,14 +251,20 @@ export async function whyPackageCommand(manager: PixiProjectManager, targetItem?
         return;
     }
 
-    const envs = manager.getEnvironmentsForProject(projectPath);
-    const targetEnv = await resolveTargetEnvironment(
-        envs,
-        targetItem,
-        'Select environment to inspect package dependencies',
-    );
-    if (targetEnv === null) {
-        return;
+    let targetEnv: string | undefined;
+    if (presetEnv !== undefined) {
+        targetEnv = presetEnv === 'default' ? undefined : presetEnv;
+    } else {
+        const envs = manager.getEnvironmentsForProject(projectPath);
+        const resolved = await resolveTargetEnvironment(
+            envs,
+            targetItem,
+            'Select environment to inspect package dependencies',
+        );
+        if (resolved === null) {
+            return;
+        }
+        targetEnv = resolved;
     }
 
     const envLabel = targetEnv || 'default';
