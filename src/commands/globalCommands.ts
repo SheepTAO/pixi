@@ -451,163 +451,162 @@ export async function handleGlobalExpose(initialTool?: string): Promise<void> {
     );
 }
 
+export async function handleGlobalInstallCommand(target?: unknown): Promise<void> {
+    const initialTool = typeof target === 'string' ? target : undefined;
+    await handleGlobalInstall(initialTool);
+}
+
+export async function handleGlobalUninstallTool(item?: unknown): Promise<void> {
+    const toolName = extractToolName(item);
+    if (toolName) {
+        await executeGlobalUninstall(toolName);
+    } else {
+        await handleGlobalUninstall();
+    }
+}
+
+export async function handleGlobalTree(item?: unknown): Promise<void> {
+    let toolName = extractToolName(item);
+    if (!toolName) {
+        const tools = await listGlobalEnvironments();
+        if (!tools || tools.length === 0) {
+            window.showInformationMessage('No global tools installed to view dependency tree for.');
+            return;
+        }
+        const picked = await window.showQuickPick(tools.map(toGlobalToolItem), {
+            title: 'Pixi Global: View Dependency Tree',
+            placeHolder: 'Select a tool to view its dependency tree',
+        });
+        if (!picked) {
+            return;
+        }
+        toolName = picked.tool.name;
+    }
+    await executeGlobalTree(toolName);
+}
+
+export async function handleGlobalMenu(): Promise<void> {
+    const menuItems: GlobalActionQuickPickItem[] = [
+        {
+            label: '$(cloud-download) Install Global Tool...',
+            description: 'Install a CLI application into global environment (e.g. ruff, ripgrep, uv)',
+            action: 'install',
+        },
+        {
+            label: '$(list-unordered) List Global Tools',
+            description: 'Inspect installed global tools, versions, and exposed commands',
+            action: 'list',
+        },
+        {
+            label: '$(add) Add Dependency to Global Tool...',
+            description: 'Add extra packages to an existing global tool environment (pixi global add)',
+            action: 'add-dep',
+        },
+        {
+            label: '$(trash) Remove Dependency from Global Tool...',
+            description: 'Remove an extra package from a global tool environment (pixi global remove)',
+            action: 'remove-dep',
+        },
+        {
+            label: '$(symbol-event) Expose Binary Mapping...',
+            description: 'Expose or alias an executable from a global environment (pixi global expose)',
+            action: 'expose',
+        },
+        {
+            label: '$(graph) View Dependency Tree...',
+            description: 'Display dependency tree for a globally installed tool (pixi global tree)',
+            action: 'tree',
+        },
+        {
+            label: '$(repo-sync) Sync Global Environments',
+            description: 'Sync installed tools with global manifest (pixi global sync)',
+            action: 'sync',
+        },
+        {
+            label: '$(refresh) Update Global Tools...',
+            description: 'Update all or specific global tools to the latest versions',
+            action: 'update',
+        },
+        {
+            label: '$(trash) Uninstall Global Tool...',
+            description: 'Remove an installed global tool environment',
+            action: 'uninstall',
+        },
+        {
+            label: '$(edit) Open Global Manifest',
+            description: 'Open pixi-global.toml in editor',
+            action: 'edit',
+        },
+        {
+            label: '$(arrow-up) Update Pixi CLI (Self-Update)...',
+            description: 'Check for updates or update the Pixi CLI binary (pixi self-update)',
+            action: 'self-update',
+        },
+    ];
+
+    const selected = await window.showQuickPick(menuItems, {
+        title: 'Pixi: Global Tools Management',
+        placeHolder: 'Select a global management action',
+    });
+    if (!selected) {
+        return;
+    }
+
+    switch (selected.action) {
+        case 'install':
+            await handleGlobalInstall();
+            break;
+        case 'list':
+            await handleGlobalList();
+            break;
+        case 'add-dep':
+            await handleGlobalAddDependency();
+            break;
+        case 'remove-dep':
+            await handleGlobalRemoveDependency();
+            break;
+        case 'expose':
+            await handleGlobalExpose();
+            break;
+        case 'tree':
+            await handleGlobalTree();
+            break;
+        case 'sync':
+            await executeGlobalSync();
+            break;
+        case 'update':
+            await handleGlobalUpdate();
+            break;
+        case 'uninstall':
+            await handleGlobalUninstall();
+            break;
+        case 'edit':
+            await handleOpenGlobalManifest();
+            break;
+        case 'self-update':
+            await commands.executeCommand('pixi.selfUpdate');
+            break;
+    }
+}
+
 export function registerGlobalCommands(): Disposable {
     return Disposable.from(
-        commands.registerCommand('pixi.refreshGlobal', () => {
-            refreshGlobalEnvironments();
-        }),
-        commands.registerCommand('pixi.global.install', async (target?: unknown) => {
-            const initialTool = typeof target === 'string' ? target : undefined;
-            await handleGlobalInstall(initialTool);
-        }),
-        commands.registerCommand('pixi.global.sync', async () => {
-            await executeGlobalSync();
-        }),
-        commands.registerCommand('pixi.global.updateTool', async (item?: unknown) => {
-            await executeGlobalUpdate(extractToolName(item));
-        }),
-        commands.registerCommand('pixi.global.uninstallTool', async (item?: unknown) => {
-            const toolName = extractToolName(item);
-            if (toolName) {
-                await executeGlobalUninstall(toolName);
-            } else {
-                await handleGlobalUninstall();
-            }
-        }),
-        commands.registerCommand('pixi.global.addDependency', async (item?: unknown) => {
-            await handleGlobalAddDependency(extractToolName(item));
-        }),
-        commands.registerCommand('pixi.global.removeDependency', async (item?: unknown) => {
-            await handleGlobalRemoveDependency(extractToolName(item));
-        }),
-        commands.registerCommand('pixi.global.expose', async (item?: unknown) => {
-            await handleGlobalExpose(extractToolName(item));
-        }),
-        commands.registerCommand('pixi.global.tree', async (item?: unknown) => {
-            let toolName = extractToolName(item);
-            if (!toolName) {
-                const tools = await listGlobalEnvironments();
-                if (!tools || tools.length === 0) {
-                    window.showInformationMessage('No global tools installed to view dependency tree for.');
-                    return;
-                }
-                const picked = await window.showQuickPick(tools.map(toGlobalToolItem), {
-                    title: 'Pixi Global: View Dependency Tree',
-                    placeHolder: 'Select a tool to view its dependency tree',
-                });
-                if (!picked) {
-                    return;
-                }
-                toolName = picked.tool.name;
-            }
-            await executeGlobalTree(toolName);
-        }),
-        commands.registerCommand('pixi.global.openManifest', async () => {
-            await handleOpenGlobalManifest();
-        }),
-        // Main Submenu Entry Point: Pixi: Global Tools...
-        commands.registerCommand('pixi.global', async () => {
-            const menuItems: GlobalActionQuickPickItem[] = [
-                {
-                    label: '$(cloud-download) Install Global Tool...',
-                    description: 'Install a CLI application into global environment (e.g. ruff, ripgrep, uv)',
-                    action: 'install',
-                },
-                {
-                    label: '$(list-unordered) List Global Tools',
-                    description: 'Inspect installed global tools, versions, and exposed commands',
-                    action: 'list',
-                },
-                {
-                    label: '$(add) Add Dependency to Global Tool...',
-                    description: 'Add extra packages to an existing global tool environment (pixi global add)',
-                    action: 'add-dep',
-                },
-                {
-                    label: '$(trash) Remove Dependency from Global Tool...',
-                    description: 'Remove an extra package from a global tool environment (pixi global remove)',
-                    action: 'remove-dep',
-                },
-                {
-                    label: '$(symbol-event) Expose Binary Mapping...',
-                    description: 'Expose or alias an executable from a global environment (pixi global expose)',
-                    action: 'expose',
-                },
-                {
-                    label: '$(graph) View Dependency Tree...',
-                    description: 'Display dependency tree for a globally installed tool (pixi global tree)',
-                    action: 'tree',
-                },
-                {
-                    label: '$(repo-sync) Sync Global Environments',
-                    description: 'Sync installed tools with global manifest (pixi global sync)',
-                    action: 'sync',
-                },
-                {
-                    label: '$(refresh) Update Global Tools...',
-                    description: 'Update all or specific global tools to the latest versions',
-                    action: 'update',
-                },
-                {
-                    label: '$(trash) Uninstall Global Tool...',
-                    description: 'Remove an installed global tool environment',
-                    action: 'uninstall',
-                },
-                {
-                    label: '$(edit) Open Global Manifest',
-                    description: 'Open pixi-global.toml in editor',
-                    action: 'edit',
-                },
-                {
-                    label: '$(arrow-up) Update Pixi CLI (Self-Update)...',
-                    description: 'Check for updates or update the Pixi CLI binary (pixi self-update)',
-                    action: 'self-update',
-                },
-            ];
-
-            const selected = await window.showQuickPick(menuItems, {
-                title: 'Pixi: Global Tools Management',
-                placeHolder: 'Select a global management action',
-            });
-            if (!selected) {
-                return;
-            }
-
-            switch (selected.action) {
-                case 'install':
-                    await handleGlobalInstall();
-                    break;
-                case 'list':
-                    await handleGlobalList();
-                    break;
-                case 'add-dep':
-                    await handleGlobalAddDependency();
-                    break;
-                case 'remove-dep':
-                    await handleGlobalRemoveDependency();
-                    break;
-                case 'expose':
-                    await handleGlobalExpose();
-                    break;
-                case 'tree':
-                    await commands.executeCommand('pixi.global.tree');
-                    break;
-                case 'sync':
-                    await executeGlobalSync();
-                    break;
-                case 'update':
-                    await handleGlobalUpdate();
-                    break;
-                case 'uninstall':
-                    await handleGlobalUninstall();
-                    break;
-                case 'edit':
-                    await handleOpenGlobalManifest();
-                    break;
-                case 'self-update':
-                    await commands.executeCommand('pixi.selfUpdate');
-                    break;
-            }
-        }),
+        commands.registerCommand('pixi.refreshGlobal', () => refreshGlobalEnvironments()),
+        commands.registerCommand('pixi.global.install', (target?: unknown) => handleGlobalInstallCommand(target)),
+        commands.registerCommand('pixi.global.sync', () => executeGlobalSync()),
+        commands.registerCommand('pixi.global.updateTool', (item?: unknown) =>
+            executeGlobalUpdate(extractToolName(item)),
+        ),
+        commands.registerCommand('pixi.global.uninstallTool', (item?: unknown) => handleGlobalUninstallTool(item)),
+        commands.registerCommand('pixi.global.addDependency', (item?: unknown) =>
+            handleGlobalAddDependency(extractToolName(item)),
+        ),
+        commands.registerCommand('pixi.global.removeDependency', (item?: unknown) =>
+            handleGlobalRemoveDependency(extractToolName(item)),
+        ),
+        commands.registerCommand('pixi.global.expose', (item?: unknown) => handleGlobalExpose(extractToolName(item))),
+        commands.registerCommand('pixi.global.tree', (item?: unknown) => handleGlobalTree(item)),
+        commands.registerCommand('pixi.global.openManifest', () => handleOpenGlobalManifest()),
+        commands.registerCommand('pixi.global', () => handleGlobalMenu()),
     );
 }

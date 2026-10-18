@@ -503,23 +503,27 @@ export async function executeUnifiedUpdate(
     }
 }
 
+export async function handleUpgradeCommand(
+    manager: PixiProjectManager,
+    targetItem?: unknown,
+    envName?: string,
+): Promise<void> {
+    const projectPath = await pickPixiProject(manager, 'Select Pixi project to upgrade dependencies', targetItem);
+    if (!projectPath) {
+        return;
+    }
+    const projectName = manager.getProjectName(projectPath);
+    const directEnv = extractEnvironmentName(targetItem, envName);
+    await handleUpgradeDependencies(manager, projectPath, projectName, directEnv);
+}
+
 export function registerUpdateCommands(manager: PixiProjectManager): Disposable[] {
     return [
-        commands.registerCommand('pixi.update', async (targetItem?: unknown, envName?: string) => {
-            await executeUnifiedUpdate(manager, targetItem, envName);
-        }),
-        commands.registerCommand('pixi.upgrade', async (targetItem?: unknown, envName?: string) => {
-            const projectPath = await pickPixiProject(
-                manager,
-                'Select Pixi project to upgrade dependencies',
-                targetItem,
-            );
-            if (!projectPath) {
-                return;
-            }
-            const projectName = manager.getProjectName(projectPath);
-            const directEnv = extractEnvironmentName(targetItem, envName);
-            await handleUpgradeDependencies(manager, projectPath, projectName, directEnv);
-        }),
+        commands.registerCommand('pixi.update', (targetItem?: unknown, envName?: string) =>
+            executeUnifiedUpdate(manager, targetItem, envName),
+        ),
+        commands.registerCommand('pixi.upgrade', (targetItem?: unknown, envName?: string) =>
+            handleUpgradeCommand(manager, targetItem, envName),
+        ),
     ];
 }

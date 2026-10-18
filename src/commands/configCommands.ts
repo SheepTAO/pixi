@@ -427,93 +427,95 @@ export async function handleConfigListMutation(
     );
 }
 
+export async function handleConfigMenu(manager: PixiProjectManager, target?: unknown): Promise<void> {
+    interface ConfigActionItem extends QuickPickItem {
+        action: 'list' | 'edit' | 'set' | 'unset' | 'append' | 'prepend' | 'auth';
+    }
+
+    const items: ConfigActionItem[] = [
+        {
+            label: '$(list-unordered) List Configuration Values',
+            description: 'pixi config list',
+            detail: 'Inspect active configuration settings across local, global, and system scopes',
+            action: 'list',
+        },
+        {
+            label: '$(edit) Edit Configuration File...',
+            description: 'pixi config edit',
+            detail: 'Open config.toml (global, workspace, or system) directly in editor',
+            action: 'edit',
+        },
+        {
+            label: '$(gear) Set Configuration Value...',
+            description: 'pixi config set KEY VALUE',
+            detail: 'Set or update a configuration key (e.g. default-channels, pinning-strategy)',
+            action: 'set',
+        },
+        {
+            label: '$(trash) Unset Configuration Value...',
+            description: 'pixi config unset KEY',
+            detail: 'Remove a custom configuration key and revert to defaults',
+            action: 'unset',
+        },
+        {
+            label: '$(add) Append Value to List Configuration...',
+            description: 'pixi config append KEY VALUE',
+            detail: 'Append an entry to a list setting (e.g. adding a channel)',
+            action: 'append',
+        },
+        {
+            label: '$(chevron-up) Prepend Value to List Configuration...',
+            description: 'pixi config prepend KEY VALUE',
+            detail: 'Prepend an entry to a list setting with highest priority',
+            action: 'prepend',
+        },
+        {
+            label: '$(key) Authentication & Credentials (pixi auth)...',
+            description: 'pixi auth',
+            detail: 'Login, logout, copy tokens, or check authentication status for registries and hosts',
+            action: 'auth',
+        },
+    ];
+
+    const picked = await window.showQuickPick(items, {
+        title: 'Pixi: Configuration Management',
+        placeHolder: 'Select a configuration management action',
+    });
+    if (!picked) {
+        return;
+    }
+
+    switch (picked.action) {
+        case 'list':
+            await handleConfigList(manager, target);
+            break;
+        case 'edit':
+            await handleConfigEdit(manager, target);
+            break;
+        case 'set':
+            await handleConfigSet(manager, target);
+            break;
+        case 'unset':
+            await handleConfigUnset(manager, target);
+            break;
+        case 'append':
+            await handleConfigListMutation('append', manager, target);
+            break;
+        case 'prepend':
+            await handleConfigListMutation('prepend', manager, target);
+            break;
+        case 'auth':
+            await commands.executeCommand('pixi.auth');
+            break;
+    }
+}
+
 export function registerConfigCommands(manager: PixiProjectManager): Disposable {
     return Disposable.from(
         commands.registerCommand('pixi.config.list', (target?: unknown) => handleConfigList(manager, target)),
         commands.registerCommand('pixi.config.edit', (target?: unknown) => handleConfigEdit(manager, target)),
         commands.registerCommand('pixi.config.set', (target?: unknown) => handleConfigSet(manager, target)),
         commands.registerCommand('pixi.config.unset', (target?: unknown) => handleConfigUnset(manager, target)),
-        commands.registerCommand('pixi.config', async (target?: unknown) => {
-            interface ConfigActionItem extends QuickPickItem {
-                action: 'list' | 'edit' | 'set' | 'unset' | 'append' | 'prepend' | 'auth';
-            }
-
-            const items: ConfigActionItem[] = [
-                {
-                    label: '$(list-unordered) List Configuration Values',
-                    description: 'pixi config list',
-                    detail: 'Inspect active configuration settings across local, global, and system scopes',
-                    action: 'list',
-                },
-                {
-                    label: '$(edit) Edit Configuration File...',
-                    description: 'pixi config edit',
-                    detail: 'Open config.toml (global, workspace, or system) directly in editor',
-                    action: 'edit',
-                },
-                {
-                    label: '$(gear) Set Configuration Value...',
-                    description: 'pixi config set KEY VALUE',
-                    detail: 'Set or update a configuration key (e.g. default-channels, pinning-strategy)',
-                    action: 'set',
-                },
-                {
-                    label: '$(trash) Unset Configuration Value...',
-                    description: 'pixi config unset KEY',
-                    detail: 'Remove a custom configuration key and revert to defaults',
-                    action: 'unset',
-                },
-                {
-                    label: '$(add) Append Value to List Configuration...',
-                    description: 'pixi config append KEY VALUE',
-                    detail: 'Append an entry to a list setting (e.g. adding a channel)',
-                    action: 'append',
-                },
-                {
-                    label: '$(chevron-up) Prepend Value to List Configuration...',
-                    description: 'pixi config prepend KEY VALUE',
-                    detail: 'Prepend an entry to a list setting with highest priority',
-                    action: 'prepend',
-                },
-                {
-                    label: '$(key) Authentication & Credentials (pixi auth)...',
-                    description: 'pixi auth',
-                    detail: 'Login, logout, copy tokens, or check authentication status for registries and hosts',
-                    action: 'auth',
-                },
-            ];
-
-            const picked = await window.showQuickPick(items, {
-                title: 'Pixi: Configuration Management',
-                placeHolder: 'Select a configuration management action',
-            });
-            if (!picked) {
-                return;
-            }
-
-            switch (picked.action) {
-                case 'list':
-                    await handleConfigList(manager, target);
-                    break;
-                case 'edit':
-                    await handleConfigEdit(manager, target);
-                    break;
-                case 'set':
-                    await handleConfigSet(manager, target);
-                    break;
-                case 'unset':
-                    await handleConfigUnset(manager, target);
-                    break;
-                case 'append':
-                    await handleConfigListMutation('append', manager, target);
-                    break;
-                case 'prepend':
-                    await handleConfigListMutation('prepend', manager, target);
-                    break;
-                case 'auth':
-                    await commands.executeCommand('pixi.auth');
-                    break;
-            }
-        }),
+        commands.registerCommand('pixi.config', (target?: unknown) => handleConfigMenu(manager, target)),
     );
 }

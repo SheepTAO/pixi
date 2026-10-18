@@ -1,5 +1,6 @@
 import { runPixi } from '../cli/pixiCli';
 import { safeJsonParse } from '../common/execUtils';
+import type { PixiProjectManager } from './projectManager';
 
 export interface SystemRequirementsRecord {
     cuda?: string;
@@ -113,8 +114,6 @@ export interface WorkspacePlatformEntry {
     features: string[];
     environments: string[];
 }
-
-import type { PixiProjectManager } from './projectManager';
 
 /**
  * Retrieves the workspace platforms and declared virtual packages natively via in-memory manager or `pixi workspace platform list --json`.
