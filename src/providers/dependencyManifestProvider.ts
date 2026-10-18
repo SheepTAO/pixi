@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import * as path from 'path';
 import {
     CancellationToken,
     commands,
@@ -24,6 +25,7 @@ import {
 } from 'vscode';
 
 import { PixiExtensionApi } from '../api';
+import { runPixi } from '../cli/pixiCli';
 import { pickPixiProject } from '../commands/workspace/common';
 import { encodeCommandArg, escapeRegex, revealRangeInEditor } from '../common/execUtils';
 import { getPrefixDevPackageUrl, getPypiPackageUrl, normalizePkgName } from '../core/packageManager';
@@ -34,6 +36,9 @@ import {
     isPyproject,
     LOCKFILE_NAME,
     MANIFEST_SELECTORS,
+    PYPROJECT_MANIFEST_NAME,
+    SUPPORTED_MANIFEST_NAMES,
+    SupportedManifestName,
 } from '../core/projectDiscovery';
 import { PixiProjectManager } from '../core/projectManager';
 import { PixiPackage } from '../core/types';
@@ -175,6 +180,7 @@ export class PixiDependencyManifestProvider
     private readonly _onDidChangeInlayHints = new EventEmitter<void>();
     public readonly onDidChangeInlayHints: Event<void> = this._onDidChangeInlayHints.event;
     private readonly disposables: Disposable[] = [];
+    private isCheckingLockfile = false;
 
     constructor(
         private readonly projectManager: PixiProjectManager,
@@ -190,6 +196,9 @@ export class PixiDependencyManifestProvider
                 if (e.affectsConfiguration('pixi.dependencies.inlayHints')) {
                     this.refresh();
                 }
+            }),
+            workspace.onDidSaveTextDocument((doc) => {
+                void this.checkLockfileOnSave(doc);
             }),
             commands.registerCommand('pixi.openLockfile', (options) => this.openLockfileCommand(options)),
         );
@@ -208,6 +217,57 @@ export class PixiDependencyManifestProvider
     public isInlayHintsEnabled(document: TextDocument): boolean {
         const config = workspace.getConfiguration('pixi.dependencies', document.uri);
         return config.get<boolean>('inlayHints', true);
+    }
+
+    private async checkLockfileOnSave(document: TextDocument): Promise<void> {
+        if (document.uri.scheme !== 'file') {
+            return;
+        }
+
+        const config = workspace.getConfiguration('pixi.lockfile', document.uri);
+        if (!config.get<boolean>('checkOnSave', false)) {
+            return;
+        }
+
+        if (this.isCheckingLockfile) {
+            return;
+        }
+
+        const projectPath = this.projectManager.findProjectForUri(document.uri);
+        if (!projectPath) {
+            return;
+        }
+
+        const filename = path.basename(document.uri.fsPath);
+        if (!SUPPORTED_MANIFEST_NAMES.includes(filename as SupportedManifestName)) {
+            return;
+        }
+        if (filename === PYPROJECT_MANIFEST_NAME && !isPyproject(document)) {
+            return;
+        }
+
+        this.isCheckingLockfile = true;
+        try {
+            await runPixi(['list', '--no-install', '--frozen'], { cwd: projectPath });
+        } catch (error) {
+            const msg = error instanceof Error ? error.message : String(error);
+            if (
+                msg.includes('out of date') ||
+                msg.includes('out of sync') ||
+                msg.includes('lockfile') ||
+                msg.includes('not satisfied')
+            ) {
+                const choice = await window.showWarningMessage(
+                    `Pixi: Lockfile is out of sync with ${filename}.`,
+                    'Update Lockfile',
+                );
+                if (choice === 'Update Lockfile') {
+                    await commands.executeCommand('pixi.install', Uri.file(projectPath));
+                }
+            }
+        } finally {
+            this.isCheckingLockfile = false;
+        }
     }
 
     /**
@@ -421,6 +481,11 @@ export class PixiDependencyManifestProvider
         position: Position,
         token: CancellationToken,
     ): Promise<Hover | undefined> {
+        const config = workspace.getConfiguration('pixi.manifest', document.uri);
+        if (!config.get<boolean>('dependencyHover', true)) {
+            return undefined;
+        }
+
         const projectPath = this.projectManager.findProjectForUri(document.uri);
         if (!projectPath) {
             return undefined;

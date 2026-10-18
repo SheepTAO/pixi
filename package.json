@@ -1781,6 +1781,12 @@
                     "description": "Mechanism used to activate the Pixi environment when opening an integrated terminal.",
                     "scope": "resource"
                 },
+                "pixi.terminal.autoActivateOnCreate": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Automatically activate the Pixi environment when opening any standard integrated terminal.",
+                    "scope": "resource"
+                },
                 "pixi.packageSearch.maxResults": {
                     "type": "integer",
                     "default": 5,
@@ -1833,6 +1839,39 @@
                     ],
                     "default": "bottom",
                     "description": "Control the placement of the System Requirements item in the Environments view when system requirements are configured in the project manifest.",
+                    "scope": "resource"
+                },
+                "pixi.environments.showToolchains": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Display detected toolchain summary (e.g. Python, C++, Rust, R) next to environment names in the Environments tree view.",
+                    "scope": "resource"
+                },
+                "pixi.toolchains.scanLanguages": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "enum": [
+                            "python",
+                            "cpp",
+                            "rust",
+                            "r"
+                        ],
+                        "enumDescriptions": [
+                            "Python interpreter, IPython kernel, and Conda python packages",
+                            "C/C++ compilers (GCC, Clang, MSVC), CMake, and Ninja",
+                            "Rust compiler (rustc) and Cargo package manager",
+                            "R language runtime and Rscript"
+                        ]
+                    },
+                    "default": [
+                        "python",
+                        "cpp",
+                        "rust",
+                        "r"
+                    ],
+                    "uniqueItems": true,
+                    "description": "Programming language toolchains to scan and detect in installed Pixi environments. Clear this list to completely disable toolchain detection.",
                     "scope": "resource"
                 },
                 "pixi.cache.autoMeasureSize": {
@@ -1916,6 +1955,18 @@
                     "type": "boolean",
                     "default": true,
                     "description": "Enable offline schema-based autocompletion and hover documentation in pixi.toml and pyproject.toml manifests.",
+                    "scope": "resource"
+                },
+                "pixi.manifest.dependencyHover": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Display rich dependency information (locked version, license, package size, documentation links) when hovering over dependencies in pixi.toml or pyproject.toml manifests.",
+                    "scope": "resource"
+                },
+                "pixi.lockfile.checkOnSave": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Automatically check if pixi.lock is in sync with the manifest when saving pixi.toml or pyproject.toml.",
                     "scope": "resource"
                 }
             }

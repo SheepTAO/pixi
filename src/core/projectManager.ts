@@ -101,6 +101,11 @@ export class PixiProjectManager implements Disposable {
             workspace.onDidChangeWorkspaceFolders(async () => {
                 await this.refreshAll();
             }),
+            workspace.onDidChangeConfiguration(async (e) => {
+                if (e.affectsConfiguration('pixi.toolchains.scanLanguages')) {
+                    await this.refreshAll();
+                }
+            }),
         );
     }
 
@@ -433,6 +438,10 @@ export class PixiProjectManager implements Disposable {
                 })),
             );
 
+            const scanLanguages = workspace
+                .getConfiguration('pixi.toolchains', Uri.file(normalized))
+                .get<string[]>('scanLanguages', ['python', 'cpp', 'rust', 'r']);
+
             const envs: PixiEnvironmentInfo[] = await Promise.all(
                 (pixiInfo.environments_info || []).map(async (rawEnv) => {
                     const platforms = rawEnv.platforms || [];
@@ -484,7 +493,7 @@ export class PixiProjectManager implements Disposable {
                     };
 
                     if (status === 'installed') {
-                        const toolchains = await scanEnvironmentToolchains(rawEnv.prefix);
+                        const toolchains = await scanEnvironmentToolchains(rawEnv.prefix, scanLanguages);
                         envInfo.toolchains = toolchains;
                     }
 

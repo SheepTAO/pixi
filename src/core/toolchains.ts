@@ -237,15 +237,21 @@ function scanRustToolchain(envPath: string, metaFiles: string[]): RustToolchainI
 }
 
 /**
- * Scans an installed Pixi environment prefix for all supported language toolchains.
+ * Scans an installed Pixi environment prefix for supported language toolchains.
  */
-export async function scanEnvironmentToolchains(envPath: string): Promise<EnvironmentToolchains> {
+export async function scanEnvironmentToolchains(
+    envPath: string,
+    scanLanguages: string[] = ['python', 'cpp', 'rust', 'r'],
+): Promise<EnvironmentToolchains> {
+    if (!scanLanguages || scanLanguages.length === 0) {
+        return {};
+    }
     const metaFiles = await readCondaMetaFiles(envPath);
     return {
-        python: scanPythonToolchain(envPath, metaFiles),
-        cpp: scanCppToolchain(envPath, metaFiles),
-        r: scanRToolchain(envPath, metaFiles),
-        rust: scanRustToolchain(envPath, metaFiles),
+        python: scanLanguages.includes('python') ? scanPythonToolchain(envPath, metaFiles) : undefined,
+        cpp: scanLanguages.includes('cpp') ? scanCppToolchain(envPath, metaFiles) : undefined,
+        r: scanLanguages.includes('r') ? scanRToolchain(envPath, metaFiles) : undefined,
+        rust: scanLanguages.includes('rust') ? scanRustToolchain(envPath, metaFiles) : undefined,
     };
 }
 

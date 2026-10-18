@@ -156,7 +156,10 @@ export class PixiEnvironmentTreeItem extends TreeItem {
         if (isInstalled) {
             this.iconPath = new ThemeIcon('pass-filled', new ThemeColor('testing.iconPassed'));
             const descParts: string[] = [];
-            if (toolchainSummary) {
+            const showToolchains = workspace
+                .getConfiguration('pixi.environments', Uri.file(env.projectPath))
+                .get<boolean>('showToolchains', true);
+            if (showToolchains && toolchainSummary) {
                 descParts.push(toolchainSummary);
             }
             if (env.solveGroup) {
@@ -332,7 +335,8 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
                 }
                 if (
                     e.affectsConfiguration('pixi.environments.viewMode') ||
-                    e.affectsConfiguration('pixi.environments.systemRequirementsPosition')
+                    e.affectsConfiguration('pixi.environments.systemRequirementsPosition') ||
+                    e.affectsConfiguration('pixi.environments.showToolchains')
                 ) {
                     const newMode = workspace
                         .getConfiguration('pixi.environments')
