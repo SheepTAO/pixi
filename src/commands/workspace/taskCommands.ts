@@ -567,9 +567,7 @@ export function registerTaskCommands(manager: PixiProjectManager, taskProvider: 
         ),
 
         // Pixi: Create Task (from view title, unseeded/clean task name)
-        commands.registerCommand('pixi.tasks.createTask', () =>
-            handleAddTaskCommand(manager, taskProvider, undefined),
-        ),
+        commands.registerCommand('pixi.tasks.createTask', () => handleAddTaskCommand(manager, taskProvider, undefined)),
 
         // Pixi: Add Task...
         commands.registerCommand('pixi.tasks.addTask', (targetItem?: unknown) =>
