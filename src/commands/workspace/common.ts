@@ -706,12 +706,13 @@ export async function resolveTargetFolder(targetItem?: unknown, placeHolder?: st
         return direct;
     }
 
-    if (!workspace.workspaceFolders || workspace.workspaceFolders.length === 0) {
+    const folders = workspace.workspaceFolders;
+    if (!folders || folders.length === 0) {
         return undefined;
     }
 
-    if (workspace.workspaceFolders.length === 1) {
-        return workspace.workspaceFolders[0].uri.fsPath;
+    if (folders.length === 1) {
+        return folders[0].uri.fsPath;
     }
 
     const pick = await window.showWorkspaceFolderPick({

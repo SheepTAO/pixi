@@ -47,8 +47,8 @@ export async function getPixi(): Promise<string> {
 
     if (value) {
         let resolved = untildify(value);
-        if (workspace.workspaceFolders && workspace.workspaceFolders.length > 0) {
-            const firstFolder = workspace.workspaceFolders[0].uri.fsPath;
+        const firstFolder = workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (firstFolder) {
             resolved = resolved.replace(/\$\{workspaceFolder\}/g, firstFolder);
             if (!path.isAbsolute(resolved)) {
                 resolved = path.resolve(firstFolder, resolved);
