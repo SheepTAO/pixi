@@ -858,6 +858,26 @@ export function registerWorkspaceManagementCommands(manager: PixiProjectManager)
                     command: 'pixi.workspaceDependencies',
                 },
                 {
+                    label: '$(export) Export Environment ...',
+                    description: 'Export environment as Conda environment.yml or explicit specification',
+                    command: 'pixi.exportEnvironment',
+                },
+                {
+                    label: '$(cloud-download) Import Dependencies from File ...',
+                    description: 'Import Conda environment.yml or PyPI requirements.txt into workspace',
+                    command: 'pixi.import',
+                },
+                {
+                    label: '$(lock) Lock Dependencies ...',
+                    description: 'Solve and update lockfile (pixi.lock) for project',
+                    command: 'pixi.lock',
+                },
+                {
+                    label: '$(pass) Check Lockfile Drift ...',
+                    description: 'Verify if pixi.lock is synchronized with manifest requirements',
+                    command: 'pixi.checkLockfile',
+                },
+                {
                     label: '$(edit) Rename Workspace ...',
                     description: 'Get or update workspace name via pixi workspace name',
                     command: 'pixi.setProjectName',

@@ -624,11 +624,11 @@
                 },
                 {
                     "command": "pixi.bumpVersion",
-                    "when": "pixi.hasPixiProject"
+                    "when": "false"
                 },
                 {
                     "command": "pixi.exportEnvironment",
-                    "when": "pixi.hasPixiProject"
+                    "when": "false"
                 },
                 {
                     "command": "pixi.setDescription",
@@ -656,11 +656,11 @@
                 },
                 {
                     "command": "pixi.workspaceDependencies",
-                    "when": "pixi.hasPixiProject"
+                    "when": "false"
                 },
                 {
                     "command": "pixi.import",
-                    "when": "pixi.hasPixiProject"
+                    "when": "false"
                 },
                 {
                     "command": "pixi.lock",
@@ -668,7 +668,7 @@
                 },
                 {
                     "command": "pixi.checkLockfile",
-                    "when": "pixi.hasPixiProject"
+                    "when": "false"
                 },
                 {
                     "command": "pixi.clean",
@@ -726,11 +726,11 @@
                 },
                 {
                     "command": "pixi.runTaskWithArgs",
-                    "when": "pixi.hasPixiProject"
+                    "when": "false"
                 },
                 {
                     "command": "pixi.tasks.addTask",
-                    "when": "pixi.hasPixiProject"
+                    "when": "false"
                 },
                 {
                     "command": "pixi.tasks.addAlias",

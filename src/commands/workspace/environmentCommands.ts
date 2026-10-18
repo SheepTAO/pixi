@@ -164,13 +164,23 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                 } catch {
                     // Ignore
                 }
-            } else if (typeof targetItem === 'string' && fs.existsSync(targetItem)) {
-                filePath = targetItem;
+            } else if (typeof targetItem === 'string') {
+                try {
+                    if (fs.statSync(targetItem).isFile()) {
+                        filePath = targetItem;
+                    }
+                } catch {
+                    // Ignore
+                }
             }
 
             if (!filePath) {
                 const defaultUri =
-                    targetItem instanceof Uri ? targetItem : (workspace.workspaceFolders?.[0]?.uri ?? undefined);
+                    targetItem instanceof Uri
+                        ? targetItem
+                        : typeof targetItem === 'string'
+                          ? Uri.file(targetItem)
+                          : (workspace.workspaceFolders?.[0]?.uri ?? undefined);
                 const pickedUris = await window.showOpenDialog({
                     canSelectMany: false,
                     canSelectFolders: false,
@@ -1081,6 +1091,16 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                     label: '$(debug-restart) Reinstall All Environments...',
                     description: 'Reinstall all environments declared in the project (pixi reinstall --all)',
                     command: 'pixi.reinstall',
+                },
+                {
+                    label: '$(export) Export Environment...',
+                    description: 'Export an environment as Conda environment.yml or explicit specification',
+                    command: 'pixi.exportEnvironment',
+                },
+                {
+                    label: '$(cloud-download) Import Dependencies from File...',
+                    description: 'Import Conda environment.yml or PyPI requirements.txt into environment or feature',
+                    command: 'pixi.import',
                 },
                 {
                     label: '$(trash) Delete Environment...',
