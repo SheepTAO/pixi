@@ -77,8 +77,11 @@ async function runPixiCommandInTerminal(
             }
         };
 
+        let exitCode: number | undefined;
+
         const procSub = tasks.onDidEndTaskProcess((e) => {
             if ((execution && e.execution === execution) || e.execution.task === task) {
+                exitCode = e.exitCode;
                 cleanup();
                 resolve(e.exitCode);
             }
@@ -87,7 +90,7 @@ async function runPixiCommandInTerminal(
         const endSub = tasks.onDidEndTask((e) => {
             if ((execution && e.execution === execution) || e.execution.task === task) {
                 cleanup();
-                resolve(undefined);
+                resolve(exitCode ?? 0);
             }
         });
 

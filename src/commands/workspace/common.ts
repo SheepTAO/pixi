@@ -638,14 +638,14 @@ export async function resolveTargetEnvironment(
     envs: PixiEnvironmentInfo[],
     targetItem?: unknown,
     placeholder?: string,
-): Promise<string | undefined | null> {
+): Promise<string | undefined> {
     const directEnvName = extractEnvironmentName(targetItem);
     if (directEnvName) {
         return directEnvName;
     }
 
     if (envs.length <= 1) {
-        return envs[0]?.pixiEnvName === 'default' ? undefined : envs[0]?.pixiEnvName;
+        return envs[0]?.pixiEnvName || 'default';
     }
 
     const namedEnvs = envs.filter((e) => e.pixiEnvName !== 'default');
@@ -653,7 +653,7 @@ export async function resolveTargetEnvironment(
         {
             label: '$(globe) Default',
             description: 'Default environment',
-            envName: undefined,
+            envName: 'default',
         },
         ...namedEnvs.map(toEnvQuickPickItem),
     ];
@@ -663,7 +663,7 @@ export async function resolveTargetEnvironment(
         placeHolder: placeholder || 'Select environment to inspect',
     });
 
-    return selected ? selected.envName : null;
+    return selected?.envName;
 }
 
 export async function resolveTargetFolder(targetItem?: unknown, placeHolder?: string): Promise<string | undefined> {

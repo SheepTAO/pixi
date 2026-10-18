@@ -178,7 +178,7 @@ export async function showDependencyTreeCommand(manager: PixiProjectManager, tar
         targetItem,
         'Select environment to view dependency tree for',
     );
-    if (targetEnv === null) {
+    if (!targetEnv) {
         return;
     }
 
@@ -261,7 +261,7 @@ export async function whyPackageCommand(
             targetItem,
             'Select environment to inspect package dependencies',
         );
-        if (resolved === null) {
+        if (!resolved) {
             return;
         }
         targetEnv = resolved;

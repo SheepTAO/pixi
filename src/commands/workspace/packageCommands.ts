@@ -293,6 +293,62 @@ function toInstalledPackageQuickPickItem(p: PixiPackage): QuickPickItem & { pkgN
     };
 }
 
+interface PickInstalledPackageOptions {
+    title: string;
+    placeHolder: string;
+    projectPlaceHolder: string;
+    filterRemotelyUpdatable?: boolean;
+}
+
+async function pickInstalledPackage(
+    manager: PixiProjectManager,
+    targetItem: unknown,
+    options: PickInstalledPackageOptions,
+): Promise<{ projectPath: string; pkgName: string; targetEnv?: string } | undefined> {
+    const ctx = extractCommandContext(targetItem);
+    if (ctx.pkg && ctx.projectPath) {
+        return { projectPath: ctx.projectPath, pkgName: ctx.pkg.name, targetEnv: ctx.envName };
+    }
+
+    const projectPath = await pickPixiProject(manager, options.projectPlaceHolder, targetItem);
+    if (!projectPath) {
+        return undefined;
+    }
+
+    const envs = manager.getEnvironmentsForProject(projectPath);
+    const targetEnv = await resolveTargetEnvironment(envs, targetItem, options.placeHolder);
+    if (!targetEnv) {
+        return undefined;
+    }
+
+    const envLabel = targetEnv || (envs.length > 0 ? envs[0].pixiEnvName : 'default');
+    const packages = await manager.getPackagesForEnvironment(envLabel, projectPath);
+    const candidatePackages = options.filterRemotelyUpdatable
+        ? packages.filter((p) => !p.is_local && !p.is_editable)
+        : packages;
+
+    if (candidatePackages.length === 0) {
+        window.showInformationMessage(
+            packages.length === 0
+                ? `No packages found in environment '${envLabel}'.`
+                : `No remotely updatable packages found in environment '${envLabel}'.`,
+        );
+        return undefined;
+    }
+
+    const items = sortPixiPackages(candidatePackages).map(toInstalledPackageQuickPickItem);
+    const picked = await window.showQuickPick(items, {
+        title: options.title,
+        placeHolder: options.placeHolder,
+        matchOnDescription: true,
+    });
+    if (!picked) {
+        return undefined;
+    }
+
+    return { projectPath, pkgName: picked.pkgName, targetEnv };
+}
+
 export function registerPackageCommands(manager: PixiProjectManager): Disposable[] {
     async function resolveDeclaredPackageTarget(
         targetItem: unknown,
@@ -530,91 +586,29 @@ export function registerPackageCommands(manager: PixiProjectManager): Disposable
 
         // Pixi: Update Package
         commands.registerCommand('pixi.updatePackage', async (targetItem?: unknown) => {
-            const ctx = extractCommandContext(targetItem);
-            if (ctx.pkg && ctx.projectPath) {
-                return executeUpdatePackage(manager, ctx.projectPath, ctx.pkg.name, ctx.envName);
-            }
-
-            const projectPath = await pickPixiProject(manager, 'Select Pixi project to update package in', targetItem);
-            if (!projectPath) {
-                return;
-            }
-
-            const placeHolder = 'Select a package to update to latest compatible version';
-            const envs = manager.getEnvironmentsForProject(projectPath);
-            const targetEnv = await resolveTargetEnvironment(envs, targetItem, placeHolder);
-            if (targetEnv === null) {
-                return;
-            }
-
-            const envLabel = targetEnv || (envs.length > 0 ? envs[0].pixiEnvName : 'default');
-            const packages = await manager.getPackagesForEnvironment(envLabel, projectPath);
-            const updatablePackages = packages.filter((p) => !p.is_local && !p.is_editable);
-            if (updatablePackages.length === 0) {
-                window.showInformationMessage(
-                    packages.length === 0
-                        ? `No packages found in environment '${envLabel}'.`
-                        : `No remotely updatable packages found in environment '${envLabel}'.`,
-                );
-                return;
-            }
-
-            const items = sortPixiPackages(updatablePackages).map(toInstalledPackageQuickPickItem);
-
-            const picked = await window.showQuickPick(items, {
+            const picked = await pickInstalledPackage(manager, targetItem, {
                 title: 'Pixi: Update Package',
-                placeHolder,
-                matchOnDescription: true,
+                placeHolder: 'Select a package to update to latest compatible version',
+                projectPlaceHolder: 'Select Pixi project to update package in',
+                filterRemotelyUpdatable: true,
             });
             if (!picked) {
                 return;
             }
-
-            return executeUpdatePackage(manager, projectPath, picked.pkgName, targetEnv);
+            return executeUpdatePackage(manager, picked.projectPath, picked.pkgName, picked.targetEnv);
         }),
 
         // Pixi: Reinstall Package (Single Package)
         commands.registerCommand('pixi.reinstallPackage', async (targetItem?: unknown) => {
-            const ctx = extractCommandContext(targetItem);
-            if (ctx.pkg && ctx.projectPath) {
-                return executeReinstallPackage(manager, ctx.projectPath, ctx.pkg.name, ctx.envName);
-            }
-
-            const projectPath = await pickPixiProject(
-                manager,
-                'Select Pixi project to reinstall package in',
-                targetItem,
-            );
-            if (!projectPath) {
-                return;
-            }
-
-            const placeHolder = 'Select a package to reinstall';
-            const envs = manager.getEnvironmentsForProject(projectPath);
-            const targetEnv = await resolveTargetEnvironment(envs, targetItem, placeHolder);
-            if (targetEnv === null) {
-                return;
-            }
-
-            const envLabel = targetEnv || (envs.length > 0 ? envs[0].pixiEnvName : 'default');
-            const packages = await manager.getPackagesForEnvironment(envLabel, projectPath);
-            if (packages.length === 0) {
-                window.showInformationMessage(`No packages found in environment '${envLabel}'.`);
-                return;
-            }
-
-            const items = sortPixiPackages(packages).map(toInstalledPackageQuickPickItem);
-
-            const picked = await window.showQuickPick(items, {
+            const picked = await pickInstalledPackage(manager, targetItem, {
                 title: 'Pixi: Reinstall Package',
-                placeHolder,
-                matchOnDescription: true,
+                placeHolder: 'Select a package to reinstall',
+                projectPlaceHolder: 'Select Pixi project to reinstall package in',
             });
             if (!picked) {
                 return;
             }
-
-            return executeReinstallPackage(manager, projectPath, picked.pkgName, targetEnv);
+            return executeReinstallPackage(manager, picked.projectPath, picked.pkgName, picked.targetEnv);
         }),
 
         // Pixi: Reveal Package in Manifest (pixi.toml / pyproject.toml)

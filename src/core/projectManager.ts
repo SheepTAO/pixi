@@ -386,42 +386,52 @@ export class PixiProjectManager implements Disposable {
             this.projectToManifest.set(projectKey, manifestPath);
             this.projectToName.set(projectKey, projectName);
 
-            const platformsMap = new Map<string, WorkspacePlatformEntry>();
+            interface PlatformAggregate {
+                name: string;
+                subdir?: string;
+                virtualPackages: Set<string>;
+                features: Set<string>;
+                environments: Set<string>;
+            }
+
+            const platformsMap = new Map<string, PlatformAggregate>();
             for (const rawEnv of pixiInfo.environments_info || []) {
                 for (const p of rawEnv.platforms || []) {
                     const platName = typeof p === 'string' ? p : p.name;
                     const subdir = typeof p === 'object' ? p.subdir : undefined;
                     const vps: string[] =
                         typeof p === 'object' && Array.isArray(p.virtual_packages) ? p.virtual_packages : [];
-                    if (!platformsMap.has(platName)) {
-                        platformsMap.set(platName, {
+                    let entry = platformsMap.get(platName);
+                    if (!entry) {
+                        entry = {
                             name: platName,
                             subdir,
-                            virtualPackages: [...vps],
-                            features: rawEnv.features || [],
-                            environments: [rawEnv.name],
-                        });
+                            virtualPackages: new Set(vps),
+                            features: new Set(rawEnv.features || []),
+                            environments: new Set([rawEnv.name]),
+                        };
+                        platformsMap.set(platName, entry);
                     } else {
-                        const entry = platformsMap.get(platName)!;
                         for (const vp of vps) {
-                            if (!entry.virtualPackages.includes(vp)) {
-                                entry.virtualPackages.push(vp);
-                            }
+                            entry.virtualPackages.add(vp);
                         }
-                        if (rawEnv.features) {
-                            for (const f of rawEnv.features) {
-                                if (!entry.features.includes(f)) {
-                                    entry.features.push(f);
-                                }
-                            }
+                        for (const f of rawEnv.features || []) {
+                            entry.features.add(f);
                         }
-                        if (!entry.environments.includes(rawEnv.name)) {
-                            entry.environments.push(rawEnv.name);
-                        }
+                        entry.environments.add(rawEnv.name);
                     }
                 }
             }
-            this.projectToPlatforms.set(projectKey, Array.from(platformsMap.values()));
+            this.projectToPlatforms.set(
+                projectKey,
+                Array.from(platformsMap.values()).map((e) => ({
+                    name: e.name,
+                    subdir: e.subdir,
+                    virtualPackages: Array.from(e.virtualPackages),
+                    features: Array.from(e.features),
+                    environments: Array.from(e.environments),
+                })),
+            );
 
             const envs: PixiEnvironmentInfo[] = await Promise.all(
                 (pixiInfo.environments_info || []).map(async (rawEnv) => {
