@@ -45,6 +45,26 @@ npm run lint -- --fix  # Auto-fix linting issues
 - **Pure Common Utilities (`src/common/`)**: Keep common helpers (exec, deferred promises, logging, persistent state) free of domain-specific Pixi assumptions.
 - **Public Extension API (`src/api/`)**: Maintain backward compatibility and clear typing for `PixiExtensionApi`.
 
+## Public Extension API
+
+Other VS Code extensions can programmatically access Pixi workspaces, environments, and active selections:
+
+```typescript
+import * as vscode from 'vscode';
+import type { PixiExtensionApi } from 'sheeptao.pixi';
+
+const pixi = vscode.extensions.getExtension<PixiExtensionApi>('sheeptao.pixi')?.exports;
+if (pixi) {
+    const projectPaths = pixi.getProjectPaths();
+    const envs = pixi.getAllEnvironments();
+    const activeEnv = await pixi.getActiveEnvironment();
+
+    pixi.onDidChangeActiveEnvironment((e) => {
+        console.log('Active environment changed:', e.environment?.pixiEnvName);
+    });
+}
+```
+
 ## Running & Debugging Locally
 
 1. Open the project folder in VS Code.

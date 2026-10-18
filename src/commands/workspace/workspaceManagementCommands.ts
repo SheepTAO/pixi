@@ -278,7 +278,7 @@ async function handleSetRequiresPixiCommand(manager: PixiProjectManager, targetI
     const items: RequiresPixiActionItem[] = [
         {
             label: '$(edit) Set Minimum Pixi Requirement...',
-            description: currentReq ? `Current: ${currentReq}` : 'e.g. >=0.80.0, >=0.81.0',
+            description: currentReq ? `Current: ${currentReq}` : 'e.g. >=0.60.0, >=0.79.0',
             detail: 'Specify the minimum required Pixi version for this workspace',
             action: 'set',
         },
@@ -330,8 +330,8 @@ async function handleSetRequiresPixiCommand(manager: PixiProjectManager, targetI
     } else if (picked.action === 'set') {
         const input = await window.showInputBox({
             title: `Pixi: Set Requires-Pixi for '${projectName}'`,
-            prompt: 'Enter Pixi version constraint (e.g. >=0.80.0, >=0.81.0, >=1.0.0)',
-            value: currentReq || '>=0.80.0',
+            prompt: 'Enter Pixi version constraint (e.g. >=0.60.0, >=0.79.0, >=1.0.0)',
+            value: currentReq || '>=0.60.0',
             validateInput: (val) => (!val.trim() ? 'Version constraint cannot be empty' : null),
         });
         if (!input) {

@@ -5,12 +5,42 @@ All notable changes to the "pixi" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.0.0] - 2026-10-18
 
-- **Task Execution with Command-Line Arguments**:
-    - Support passing custom arguments directly to tasks via unified command-line execution (`ShellExecution`), preserving quotes, flags, and parameters without lossy parsing.
-    - Consolidate argument prompting into `pixi.runTask`, `pixi.runTaskWithArgs`, and `pixi.runTaskInEnvironment` with clean, optional input prompts.
-    - Add `Run Task with Arguments ...` action to Tasks tree view (inline & context menu) and manifest Hover / CodeLens actions.
+- **Modern Pixi Workspace Architecture & Baseline Compatibility**:
+    - Set minimum Pixi version requirement to `>= 0.60.0` (covering all daily workflows: environments, tasks, packages, terminals, Python, and manifests), with `>= 0.79.0` recommended for complete modern workspace CLI feature access.
+    - Completely remove legacy compatibility shims and workarounds for obsolete pre-0.60 Pixi releases.
+    - Streamline Command Palette hierarchy: consolidate scattered commands into 15 high-level, focused Hub entries and hide internal sub-menus (`when: false`).
+- **Pixi Solve Groups & Workspace Dependencies**:
+    - Add native support for Pixi solve groups (`[environments.<name>.solve-group]`), enabling co-solved environments and visual solve group indicators in the Environments view.
+    - Add first-class support for workspace-level shared dependencies (`[workspace.dependencies]`) via native `pixi workspace dependencies` CLI.
+- **Unified Workspace Hub (`pixi.workspace`)**:
+    - Centralized interactive menu to manage shared workspace dependencies, target platforms, channels, system requirements, lockfiles, version bumping, and descriptions.
+    - Interactive target platform picker with 1-click host auto-detection for OS, architecture, and GPU CUDA virtual packages.
+    - Interactive system requirements hub (`pixi.systemRequirements`) for CUDA, glibc, archspec, and OS platform constraints.
+- **Unified Configuration & Authentication Hub (`pixi.config`)**:
+    - Manage Pixi configuration across workspace local, user global, and system scopes (`pixi config list`, `set`, `unset`, `append`, `prepend`, `edit`).
+    - Consolidate private registry credentials and authentication (`pixi auth`), including background OAuth device flow with zero terminal clutter.
+- **Environment Import & Export**:
+    - Import external Conda `environment.yml` and PyPI `requirements.txt` into existing or new environments (`pixi import`).
+    - Export environment specifications to standard Conda environment YAML or Conda Explicit Specification (`@EXPLICIT`).
+- **Granular Cleanup & Machine Registry Management (`pixi.clean`)**:
+    - Targeted cleanup for project environments, individual environment prefixes, activation script cache (`pixi clean --activation-cache`), build backends, and package caches.
+    - Machine-wide workspace registry management (`pixi workspace register`) and stale registry cleanup (`pixi clean --workspaces-registry`).
+- **Task Execution Arguments Pipeline**:
+    - Pass arbitrary runtime arguments (`ShellExecution`) to Pixi tasks from Command Palette (`pixi.runTaskWithArgs`), Tasks tree view, Hover, and CodeLens without argument loss.
+    - Support declared task aliases in project manifests.
+- **Terminal Execution & ShellHook Mode**:
+    - Introduce `pixi.terminal.activationMode` supporting fast `shellHook` environment variable activation alongside `shell`.
+    - Add configurable `pixi.executionMode` (`smart`, `terminal`, `notification`) for running tasks and package actions.
+- **Package Management Enhancements**:
+    - 1-click single package reinstall directly from the Environments tree view.
+    - Selective package upgrades via interactive multi-select QuickPick in `Pixi: Update / Upgrade ...`.
+    - Outdated package dry-run inspection with build diffs and cascade removal warnings.
+- **Codebase Modernization & Performance**:
+    - Eliminate indirect command reflection (`executeCommand('pixi....')`) in favor of direct handler functions.
+    - Consolidate project path resolution, storage key normalization, and precompiled regexes.
+    - Upgrade development toolchain to TypeScript 6, ESLint 10, and Prettier 3.8.
 
 ## [1.6.4] - 2026-10-13
 

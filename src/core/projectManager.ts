@@ -298,7 +298,7 @@ export class PixiProjectManager implements Disposable {
                         }),
                     );
 
-                    // Check for registered sub-workspaces within open workspace folders (Pixi 0.80+)
+                    // Check for registered sub-workspaces within open workspace folders
                     try {
                         const isWindows = process.platform === 'win32';
                         const regOutput = await runPixi(['workspace', 'register', 'list', '--json']);

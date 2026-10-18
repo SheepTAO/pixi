@@ -134,7 +134,7 @@ export async function runPixi(args: string[], options?: PixiRunOptions, token?: 
     });
 }
 
-const MINIMUM_PIXI_VERSION = '0.80.0';
+const MINIMUM_PIXI_VERSION = '0.60.0';
 
 export async function validatePixiCli(): Promise<boolean> {
     try {

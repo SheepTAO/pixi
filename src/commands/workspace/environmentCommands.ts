@@ -374,7 +374,7 @@ async function handleCreateEnvironmentCommand(manager: PixiProjectManager, targe
         return;
     }
 
-    // Optional Solve Group selection (Pixi 0.80+)
+    // Optional Solve Group selection
     const existingSolveGroups = Array.from(
         new Set(existingEnvs.map((e) => e.solveGroup).filter((g): g is string => Boolean(g))),
     );
