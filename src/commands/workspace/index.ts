@@ -1,5 +1,6 @@
 import { Disposable } from 'vscode';
 
+import { PixiPackageUpdateService } from '../../core/packageUpdateService';
 import { PixiProjectManager } from '../../core/projectManager';
 import { PixiTaskProvider } from '../../providers/taskProvider';
 import { registerChannelCommands } from './channelCommands';
@@ -11,14 +12,18 @@ import { registerTaskCommands } from './taskCommands';
 import { registerUpdateCommands } from './updateCommands';
 import { registerWorkspaceManagementCommands } from './workspaceManagementCommands';
 
-export function registerWorkspaceCommands(manager: PixiProjectManager, taskProvider: PixiTaskProvider): Disposable {
+export function registerWorkspaceCommands(
+    manager: PixiProjectManager,
+    taskProvider: PixiTaskProvider,
+    packageUpdateService?: PixiPackageUpdateService,
+): Disposable {
     return Disposable.from(
         ...registerEnvironmentCommands(manager),
         ...registerPackageCommands(manager),
         ...registerChannelCommands(manager),
         ...registerPlatformCommands(manager),
         ...registerSystemRequirementsCommands(manager),
-        ...registerUpdateCommands(manager),
+        ...registerUpdateCommands(manager, packageUpdateService),
         ...registerWorkspaceManagementCommands(manager),
         ...registerTaskCommands(manager, taskProvider),
     );

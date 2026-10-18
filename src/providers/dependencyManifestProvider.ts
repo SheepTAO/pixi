@@ -29,6 +29,7 @@ import { runPixi } from '../cli/pixiCli';
 import { pickPixiProject } from '../commands/workspace/common';
 import { encodeCommandArg, escapeRegex, revealRangeInEditor } from '../common/execUtils';
 import { getPrefixDevPackageUrl, getPypiPackageUrl, normalizePkgName } from '../core/packageManager';
+import { PixiPackageUpdateService } from '../core/packageUpdateService';
 import {
     DEFAULT_CONDA_CHANNEL,
     getLockfilePath,
@@ -185,15 +186,22 @@ export class PixiDependencyManifestProvider
     constructor(
         private readonly projectManager: PixiProjectManager,
         pixiApi: PixiExtensionApi,
+        private readonly packageUpdateService?: PixiPackageUpdateService,
     ) {
         this.disposables.push(
             languages.registerInlayHintsProvider(MANIFEST_SELECTORS, this),
             languages.registerHoverProvider(MANIFEST_SELECTORS, this),
             languages.registerDefinitionProvider(MANIFEST_SELECTORS, this),
             this.projectManager.onDidChangeEnvironments(() => this.refresh()),
+            this.packageUpdateService
+                ? this.packageUpdateService.onDidChangeOutdatedPackages(() => this.refresh())
+                : Disposable.from(),
             pixiApi.onDidChangeActiveEnvironment(() => this.refresh()),
             workspace.onDidChangeConfiguration((e) => {
-                if (e.affectsConfiguration('pixi.dependencies.inlayHints')) {
+                if (
+                    e.affectsConfiguration('pixi.dependencies.inlayHints') ||
+                    e.affectsConfiguration('pixi.packages.checkForUpdates')
+                ) {
                     this.refresh();
                 }
             }),
@@ -412,6 +420,10 @@ export class PixiDependencyManifestProvider
             return [];
         }
 
+        if (this.packageUpdateService) {
+            void this.packageUpdateService.checkForUpdates(projectPath);
+        }
+
         const activeEnv = this.projectManager.getEnvironmentForUri(document.uri);
         const activeEnvName = activeEnv?.pixiEnvName || 'default';
         const activePackages = await this.projectManager.getPackagesForEnvironment(activeEnvName, projectPath);
@@ -426,7 +438,12 @@ export class PixiDependencyManifestProvider
         for (const dep of visibleDeps) {
             const pkg = activeMap.get(normalizePkgName(dep.name));
             if (pkg && pkg.version) {
-                hints.push(this.createInlayHint(dep, pkg));
+                const outdatedVer = this.packageUpdateService?.getOutdatedPackage(
+                    projectPath,
+                    activeEnvName,
+                    dep.name,
+                )?.afterVer;
+                hints.push(this.createInlayHint(dep, pkg, outdatedVer));
             } else {
                 missingDeps.push(dep);
             }
@@ -448,7 +465,12 @@ export class PixiDependencyManifestProvider
                     const dep = missingDeps[i];
                     const pkg = envMap.get(normalizePkgName(dep.name));
                     if (pkg && pkg.version) {
-                        hints.push(this.createInlayHint(dep, pkg));
+                        const outdatedVer = this.packageUpdateService?.getOutdatedPackage(
+                            projectPath,
+                            env.pixiEnvName,
+                            dep.name,
+                        )?.afterVer;
+                        hints.push(this.createInlayHint(dep, pkg, outdatedVer));
                         missingDeps.splice(i, 1);
                     }
                 }
@@ -463,7 +485,12 @@ export class PixiDependencyManifestProvider
                     for (const dep of missingDeps) {
                         const lockedVer = getLockedVersionFromLines(lockLines, dep.name);
                         if (lockedVer) {
-                            hints.push(this.createInlayHint(dep, { version: lockedVer } as PixiPackage));
+                            const outdatedVer = this.packageUpdateService?.getOutdatedPackage(
+                                projectPath,
+                                activeEnvName,
+                                dep.name,
+                            )?.afterVer;
+                            hints.push(this.createInlayHint(dep, { version: lockedVer } as PixiPackage, outdatedVer));
                         }
                     }
                 }
@@ -494,6 +521,10 @@ export class PixiDependencyManifestProvider
         const matched = this.getDependencyAtPosition(document, position);
         if (!matched || token.isCancellationRequested) {
             return undefined;
+        }
+
+        if (this.packageUpdateService) {
+            void this.packageUpdateService.checkForUpdates(projectPath);
         }
 
         const activeEnv = this.projectManager.getEnvironmentForUri(document.uri);
@@ -580,7 +611,16 @@ export class PixiDependencyManifestProvider
             ];
             md.appendMarkdown(`---\n${unresolvedActions.join(' &nbsp;&nbsp;|&nbsp;&nbsp; ')}`);
         } else {
-            md.appendMarkdown(`### $(package) **${targetPkg.name}** \`${targetPkg.version}\`\n\n`);
+            const activeOutdated = this.packageUpdateService?.getOutdatedPackage(
+                projectPath,
+                foundEnvName,
+                targetPkg.name,
+            );
+            const titleUpdateArrow =
+                activeOutdated?.afterVer && activeOutdated.afterVer !== targetPkg.version
+                    ? ` (↑ \`${activeOutdated.afterVer}\`)`
+                    : '';
+            md.appendMarkdown(`### $(package) **${targetPkg.name}** \`${targetPkg.version}\`${titleUpdateArrow}\n\n`);
 
             md.appendMarkdown(`| Detail | Value |\n`);
             md.appendMarkdown(`| :--- | :--- |\n`);
@@ -614,15 +654,35 @@ export class PixiDependencyManifestProvider
 
             // Highlight differences across other environments if any
             if (envVersions.size > 1) {
-                const diffVersions = Array.from(envVersions.entries()).filter(
-                    ([env, p]) =>
-                        env !== foundEnvName && (p.version !== targetPkg?.version || p.build !== targetPkg?.build),
-                );
+                const diffVersions = Array.from(envVersions.entries()).filter(([env, p]) => {
+                    if (env === foundEnvName) {
+                        return false;
+                    }
+                    const otherOutdated = this.packageUpdateService?.getOutdatedPackage(
+                        projectPath,
+                        env,
+                        targetPkg?.name ?? '',
+                    );
+                    return (
+                        p.version !== targetPkg?.version ||
+                        p.build !== targetPkg?.build ||
+                        otherOutdated?.afterVer !== activeOutdated?.afterVer
+                    );
+                });
                 if (diffVersions.length > 0) {
                     md.appendMarkdown(`**Other Environments:**\n`);
                     for (const [env, p] of diffVersions) {
                         const buildSuffix = p.build ? ` (\`${p.build}\`)` : '';
-                        md.appendMarkdown(`- \`${env}\`: \`${p.version}\`${buildSuffix}\n`);
+                        const otherOutdated = this.packageUpdateService?.getOutdatedPackage(
+                            projectPath,
+                            env,
+                            targetPkg.name,
+                        );
+                        const otherArrow =
+                            otherOutdated?.afterVer && otherOutdated.afterVer !== p.version
+                                ? ` (↑ \`${otherOutdated.afterVer}\`)`
+                                : '';
+                        md.appendMarkdown(`- \`${env}\`: \`${p.version}\`${buildSuffix}${otherArrow}\n`);
                     }
                     md.appendMarkdown(`\n`);
                 }
@@ -747,9 +807,10 @@ export class PixiDependencyManifestProvider
         return new Map(packages.map((pkg) => [normalizePkgName(pkg.name), pkg]));
     }
 
-    private createInlayHint(dep: ParsedDependency, pkg: PixiPackage): InlayHint {
+    private createInlayHint(dep: ParsedDependency, pkg: PixiPackage, outdatedVer?: string): InlayHint {
         const tag = pkg.is_editable ? ' (editable)' : pkg.is_local ? ' (local)' : '';
-        const hint = new InlayHint(dep.insertPosition, `: ${pkg.version}${tag}`, InlayHintKind.Type);
+        const updateArrow = outdatedVer && outdatedVer !== pkg.version ? ` (↑ ${outdatedVer})` : '';
+        const hint = new InlayHint(dep.insertPosition, `: ${pkg.version}${tag}${updateArrow}`, InlayHintKind.Type);
         hint.paddingLeft = true;
         hint.paddingRight = false;
         return hint;

@@ -9,6 +9,7 @@ import { registerInfoCommands } from './commands/infoCommands';
 import { registerWorkspaceCommands } from './commands/workspace';
 import { registerLogger, traceInfo } from './common/logging';
 import { setPersistentState } from './common/persistentState';
+import { PixiPackageUpdateService } from './core/packageUpdateService';
 import { PixiProjectManager } from './core/projectManager';
 import { activatePythonSupport } from './languages/python';
 import { PixiDependencyManifestProvider } from './providers/dependencyManifestProvider';
@@ -32,6 +33,9 @@ export async function activate(context: ExtensionContext): Promise<PixiExtension
     const projectManager = new PixiProjectManager();
     context.subscriptions.push(projectManager);
 
+    const packageUpdateService = new PixiPackageUpdateService(projectManager);
+    context.subscriptions.push(packageUpdateService);
+
     const extensionVersion: string = context.extension.packageJSON.version;
     const pixiApi = createPixiApi(projectManager, extensionVersion);
     context.subscriptions.push(pixiApi);
@@ -42,7 +46,11 @@ export async function activate(context: ExtensionContext): Promise<PixiExtension
     const taskManifestProvider = new PixiTaskManifestProvider(projectManager, taskProvider);
     context.subscriptions.push(taskManifestProvider);
 
-    const dependencyManifestProvider = new PixiDependencyManifestProvider(projectManager, pixiApi);
+    const dependencyManifestProvider = new PixiDependencyManifestProvider(
+        projectManager,
+        pixiApi,
+        packageUpdateService,
+    );
     context.subscriptions.push(dependencyManifestProvider);
 
     const manifestSchemaProvider = new PixiManifestSchemaProvider(context);
@@ -51,7 +59,7 @@ export async function activate(context: ExtensionContext): Promise<PixiExtension
     const terminalProvider = new PixiTerminalProvider(projectManager, context);
     context.subscriptions.push(terminalProvider);
 
-    const workspaceCommands = registerWorkspaceCommands(projectManager, taskProvider);
+    const workspaceCommands = registerWorkspaceCommands(projectManager, taskProvider, packageUpdateService);
     context.subscriptions.push(workspaceCommands);
 
     const globalCommands = registerGlobalCommands();
@@ -61,7 +69,7 @@ export async function activate(context: ExtensionContext): Promise<PixiExtension
     context.subscriptions.push(configCommands);
 
     // 2. Register Tree Views
-    const projectsTreeDataProvider = new PixiProjectsTreeDataProvider(projectManager);
+    const projectsTreeDataProvider = new PixiProjectsTreeDataProvider(projectManager, packageUpdateService);
     const projectsTreeView = window.createTreeView('pixi.views.projects', {
         treeDataProvider: projectsTreeDataProvider,
     });

@@ -1811,6 +1811,12 @@
                     "description": "Control how installed packages are displayed in the Environments tree view.",
                     "scope": "resource"
                 },
+                "pixi.packages.checkForUpdates": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Automatically check for available package updates in the background and display upgrade hints in the Environments tree view and manifest files (pixi.toml / pyproject.toml).",
+                    "scope": "resource"
+                },
                 "pixi.environments.viewMode": {
                     "type": "string",
                     "enum": [

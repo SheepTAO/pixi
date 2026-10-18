@@ -93,19 +93,20 @@ All actions are organized into intuitive, guided QuickPick hubs. Press `Ctrl+Shi
 
 Customize extension behavior in your VS Code `settings.json`:
 
-| Setting                              | Default                          | Description                                                                       |
-| :----------------------------------- | :------------------------------- | :-------------------------------------------------------------------------------- |
-| `pixi.executablePath`                | `""`                             | Path to `pixi` binary (auto-discovered from `PATH` by default).                   |
-| `pixi.executionMode`                 | `"smart"`                        | Command output mode: `"smart"`, `"terminal"`, or `"notification"`.                |
-| `pixi.environmentRules`              | `[]`                             | Route files/folders to environments (e.g. `["tests/**=dev", "train/**=gpu"]`).    |
-| `pixi.environments.showToolchains`   | `true`                           | Display detected toolchains (`Python`, `C++`, `Rust`, `R`) in environment tree.   |
-| `pixi.toolchains.scanLanguages`      | `["python", "cpp", "rust", "r"]` | Languages to scan for toolchains (clear to `[]` to disable detection).            |
-| `pixi.terminal.autoActivateOnCreate` | `false`                          | Automatically activate default Pixi environment in standard integrated terminals. |
-| `pixi.lockfile.checkOnSave`          | `false`                          | Automatically detect lockfile drift when saving manifests.                        |
-| `pixi.tasks.groupBy`                 | `"prefix"`                       | Organize task tree by `"prefix"`, `"environment"`, or `"none"`.                   |
-| `pixi.tasks.manifestActions`         | `"hover"`                        | Manifest task action style: `"hover"`, `"compact"`, `"full"`, or `"off"`.         |
-| `pixi.dependencies.inlayHints`       | `true`                           | Show resolved package versions inline in `pixi.toml` and `pyproject.toml`.        |
-| `pixi.manifest.dependencyHover`      | `true`                           | Display rich package hover cards in manifest files.                               |
+| Setting                              | Default                          | Description                                                                        |
+| :----------------------------------- | :------------------------------- | :--------------------------------------------------------------------------------- |
+| `pixi.executablePath`                | `""`                             | Path to `pixi` binary (auto-discovered from `PATH` by default).                    |
+| `pixi.executionMode`                 | `"smart"`                        | Command output mode: `"smart"`, `"terminal"`, or `"notification"`.                 |
+| `pixi.environmentRules`              | `[]`                             | Route files/folders to environments (e.g. `["tests/**=dev", "train/**=gpu"]`).     |
+| `pixi.environments.showToolchains`   | `true`                           | Display detected toolchains (`Python`, `C++`, `Rust`, `R`) in environment tree.    |
+| `pixi.toolchains.scanLanguages`      | `["python", "cpp", "rust", "r"]` | Languages to scan for toolchains (clear to `[]` to disable detection).             |
+| `pixi.terminal.autoActivateOnCreate` | `false`                          | Automatically activate default Pixi environment in standard integrated terminals.  |
+| `pixi.lockfile.checkOnSave`          | `false`                          | Automatically detect lockfile drift when saving manifests.                         |
+| `pixi.tasks.groupBy`                 | `"prefix"`                       | Organize task tree by `"prefix"`, `"environment"`, or `"none"`.                    |
+| `pixi.tasks.manifestActions`         | `"hover"`                        | Manifest task action style: `"hover"`, `"compact"`, `"full"`, or `"off"`.          |
+| `pixi.dependencies.inlayHints`       | `true`                           | Show resolved package versions inline in `pixi.toml` and `pyproject.toml`.         |
+| `pixi.manifest.dependencyHover`      | `true`                           | Display rich package hover cards in manifest files.                                |
+| `pixi.packages.checkForUpdates`      | `false`                          | Automatically detect package updates and show upgrade hints in tree and manifests. |
 
 _Tip: Search `@ext:sheeptao.pixi` in VS Code Settings (`Ctrl+,` / `Cmd+,`) to browse all available options._
 

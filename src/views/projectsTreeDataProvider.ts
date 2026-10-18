@@ -15,6 +15,7 @@ import {
 
 import { getReferencingEnvs, getWorkspaceFeatures, WorkspaceListEntry } from '../commands/workspace/common';
 import { enrichLocalPackages, normalizePkgName, sortPixiPackages, splitPackageSpec } from '../core/packageManager';
+import { PixiPackageUpdateService } from '../core/packageUpdateService';
 import { getProjectKey } from '../core/projectDiscovery';
 import { PixiProjectManager } from '../core/projectManager';
 import {
@@ -58,9 +59,11 @@ export class PixiPackageTreeItem extends TreeItem {
         public readonly env: PixiEnvironmentInfo | undefined,
         public readonly project: PixiProject,
         public readonly featureName?: string,
+        public readonly outdatedVer?: string,
     ) {
         super(pkg.name, TreeItemCollapsibleState.None);
         const versionStr = pkg.version ? ` v${pkg.version}` : '';
+        const updateArrow = outdatedVer && outdatedVer !== pkg.version ? ` (↑ ${outdatedVer})` : '';
 
         if (pkg.is_editable || pkg.is_local) {
             const tag = pkg.is_editable ? 'editable' : 'local';
@@ -69,8 +72,8 @@ export class PixiPackageTreeItem extends TreeItem {
         } else {
             this.description = pkg.version
                 ? pkg.kind === 'pypi'
-                    ? `${pkg.version} (pypi)`
-                    : pkg.version
+                    ? `${pkg.version}${updateArrow} (pypi)`
+                    : `${pkg.version}${updateArrow}`
                 : pkg.kind === 'pypi'
                   ? '(pypi)'
                   : undefined;
@@ -80,7 +83,7 @@ export class PixiPackageTreeItem extends TreeItem {
         }
 
         const lines = [
-            `${pkg.name}${versionStr}`,
+            `${pkg.name}${versionStr}${updateArrow}`,
             `Kind: ${pkg.kind ? pkg.kind.toUpperCase() : 'Conda'}${pkg.is_explicit ? ' (explicit dependency)' : ' (transitive dependency)'}`,
         ];
         if (this.featureName) {
@@ -323,14 +326,23 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
     private currentViewMode: ProjectsViewMode = 'environment';
     private readonly featuresCache = new Map<string, Promise<WorkspaceListEntry[]>>();
 
-    constructor(private readonly projectManager: PixiProjectManager) {
+    constructor(
+        private readonly projectManager: PixiProjectManager,
+        private readonly packageUpdateService?: PixiPackageUpdateService,
+    ) {
         const config = workspace.getConfiguration('pixi.environments');
         this.currentViewMode = config.get<ProjectsViewMode>('viewMode', 'environment');
 
         this.disposables.push(
             this.projectManager.onDidChangeEnvironments(() => this.refresh()),
+            this.packageUpdateService
+                ? this.packageUpdateService.onDidChangeOutdatedPackages(() => this._onDidChangeTreeData.fire())
+                : Disposable.from(),
             workspace.onDidChangeConfiguration((e) => {
-                if (e.affectsConfiguration('pixi.packages.displayMode')) {
+                if (
+                    e.affectsConfiguration('pixi.packages.displayMode') ||
+                    e.affectsConfiguration('pixi.packages.checkForUpdates')
+                ) {
                     this._onDidChangeTreeData.fire();
                 }
                 if (
@@ -478,6 +490,13 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
         return items;
     }
 
+    private getOutdatedVersion(projectPath: string, envName?: string, pkgName?: string): string | undefined {
+        if (!this.packageUpdateService || !envName || !pkgName) {
+            return undefined;
+        }
+        return this.packageUpdateService.getOutdatedPackage(projectPath, envName, pkgName)?.afterVer;
+    }
+
     public async getChildren(element?: PixiProjectsTreeItem): Promise<PixiProjectsTreeItem[]> {
         const projects = this.projectManager.getProjects();
 
@@ -496,17 +515,30 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
         }
 
         if (element instanceof PixiFeatureTreeItem) {
+            if (this.packageUpdateService) {
+                void this.packageUpdateService.checkForUpdates(element.project.projectPath);
+            }
             const packages =
                 element.packages ??
                 (await this.resolvePackagesForFeature(element.feature, element.project, element.env));
             return packages.map(
-                (pkg) => new PixiPackageTreeItem(pkg, element.env, element.project, element.feature.name),
+                (pkg) =>
+                    new PixiPackageTreeItem(
+                        pkg,
+                        element.env,
+                        element.project,
+                        element.feature.name,
+                        this.getOutdatedVersion(element.project.projectPath, element.env?.pixiEnvName, pkg.name),
+                    ),
             );
         }
 
         if (element instanceof PixiEnvironmentTreeItem) {
             if (element.env.pixiStatus !== 'installed') {
                 return [];
+            }
+            if (this.packageUpdateService) {
+                void this.packageUpdateService.checkForUpdates(element.project.projectPath);
             }
             const packages = await this.projectManager.getPackagesForEnvironment(
                 element.env.pixiEnvName,
@@ -526,7 +558,16 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
 
             if (!hasCustomFeatures) {
                 if (displayMode === 'all') {
-                    return sorted.map((pkg) => new PixiPackageTreeItem(pkg, element.env, element.project));
+                    return sorted.map(
+                        (pkg) =>
+                            new PixiPackageTreeItem(
+                                pkg,
+                                element.env,
+                                element.project,
+                                undefined,
+                                this.getOutdatedVersion(element.project.projectPath, element.env.pixiEnvName, pkg.name),
+                            ),
+                    );
                 }
 
                 const explicit = sorted.filter((p) => p.is_explicit);
@@ -534,13 +575,29 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
                     if (explicit.length === 0) {
                         return [new PixiEmptyTreeItem('No explicit packages found', element.project, element.env)];
                     }
-                    return explicit.map((pkg) => new PixiPackageTreeItem(pkg, element.env, element.project));
+                    return explicit.map(
+                        (pkg) =>
+                            new PixiPackageTreeItem(
+                                pkg,
+                                element.env,
+                                element.project,
+                                undefined,
+                                this.getOutdatedVersion(element.project.projectPath, element.env.pixiEnvName, pkg.name),
+                            ),
+                    );
                 }
 
                 // 'grouped' mode (default)
                 const transitive = sorted.filter((p) => !p.is_explicit);
                 const result: PixiProjectsTreeItem[] = explicit.map(
-                    (pkg) => new PixiPackageTreeItem(pkg, element.env, element.project),
+                    (pkg) =>
+                        new PixiPackageTreeItem(
+                            pkg,
+                            element.env,
+                            element.project,
+                            undefined,
+                            this.getOutdatedVersion(element.project.projectPath, element.env.pixiEnvName, pkg.name),
+                        ),
                 );
                 if (transitive.length > 0) {
                     result.push(new PixiTransitiveGroupTreeItem(transitive, element.env, element.project));
@@ -578,7 +635,16 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
         }
 
         if (element instanceof PixiTransitiveGroupTreeItem) {
-            return element.packages.map((pkg) => new PixiPackageTreeItem(pkg, element.env, element.project));
+            return element.packages.map(
+                (pkg) =>
+                    new PixiPackageTreeItem(
+                        pkg,
+                        element.env,
+                        element.project,
+                        undefined,
+                        this.getOutdatedVersion(element.project.projectPath, element.env.pixiEnvName, pkg.name),
+                    ),
+            );
         }
 
         if (element instanceof PixiSystemRequirementsTreeItem) {

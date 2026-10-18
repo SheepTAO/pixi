@@ -2,71 +2,13 @@ import { CancellationError, commands, Disposable, ProgressLocation, QuickPickIte
 
 import { runPixi } from '../../cli/pixiCli';
 import { runPixiWithProgress } from '../../cli/workspaceCli';
-import { escapeRegex, safeJsonParse } from '../../common/execUtils';
 import { getPackageKindBadge, normalizePkgName } from '../../core/packageManager';
+import { DryRunPackageChange, parseDryRunOutput, PixiPackageUpdateService } from '../../core/packageUpdateService';
 import { PixiProjectManager } from '../../core/projectManager';
 import { extractEnvironmentName, pickPixiProject, pickProjectEnvironmentName } from './common';
 import { buildDeclaredPackageQuickPickItems } from './packageCommands';
 
-export interface DryRunPackageChange {
-    name: string;
-    type: 'conda' | 'pypi';
-    beforeVer?: string;
-    afterVer?: string;
-    beforeBuild?: string;
-    afterBuild?: string;
-    isNew: boolean;
-    isRemoved: boolean;
-    platforms: string[];
-    environment: string;
-}
-
-interface RawPackageItem {
-    name: string;
-    type?: 'conda' | 'pypi';
-    before?: {
-        conda?: string;
-        pypi?: string;
-        version?: string;
-    };
-    after?: {
-        conda?: string;
-        pypi?: string;
-        version?: string;
-    };
-}
-
-interface RawDryRunResult {
-    version?: number;
-    environment?: Record<string, Record<string, RawPackageItem[]>>;
-}
-
-/**
- * Extracts version and build strings from a Conda package URL or filename.
- * e.g., '.../bzip2-1.0.8-hda65f42_9.conda' -> { version: '1.0.8', build: 'hda65f42_9' }
- */
-function parseCondaInfo(url?: string, pkgName?: string): { version?: string; build?: string } {
-    if (!url) {
-        return {};
-    }
-    const filename =
-        url
-            .split('/')
-            .pop()
-            ?.replace(/(\.conda|\.tar\.bz2|\.whl|\.tar\.gz)$/, '') || '';
-    let rest = filename;
-    if (pkgName && new RegExp(`^${escapeRegex(pkgName).replace(/[-_]/g, '[-_]')}-`, 'i').test(rest)) {
-        rest = rest.slice(pkgName.length + 1);
-    }
-    const lastDash = rest.lastIndexOf('-');
-    if (lastDash > 0) {
-        return {
-            version: rest.substring(0, lastDash),
-            build: rest.substring(lastDash + 1),
-        };
-    }
-    return { version: rest };
-}
+export { DryRunPackageChange, parseDryRunOutput };
 
 /**
  * Formats a human-readable version diff for a package change.
@@ -85,70 +27,12 @@ function formatVersionDiff(pkg: DryRunPackageChange): string {
     return `v${pkg.beforeVer || '?'} -> v${pkg.afterVer || '?'} ${typeBadge}`;
 }
 
-/**
- * Parses the stdout JSON of `pixi update --dry-run --json`.
- */
-function parseDryRunOutput(jsonStr: string): DryRunPackageChange[] {
-    const data = safeJsonParse<RawDryRunResult>(jsonStr, {});
-    const envMap = data.environment || {};
-    const result: DryRunPackageChange[] = [];
-
-    for (const [envName, platformMap] of Object.entries(envMap)) {
-        const pkgMap = new Map<string, DryRunPackageChange>();
-
-        for (const [platform, pkgs] of Object.entries(platformMap)) {
-            if (!Array.isArray(pkgs)) {
-                continue;
-            }
-            for (const p of pkgs) {
-                if (!p || !p.name) {
-                    continue;
-                }
-                const isPypi = p.type === 'pypi';
-                const beforeConda = isPypi ? undefined : parseCondaInfo(p.before?.conda, p.name);
-                const afterConda = isPypi ? undefined : parseCondaInfo(p.after?.conda, p.name);
-                const beforeVer = isPypi ? p.before?.version : beforeConda?.version;
-                const afterVer = isPypi ? p.after?.version : afterConda?.version;
-                const beforeBuild = beforeConda?.build;
-                const afterBuild = afterConda?.build;
-
-                const existing = pkgMap.get(p.name);
-                if (!existing) {
-                    pkgMap.set(p.name, {
-                        name: p.name,
-                        type: isPypi ? 'pypi' : 'conda',
-                        beforeVer,
-                        afterVer,
-                        beforeBuild,
-                        afterBuild,
-                        isNew: !p.before && !!p.after,
-                        isRemoved: !!p.before && !p.after,
-                        platforms: [platform],
-                        environment: envName,
-                    });
-                } else {
-                    if (!existing.platforms.includes(platform)) {
-                        existing.platforms.push(platform);
-                    }
-                    existing.beforeVer ||= beforeVer;
-                    existing.afterVer ||= afterVer;
-                    existing.beforeBuild ||= beforeBuild;
-                    existing.afterBuild ||= afterBuild;
-                }
-            }
-        }
-
-        result.push(...pkgMap.values());
-    }
-
-    return result;
-}
-
 async function handleCheckOutdated(
     manager: PixiProjectManager,
     projectPath: string,
     projectName: string,
     targetEnv?: string,
+    packageUpdateService?: PixiPackageUpdateService,
 ): Promise<void> {
     const envLabel = targetEnv || 'All Environments';
     let stdout = '';
@@ -178,6 +62,7 @@ async function handleCheckOutdated(
     }
 
     const changes = parseDryRunOutput(stdout);
+    packageUpdateService?.populateCache(projectPath, changes, { targetEnv });
     if (changes.length === 0) {
         window.showInformationMessage(`All dependencies in ${projectName} (${envLabel}) are up to date!`);
         return;
@@ -431,6 +316,7 @@ export async function executeUnifiedUpdate(
     manager: PixiProjectManager,
     targetItem?: unknown,
     envName?: string,
+    packageUpdateService?: PixiPackageUpdateService,
 ): Promise<void> {
     const projectPath = await pickPixiProject(manager, 'Select Pixi project to update dependencies', targetItem);
     if (!projectPath) {
@@ -473,6 +359,7 @@ export async function executeUnifiedUpdate(
 
     if (chosenAction.action === 'upgrade') {
         await handleUpgradeDependencies(manager, projectPath, projectName, directEnv);
+        packageUpdateService?.clearCache(projectPath);
         return;
     }
 
@@ -495,10 +382,11 @@ export async function executeUnifiedUpdate(
 
     switch (chosenAction.action) {
         case 'check':
-            await handleCheckOutdated(manager, projectPath, projectName, selectedEnv);
+            await handleCheckOutdated(manager, projectPath, projectName, selectedEnv, packageUpdateService);
             break;
         case 'update':
             await handleUpdateDependencies(manager, projectPath, projectName, selectedEnv);
+            packageUpdateService?.clearCache(projectPath);
             break;
     }
 }
@@ -507,6 +395,7 @@ export async function handleUpgradeCommand(
     manager: PixiProjectManager,
     targetItem?: unknown,
     envName?: string,
+    packageUpdateService?: PixiPackageUpdateService,
 ): Promise<void> {
     const projectPath = await pickPixiProject(manager, 'Select Pixi project to upgrade dependencies', targetItem);
     if (!projectPath) {
@@ -515,15 +404,19 @@ export async function handleUpgradeCommand(
     const projectName = manager.getProjectName(projectPath);
     const directEnv = extractEnvironmentName(targetItem, envName);
     await handleUpgradeDependencies(manager, projectPath, projectName, directEnv);
+    packageUpdateService?.clearCache(projectPath);
 }
 
-export function registerUpdateCommands(manager: PixiProjectManager): Disposable[] {
+export function registerUpdateCommands(
+    manager: PixiProjectManager,
+    packageUpdateService?: PixiPackageUpdateService,
+): Disposable[] {
     return [
         commands.registerCommand('pixi.update', (targetItem?: unknown, envName?: string) =>
-            executeUnifiedUpdate(manager, targetItem, envName),
+            executeUnifiedUpdate(manager, targetItem, envName, packageUpdateService),
         ),
         commands.registerCommand('pixi.upgrade', (targetItem?: unknown, envName?: string) =>
-            handleUpgradeCommand(manager, targetItem, envName),
+            handleUpgradeCommand(manager, targetItem, envName, packageUpdateService),
         ),
     ];
 }
