@@ -213,211 +213,221 @@ async function applyRequirementUpdate(
     );
 }
 
-export function registerSystemRequirementsCommands(manager: PixiProjectManager): Disposable[] {
-    // 1. Configure System Requirements
-    const configCommand = commands.registerCommand(
-        'pixi.systemRequirements',
-        async (targetItem?: unknown, preselectedProp?: string) => {
-            const ctx = extractCommandContext(targetItem);
-            const projectPath = await pickPixiProject(
-                manager,
-                'Select Pixi project to configure system requirements for',
-                targetItem,
-            );
-            if (!projectPath) {
-                return;
-            }
-
-            const manifestPath = manager.getManifestPath(projectPath);
-            if (!manifestPath) {
-                window.showErrorMessage('No pixi.toml or pyproject.toml found in this project.');
-                return;
-            }
-
-            const targetProp = preselectedProp || ctx.propertyName;
-            if (targetProp) {
-                const descriptor = SYSTEM_REQUIREMENT_DESCRIPTORS.find((d) => d.id === targetProp) || {
-                    id: targetProp,
-                    label: targetProp,
-                    description: `System requirement '${targetProp}'`,
-                    icon: 'symbol-property',
-                    presets: [],
-                    placeholder: `Enter value for '${targetProp}'`,
-                    virtualPackageName: `__${targetProp}`,
-                };
-                const currentReqs = (await getProjectSystemRequirements(projectPath, manager)) ?? {};
-                const newVal = await promptForPropertyValue(descriptor, currentReqs[descriptor.id], projectPath);
-                if (newVal === undefined) {
-                    return;
-                }
-                await applyRequirementUpdate(projectPath, manager, descriptor, newVal);
-                return;
-            }
-
-            // Main QuickPick flow
-            const currentReqs: SystemRequirementsRecord =
-                (await getProjectSystemRequirements(projectPath, manager)) ?? {};
-            const items: SystemRequirementItem[] = SYSTEM_REQUIREMENT_DESCRIPTORS.map((desc) => {
-                const val = currentReqs[desc.id];
-                return {
-                    label: `$(${desc.icon}) ${desc.label} (${desc.id})`,
-                    description: val ? `Current: ${val}` : '(Not configured)',
-                    detail: desc.description,
-                    descriptor: desc,
-                };
-            });
-
-            const hasAny = Object.keys(currentReqs).length > 0;
-            if (hasAny) {
-                items.push({
-                    label: 'Actions',
-                    kind: QuickPickItemKind.Separator,
-                });
-                items.push({
-                    label: '$(go-to-file) Reveal in Manifest',
-                    description: 'Jump to platforms in manifest file',
-                    action: 'reveal',
-                });
-                items.push({
-                    label: '$(trash) Remove All System Requirements',
-                    description: 'Clear virtual package requirements across all platforms',
-                    action: 'clear',
-                });
-            }
-
-            const projectName = manager.getProjectName(projectPath);
-            const picked = await window.showQuickPick(items, {
-                title: `Pixi: System Requirements (${projectName})`,
-                placeHolder: 'Select a system requirement to configure, edit, or remove',
-                matchOnDescription: true,
-                matchOnDetail: true,
-            });
-
-            if (!picked) {
-                return;
-            }
-
-            if (picked.action === 'reveal') {
-                await revealDefinitionInManifest({
-                    manifestPath,
-                    targetName: 'platforms',
-                    kind: 'platforms',
-                });
-                return;
-            }
-
-            if (picked.action === 'clear') {
-                const confirm = await window.showWarningMessage(
-                    `Are you sure you want to remove all system requirements from '${projectName}'?`,
-                    { modal: true },
-                    'Remove All',
-                );
-                if (confirm !== 'Remove All') {
-                    return;
-                }
-
-                const existingPlatforms = await getWorkspacePlatforms(projectPath, manager);
-                const platformsWithVp = existingPlatforms.filter((p) => p.virtualPackages.length > 0);
-                const commandBatch: string[][] = [];
-                for (const p of platformsWithVp) {
-                    commandBatch.push(['workspace', 'platform', 'edit', p.name, '--clear-virtual-packages']);
-                }
-
-                if (commandBatch.length > 0) {
-                    await runPixiWithProgress(
-                        `Pixi: Clearing system requirements in '${projectName}'...`,
-                        commandBatch,
-                        projectPath,
-                        manager,
-                        `Pixi: Cleared all system requirements from '${projectName}'.`,
-                    );
-                } else {
-                    await manager.refresh(Uri.file(projectPath));
-                    window.showInformationMessage(`Pixi: Removed all system requirements from '${projectName}'.`);
-                }
-                return;
-            }
-
-            if (picked.descriptor) {
-                const desc = picked.descriptor;
-                const newVal = await promptForPropertyValue(desc, currentReqs[desc.id], projectPath);
-                if (newVal === undefined) {
-                    return;
-                }
-                await applyRequirementUpdate(projectPath, manager, desc, newVal);
-            }
-        },
+export async function handleSystemRequirementsCommand(
+    manager: PixiProjectManager,
+    targetItem?: unknown,
+    preselectedProp?: string,
+): Promise<void> {
+    const ctx = extractCommandContext(targetItem);
+    const projectPath = await pickPixiProject(
+        manager,
+        'Select Pixi project to configure system requirements for',
+        targetItem,
     );
+    if (!projectPath) {
+        return;
+    }
 
-    // 2. Reveal in Manifest
-    const revealCommand = commands.registerCommand('pixi.systemRequirements.reveal', async (targetItem?: unknown) => {
-        const ctx = extractCommandContext(targetItem);
-        const projectPath = await pickPixiProject(
-            manager,
-            'Select Pixi project to reveal system requirements for',
-            targetItem,
-        );
-        if (!projectPath) {
+    const manifestPath = manager.getManifestPath(projectPath);
+    if (!manifestPath) {
+        window.showErrorMessage('No pixi.toml or pyproject.toml found in this project.');
+        return;
+    }
+
+    const targetProp = preselectedProp || ctx.propertyName;
+    if (targetProp) {
+        const descriptor = SYSTEM_REQUIREMENT_DESCRIPTORS.find((d) => d.id === targetProp) || {
+            id: targetProp,
+            label: targetProp,
+            description: `System requirement '${targetProp}'`,
+            icon: 'symbol-property',
+            presets: [],
+            placeholder: `Enter value for '${targetProp}'`,
+            virtualPackageName: `__${targetProp}`,
+        };
+        const currentReqs = (await getProjectSystemRequirements(projectPath, manager)) ?? {};
+        const newVal = await promptForPropertyValue(descriptor, currentReqs[descriptor.id], projectPath);
+        if (newVal === undefined) {
             return;
         }
-        const manifestPath = manager.getManifestPath(projectPath);
-        if (!manifestPath) {
-            window.showErrorMessage('No manifest file found for this project.');
-            return;
-        }
+        await applyRequirementUpdate(projectPath, manager, descriptor, newVal);
+        return;
+    }
 
-        await revealDefinitionInManifest({
-            manifestPath,
-            targetName: ctx.propertyName || 'platforms',
-            kind: 'platforms',
-        });
+    // Main QuickPick flow
+    const currentReqs: SystemRequirementsRecord = (await getProjectSystemRequirements(projectPath, manager)) ?? {};
+    const items: SystemRequirementItem[] = SYSTEM_REQUIREMENT_DESCRIPTORS.map((desc) => {
+        const val = currentReqs[desc.id];
+        return {
+            label: `$(${desc.icon}) ${desc.label} (${desc.id})`,
+            description: val ? `Current: ${val}` : '(Not configured)',
+            detail: desc.description,
+            descriptor: desc,
+        };
     });
 
-    // 3. Edit single property
-    const editPropCommand = commands.registerCommand(
-        'pixi.systemRequirements.editProperty',
-        async (targetItem?: unknown, propName?: string) => {
-            const ctx = extractCommandContext(targetItem);
-            const targetProp = propName || ctx.propertyName;
-            await commands.executeCommand('pixi.systemRequirements', ctx.projectPath || targetItem, targetProp);
-        },
-    );
+    const hasAny = Object.keys(currentReqs).length > 0;
+    if (hasAny) {
+        items.push({
+            label: 'Actions',
+            kind: QuickPickItemKind.Separator,
+        });
+        items.push({
+            label: '$(go-to-file) Reveal in Manifest',
+            description: 'Jump to platforms in manifest file',
+            action: 'reveal',
+        });
+        items.push({
+            label: '$(trash) Remove All System Requirements',
+            description: 'Clear virtual package requirements across all platforms',
+            action: 'clear',
+        });
+    }
 
-    // 4. Remove single property
-    const removePropCommand = commands.registerCommand(
-        'pixi.systemRequirements.removeProperty',
-        async (targetItem?: unknown, propName?: string) => {
-            const ctx = extractCommandContext(targetItem);
-            const targetProp = propName || ctx.propertyName;
-            const projectPath = await pickPixiProject(
+    const projectName = manager.getProjectName(projectPath);
+    const picked = await window.showQuickPick(items, {
+        title: `Pixi: System Requirements (${projectName})`,
+        placeHolder: 'Select a system requirement to configure, edit, or remove',
+        matchOnDescription: true,
+        matchOnDetail: true,
+    });
+
+    if (!picked) {
+        return;
+    }
+
+    if (picked.action === 'reveal') {
+        await revealDefinitionInManifest({
+            manifestPath,
+            targetName: 'platforms',
+            kind: 'platforms',
+        });
+        return;
+    }
+
+    if (picked.action === 'clear') {
+        const confirm = await window.showWarningMessage(
+            `Are you sure you want to remove all system requirements from '${projectName}'?`,
+            { modal: true },
+            'Remove All',
+        );
+        if (confirm !== 'Remove All') {
+            return;
+        }
+
+        const existingPlatforms = await getWorkspacePlatforms(projectPath, manager);
+        const platformsWithVp = existingPlatforms.filter((p) => p.virtualPackages.length > 0);
+        const commandBatch: string[][] = [];
+        for (const p of platformsWithVp) {
+            commandBatch.push(['workspace', 'platform', 'edit', p.name, '--clear-virtual-packages']);
+        }
+
+        if (commandBatch.length > 0) {
+            await runPixiWithProgress(
+                `Pixi: Clearing system requirements in '${projectName}'...`,
+                commandBatch,
+                projectPath,
                 manager,
-                'Select Pixi project to remove system requirement from',
-                targetItem,
+                `Pixi: Cleared all system requirements from '${projectName}'.`,
             );
-            if (!projectPath || !targetProp) {
-                return;
-            }
+        } else {
+            await manager.refresh(Uri.file(projectPath));
+            window.showInformationMessage(`Pixi: Removed all system requirements from '${projectName}'.`);
+        }
+        return;
+    }
 
-            const confirm = await window.showWarningMessage(
-                `Remove '${targetProp}' requirement from project?`,
-                'Remove',
-            );
-            if (confirm !== 'Remove') {
-                return;
-            }
+    if (picked.descriptor) {
+        const desc = picked.descriptor;
+        const newVal = await promptForPropertyValue(desc, currentReqs[desc.id], projectPath);
+        if (newVal === undefined) {
+            return;
+        }
+        await applyRequirementUpdate(projectPath, manager, desc, newVal);
+    }
+}
 
-            const descriptor = SYSTEM_REQUIREMENT_DESCRIPTORS.find((d) => d.id === targetProp) || {
-                id: targetProp,
-                label: targetProp,
-                description: `System requirement '${targetProp}'`,
-                icon: 'symbol-property',
-                presets: [],
-                placeholder: '',
-                virtualPackageName: `__${targetProp}`,
-            };
-            await applyRequirementUpdate(projectPath, manager, descriptor, null);
-        },
+export async function handleRevealSystemRequirementsCommand(
+    manager: PixiProjectManager,
+    targetItem?: unknown,
+): Promise<void> {
+    const ctx = extractCommandContext(targetItem);
+    const projectPath = await pickPixiProject(
+        manager,
+        'Select Pixi project to reveal system requirements for',
+        targetItem,
     );
+    if (!projectPath) {
+        return;
+    }
+    const manifestPath = manager.getManifestPath(projectPath);
+    if (!manifestPath) {
+        window.showErrorMessage('No manifest file found for this project.');
+        return;
+    }
 
-    return [configCommand, revealCommand, editPropCommand, removePropCommand];
+    await revealDefinitionInManifest({
+        manifestPath,
+        targetName: ctx.propertyName || 'platforms',
+        kind: 'platforms',
+    });
+}
+
+export async function handleEditSystemRequirementPropertyCommand(
+    targetItem?: unknown,
+    propName?: string,
+): Promise<void> {
+    const ctx = extractCommandContext(targetItem);
+    const targetProp = propName || ctx.propertyName;
+    await commands.executeCommand('pixi.systemRequirements', ctx.projectPath || targetItem, targetProp);
+}
+
+export async function handleRemoveSystemRequirementPropertyCommand(
+    manager: PixiProjectManager,
+    targetItem?: unknown,
+    propName?: string,
+): Promise<void> {
+    const ctx = extractCommandContext(targetItem);
+    const targetProp = propName || ctx.propertyName;
+    const projectPath = await pickPixiProject(
+        manager,
+        'Select Pixi project to remove system requirement from',
+        targetItem,
+    );
+    if (!projectPath || !targetProp) {
+        return;
+    }
+
+    const confirm = await window.showWarningMessage(`Remove '${targetProp}' requirement from project?`, 'Remove');
+    if (confirm !== 'Remove') {
+        return;
+    }
+
+    const descriptor = SYSTEM_REQUIREMENT_DESCRIPTORS.find((d) => d.id === targetProp) || {
+        id: targetProp,
+        label: targetProp,
+        description: `System requirement '${targetProp}'`,
+        icon: 'symbol-property',
+        presets: [],
+        placeholder: '',
+        virtualPackageName: `__${targetProp}`,
+    };
+    await applyRequirementUpdate(projectPath, manager, descriptor, null);
+}
+
+export function registerSystemRequirementsCommands(manager: PixiProjectManager): Disposable[] {
+    return [
+        commands.registerCommand('pixi.systemRequirements', (targetItem?: unknown, preselectedProp?: string) =>
+            handleSystemRequirementsCommand(manager, targetItem, preselectedProp),
+        ),
+        commands.registerCommand('pixi.systemRequirements.reveal', (targetItem?: unknown) =>
+            handleRevealSystemRequirementsCommand(manager, targetItem),
+        ),
+        commands.registerCommand('pixi.systemRequirements.editProperty', (targetItem?: unknown, propName?: string) =>
+            handleEditSystemRequirementPropertyCommand(targetItem, propName),
+        ),
+        commands.registerCommand('pixi.systemRequirements.removeProperty', (targetItem?: unknown, propName?: string) =>
+            handleRemoveSystemRequirementPropertyCommand(manager, targetItem, propName),
+        ),
+    ];
 }
