@@ -321,7 +321,7 @@ async function pickInstalledPackage(
         return undefined;
     }
 
-    const envLabel = targetEnv || (envs.length > 0 ? envs[0].pixiEnvName : 'default');
+    const envLabel = targetEnv;
     const packages = await manager.getPackagesForEnvironment(envLabel, projectPath);
     const candidatePackages = options.filterRemotelyUpdatable
         ? packages.filter((p) => !p.is_local && !p.is_editable)

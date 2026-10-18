@@ -416,16 +416,26 @@ export async function findPackageScope(
     return undefined;
 }
 
+export interface PickTargetScopeOptions {
+    allowWorkspaceDependencies?: boolean;
+    title?: string;
+    placeHolder?: string;
+}
+
 export interface ScopeQuickPickItem extends QuickPickItem {
     scope?: TargetScope;
     isCreateFeature?: boolean;
+    isCreateEnvironment?: boolean;
 }
 
 export async function pickTargetScope(
     projectPath: string,
     envs: PixiEnvironmentInfo[],
     presetScopeName?: string,
+    options?: PickTargetScopeOptions,
 ): Promise<TargetScope | null> {
+    const allowWsDeps = options?.allowWorkspaceDependencies !== false;
+
     if (presetScopeName) {
         if (presetScopeName === 'default') {
             return { kind: 'global' };
@@ -458,15 +468,17 @@ export async function pickTargetScope(
                 description: 'Available to all environments',
                 scope: { kind: 'global' },
             },
-            {
+        ];
+        if (allowWsDeps) {
+            items.push({
                 label: '$(library) Shared Workspace Dependencies ([workspace.dependencies])',
                 description: 'Shared across workspace features (pixi workspace dependencies add)',
                 scope: { kind: 'workspace-dependency' },
-            },
-        ];
+            });
+        }
         const selected = await window.showQuickPick(items, {
-            title: 'Pixi: Select Target Scope',
-            placeHolder: `Select where to add package for '${presetScopeName}'`,
+            title: options?.title || 'Pixi: Select Target Scope',
+            placeHolder: options?.placeHolder || `Select where to add package for '${presetScopeName}'`,
         });
         return selected?.scope ?? null;
     }
@@ -476,7 +488,7 @@ export async function pickTargetScope(
     const namedEnvs = envs.filter((e) => e.pixiEnvName !== 'default');
     const wsDeps = await getWorkspaceDependencies(projectPath);
 
-    if (namedFeatures.length === 0 && namedEnvs.length === 0 && wsDeps.length === 0) {
+    if (namedFeatures.length === 0 && namedEnvs.length === 0 && (!allowWsDeps || wsDeps.length === 0)) {
         return { kind: 'global' };
     }
 
@@ -490,19 +502,22 @@ export async function pickTargetScope(
             description: 'Shared across all environments',
             scope: { kind: 'global' },
         },
-        {
+    ];
+
+    if (allowWsDeps) {
+        items.push({
             label: '$(library) Shared Workspace Dependencies ([workspace.dependencies])',
             description: 'Shared across workspace features (pixi workspace dependencies add)',
             scope: { kind: 'workspace-dependency' },
-        },
-    ];
+        });
+    }
 
     if (namedFeatures.length > 0) {
-        items.push({
-            label: 'Features (Reusable)',
-            kind: QuickPickItemKind.Separator,
-        });
         items.push(
+            {
+                label: 'Features (Reusable)',
+                kind: QuickPickItemKind.Separator,
+            },
             ...namedFeatures.map((f) => ({
                 label: `$(symbol-namespace) Feature: ${f.name}`,
                 description: `Reusable feature (${f.dependencies.length + f.pypiDependencies.length} dependencies)`,
@@ -512,11 +527,11 @@ export async function pickTargetScope(
     }
 
     if (namedEnvs.length > 0) {
-        items.push({
-            label: 'Environments (Inline Dependencies)',
-            kind: QuickPickItemKind.Separator,
-        });
         items.push(
+            {
+                label: 'Environments (Inline Dependencies)',
+                kind: QuickPickItemKind.Separator,
+            },
             ...namedEnvs.map((e) => {
                 const { icon, text } = getEnvironmentStatusBadge(e.pixiStatus);
                 return {
@@ -537,14 +552,19 @@ export async function pickTargetScope(
         },
         {
             label: '$(plus) Create New Feature ...',
-            description: 'Create a new feature and add this package to it',
+            description: 'Create a new feature and target it',
             isCreateFeature: true,
+        },
+        {
+            label: '$(plus) Create New Environment ...',
+            description: 'Create a new isolated environment and target it',
+            isCreateEnvironment: true,
         },
     );
 
     const selected = await window.showQuickPick(items, {
-        title: 'Pixi: Target Scope',
-        placeHolder: 'Select where to add the package (Feature or Environment)',
+        title: options?.title || 'Pixi: Target Scope',
+        placeHolder: options?.placeHolder || 'Select where to add the package (Feature or Environment)',
     });
 
     if (!selected) {
@@ -554,6 +574,20 @@ export async function pickTargetScope(
     if (selected.isCreateFeature) {
         const newName = await promptNewFeatureName(features);
         return newName ? { kind: 'feature', name: newName } : null;
+    }
+
+    if (selected.isCreateEnvironment) {
+        const input = await window.showInputBox({
+            title: 'Pixi: Enter New Environment Name',
+            prompt: 'Enter name for the new environment',
+            placeHolder: 'e.g. dev, test, ml',
+            validateInput: (v) =>
+                validatePixiIdentifier(v, {
+                    entityName: 'Environment',
+                    existingNames: envs.map((e) => e.pixiEnvName),
+                }),
+        });
+        return input?.trim() ? { kind: 'environment', name: input.trim() } : null;
     }
 
     return selected.scope ?? null;
