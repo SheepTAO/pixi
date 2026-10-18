@@ -108,15 +108,9 @@ export class PixiTaskEmptyTreeItem extends TreeItem {
     constructor(public readonly project: PixiProject) {
         super('No tasks found', TreeItemCollapsibleState.None);
         const manifestName = path.basename(project.manifestPath);
-        this.description = '(click to add task)';
-        this.tooltip = `No tasks defined in ${project.name}. Click to add a task, or define under [tasks] in ${manifestName}.`;
-        this.iconPath = new ThemeIcon('plus', new ThemeColor('charts.blue'));
+        this.tooltip = `No tasks defined in ${project.name}. Define tasks under [tasks] in ${manifestName} or click '+' in the view title.`;
+        this.iconPath = new ThemeIcon('info');
         this.contextValue = 'pixiTaskEmpty';
-        this.command = {
-            command: 'pixi.tasks.addTask',
-            title: 'Add Task',
-            arguments: [{ project }],
-        };
     }
 }
 

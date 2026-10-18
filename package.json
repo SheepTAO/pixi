@@ -557,6 +557,12 @@
                 "icon": "$(go-to-file)"
             },
             {
+                "command": "pixi.tasks.createTask",
+                "title": "Add Task ...",
+                "category": "Pixi",
+                "icon": "$(plus)"
+            },
+            {
                 "command": "pixi.tasks.addTask",
                 "title": "Add Task ...",
                 "category": "Pixi",
@@ -728,6 +734,10 @@
                 },
                 {
                     "command": "pixi.runTaskWithArgs",
+                    "when": "false"
+                },
+                {
+                    "command": "pixi.tasks.createTask",
                     "when": "false"
                 },
                 {
@@ -1092,7 +1102,7 @@
                     "group": "1_tools@1"
                 },
                 {
-                    "command": "pixi.tasks.addTask",
+                    "command": "pixi.tasks.createTask",
                     "when": "view == pixi.views.tasks && pixi.hasPixiProject",
                     "group": "navigation@0"
                 },
@@ -1575,17 +1585,17 @@
                 },
                 {
                     "command": "pixi.tasks.addTask",
-                    "when": "view == pixi.views.tasks && (viewItem == pixiTaskGroup || viewItem == pixiTaskEmpty)",
+                    "when": "view == pixi.views.tasks && viewItem == pixiTaskGroup",
                     "group": "inline@1"
                 },
                 {
                     "command": "pixi.tasks.addTask",
-                    "when": "view == pixi.views.tasks && (viewItem == pixiTaskGroup || viewItem == pixiTaskEmpty)",
+                    "when": "view == pixi.views.tasks && viewItem == pixiTaskGroup",
                     "group": "1_task@1"
                 },
                 {
                     "command": "pixi.tasks.addAlias",
-                    "when": "view == pixi.views.tasks && (viewItem == pixiTaskGroup || viewItem == pixiTaskEmpty)",
+                    "when": "view == pixi.views.tasks && viewItem == pixiTaskGroup",
                     "group": "1_task@2"
                 }
             ]
