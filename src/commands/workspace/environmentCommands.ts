@@ -52,10 +52,10 @@ async function runSingleEnvironmentInstallCommand(
     targetItem?: unknown,
     presetEnv?: string,
 ): Promise<void> {
-    const targetCommand = action === 'reinstall' ? 'pixi.reinstall' : 'pixi.install';
+    const handler = action === 'reinstall' ? handleReinstallCommand : handleInstallCommand;
     const envName = extractEnvironmentName(targetItem, presetEnv);
     if (envName) {
-        await commands.executeCommand(targetCommand, targetItem, envName);
+        await handler(manager, targetItem, envName);
         return;
     }
 
@@ -67,7 +67,7 @@ async function runSingleEnvironmentInstallCommand(
     const title = action === 'reinstall' ? 'Pixi: Reinstall Environment' : 'Pixi: Install Environment';
     const pickedEnv = await pickInstallableEnvironment(manager, projectPath, title, `Select environment to ${action}`);
     if (pickedEnv) {
-        await commands.executeCommand(targetCommand, Uri.file(projectPath), pickedEnv);
+        await handler(manager, Uri.file(projectPath), pickedEnv);
     }
 }
 
@@ -777,7 +777,7 @@ async function handleCheckLockfileCommand(manager: PixiProjectManager, targetIte
                     'Update Lockfile Now',
                 );
                 if (action === 'Update Lockfile Now') {
-                    await commands.executeCommand('pixi.lock', Uri.file(projectPath));
+                    await handleLockCommand(manager, Uri.file(projectPath));
                 }
             }
         },

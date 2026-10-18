@@ -126,7 +126,7 @@ export async function runPixi(args: string[], options?: PixiRunOptions, token?: 
                 traceError(`Failed to run "${safeCommand}":\n${stderr}`);
                 reject(new Error(`Failed to run "${safeCommand}":\n ${stderr}`));
             } else if (options?.includeStderr) {
-                resolve(stdout ? (stderr ? `${stdout}\n${stderr}` : stdout) : stderr);
+                resolve([stdout, stderr].filter(Boolean).join('\n'));
             } else {
                 resolve(stdout);
             }

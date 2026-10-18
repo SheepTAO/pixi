@@ -24,9 +24,7 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
     constructor(private readonly projectManager: PixiProjectManager) {
         this.disposables.push(
             window.registerTerminalProfileProvider('pixi.terminal', this),
-            commands.registerCommand('pixi.openTerminal', async (target?: unknown) => {
-                await this.openTerminal(target);
-            }),
+            commands.registerCommand('pixi.openTerminal', (target?: unknown) => this.openTerminal(target)),
         );
     }
 
