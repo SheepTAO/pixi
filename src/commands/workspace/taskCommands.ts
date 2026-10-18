@@ -547,7 +547,7 @@ export function registerTaskCommands(manager: PixiProjectManager, taskProvider: 
 
         // Pixi: Run Task with Arguments
         commands.registerCommand('pixi.runTaskWithArgs', (targetItem?: unknown) =>
-            commands.executeCommand('pixi.runTask', targetItem, { promptArgs: true }),
+            handleRunTaskCommand(manager, taskProvider, targetItem, { promptArgs: true }),
         ),
 
         // Pixi: Run Task in Environment
@@ -556,9 +556,7 @@ export function registerTaskCommands(manager: PixiProjectManager, taskProvider: 
         ),
 
         // Pixi: Refresh Tasks
-        commands.registerCommand('pixi.tasks.refresh', () => {
-            taskProvider.refresh();
-        }),
+        commands.registerCommand('pixi.tasks.refresh', () => taskProvider.refresh()),
 
         // Pixi: Change Grouping
         commands.registerCommand('pixi.tasks.changeGrouping', () => handleChangeGroupingCommand()),

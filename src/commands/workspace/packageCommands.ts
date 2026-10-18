@@ -500,7 +500,7 @@ export async function handleRemovePackageCommand(manager: PixiProjectManager, ta
                 )
                 .then((action) => {
                     if (action === 'Why is this installed?') {
-                        commands.executeCommand('pixi.whyPackage', targetItem);
+                        void whyPackageCommand(manager, targetItem);
                     }
                 });
             return;

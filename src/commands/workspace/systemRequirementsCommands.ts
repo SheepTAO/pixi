@@ -374,12 +374,13 @@ export async function handleRevealSystemRequirementsCommand(
 }
 
 export async function handleEditSystemRequirementPropertyCommand(
+    manager: PixiProjectManager,
     targetItem?: unknown,
     propName?: string,
 ): Promise<void> {
     const ctx = extractCommandContext(targetItem);
     const targetProp = propName || ctx.propertyName;
-    await commands.executeCommand('pixi.systemRequirements', ctx.projectPath || targetItem, targetProp);
+    await handleSystemRequirementsCommand(manager, ctx.projectPath || targetItem, targetProp);
 }
 
 export async function handleRemoveSystemRequirementPropertyCommand(
@@ -424,7 +425,7 @@ export function registerSystemRequirementsCommands(manager: PixiProjectManager):
             handleRevealSystemRequirementsCommand(manager, targetItem),
         ),
         commands.registerCommand('pixi.systemRequirements.editProperty', (targetItem?: unknown, propName?: string) =>
-            handleEditSystemRequirementPropertyCommand(targetItem, propName),
+            handleEditSystemRequirementPropertyCommand(manager, targetItem, propName),
         ),
         commands.registerCommand('pixi.systemRequirements.removeProperty', (targetItem?: unknown, propName?: string) =>
             handleRemoveSystemRequirementPropertyCommand(manager, targetItem, propName),

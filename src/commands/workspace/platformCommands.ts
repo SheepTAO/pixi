@@ -4,10 +4,8 @@ import { getHostCondaPlatform } from '../../cli/pixiCli';
 import { runPixiWithProgress } from '../../cli/workspaceCli';
 import { CONDA_PLATFORM_PRESETS } from '../../core/presets';
 import { PixiProjectManager } from '../../core/projectManager';
-import { getWorkspacePlatforms, WorkspacePlatformEntry } from '../../core/systemRequirements';
+import { getWorkspacePlatforms, type WorkspacePlatformEntry } from '../../core/systemRequirements';
 import { formatScope, pickPixiProject, resolveWorkspaceOrFeatureScope } from './common';
-
-export { getWorkspacePlatforms, WorkspacePlatformEntry };
 
 function isGlobalPlatform(p: WorkspacePlatformEntry): boolean {
     return p.features.length === 0 || p.environments.includes('default');

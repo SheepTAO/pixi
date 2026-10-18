@@ -18,7 +18,7 @@ export interface PromptCondaChannelOptions {
  * Returns the selected channel string (or undefined if defaultChannelValue was undefined), or null if cancelled.
  */
 export async function promptCondaChannel(options?: PromptCondaChannelOptions): Promise<string | undefined | null> {
-    const defaultVal = options?.defaultChannelValue !== undefined ? options.defaultChannelValue : DEFAULT_CONDA_CHANNEL;
+    const defaultVal = options?.defaultChannelValue ?? DEFAULT_CONDA_CHANNEL;
 
     interface ChannelItem extends QuickPickItem {
         channel?: string;
@@ -231,22 +231,30 @@ export async function handleRemoveChannelCommand(
     );
 }
 
-export async function handleChannelHubCommand(targetItem?: unknown, presetFeature?: string): Promise<void> {
-    const actions = [
+export async function handleChannelHubCommand(
+    manager: PixiProjectManager,
+    targetItem?: unknown,
+    presetFeature?: string,
+): Promise<void> {
+    interface ChannelActionItem extends QuickPickItem {
+        action: 'add' | 'remove' | 'auth';
+    }
+
+    const actions: ChannelActionItem[] = [
         {
             label: '$(plus) Add Channel...',
             description: 'Add a Conda channel preset, mirror URL, or custom channel to the workspace or a feature',
-            command: 'pixi.addChannel',
+            action: 'add',
         },
         {
             label: '$(trash) Remove Channel...',
             description: 'Remove configured channel(s) from the project manifest',
-            command: 'pixi.removeChannel',
+            action: 'remove',
         },
         {
             label: '$(key) Manage Authentication (pixi auth)...',
             description: 'Login, logout, or manage credentials for private channels and registries',
-            command: 'pixi.auth',
+            action: 'auth',
         },
     ];
 
@@ -254,8 +262,20 @@ export async function handleChannelHubCommand(targetItem?: unknown, presetFeatur
         title: 'Pixi: Channel Management',
         placeHolder: 'Select channel operation',
     });
-    if (pick) {
-        await commands.executeCommand(pick.command, targetItem, presetFeature);
+    if (!pick) {
+        return;
+    }
+
+    switch (pick.action) {
+        case 'add':
+            await handleAddChannelCommand(manager, targetItem, presetFeature);
+            break;
+        case 'remove':
+            await handleRemoveChannelCommand(manager, targetItem, presetFeature);
+            break;
+        case 'auth':
+            await commands.executeCommand('pixi.auth');
+            break;
     }
 }
 
@@ -268,7 +288,7 @@ export function registerChannelCommands(manager: PixiProjectManager): Disposable
             handleRemoveChannelCommand(manager, targetItem, presetFeature),
         ),
         commands.registerCommand('pixi.channel', (targetItem?: unknown, presetFeature?: string) =>
-            handleChannelHubCommand(targetItem, presetFeature),
+            handleChannelHubCommand(manager, targetItem, presetFeature),
         ),
     ];
 }

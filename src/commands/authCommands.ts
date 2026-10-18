@@ -580,23 +580,13 @@ export async function showAuthHub(infoProvider: PixiInfoTreeDataProvider): Promi
 }
 
 export function registerAuthCommands(infoProvider: PixiInfoTreeDataProvider): Disposable {
-    const disposables: Disposable[] = [
-        commands.registerCommand('pixi.auth', async () => {
-            await showAuthHub(infoProvider);
-        }),
-        commands.registerCommand('pixi.auth.login', async (host?: string) => {
-            await promptLogin(infoProvider, typeof host === 'string' ? host : undefined);
-        }),
-        commands.registerCommand('pixi.auth.logout', async (targetItem?: unknown) => {
-            await promptLogout(infoProvider, targetItem);
-        }),
-        commands.registerCommand('pixi.auth.copyToken', async (targetItem?: unknown) => {
-            await promptCopyToken(targetItem);
-        }),
-        commands.registerCommand('pixi.auth.status', async () => {
-            await showAuthStatus();
-        }),
-    ];
-
-    return Disposable.from(...disposables);
+    return Disposable.from(
+        commands.registerCommand('pixi.auth', () => showAuthHub(infoProvider)),
+        commands.registerCommand('pixi.auth.login', (host?: unknown) =>
+            promptLogin(infoProvider, typeof host === 'string' ? host : undefined),
+        ),
+        commands.registerCommand('pixi.auth.logout', (targetItem?: unknown) => promptLogout(infoProvider, targetItem)),
+        commands.registerCommand('pixi.auth.copyToken', (targetItem?: unknown) => promptCopyToken(targetItem)),
+        commands.registerCommand('pixi.auth.status', () => showAuthStatus()),
+    );
 }
