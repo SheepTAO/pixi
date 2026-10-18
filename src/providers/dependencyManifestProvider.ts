@@ -191,12 +191,7 @@ export class PixiDependencyManifestProvider
                     this.refresh();
                 }
             }),
-            commands.registerCommand(
-                'pixi.openLockfile',
-                async (options?: { projectPath?: string; packageName?: string } | Uri) => {
-                    await this.openLockfileCommand(options);
-                },
-            ),
+            commands.registerCommand('pixi.openLockfile', (options) => this.openLockfileCommand(options)),
         );
     }
 
