@@ -601,7 +601,7 @@
                 },
                 {
                     "command": "pixi.reinstall",
-                    "when": "pixi.hasPixiProject"
+                    "when": "false"
                 },
                 {
                     "command": "pixi.reinstallEnvironment",
@@ -665,7 +665,7 @@
                 },
                 {
                     "command": "pixi.lock",
-                    "when": "pixi.hasPixiProject"
+                    "when": "false"
                 },
                 {
                     "command": "pixi.checkLockfile",
@@ -747,7 +747,7 @@
                 },
                 {
                     "command": "pixi.openLockfile",
-                    "when": "pixi.hasPixiProject"
+                    "when": "false"
                 },
                 {
                     "command": "pixi.showDependencyTree",

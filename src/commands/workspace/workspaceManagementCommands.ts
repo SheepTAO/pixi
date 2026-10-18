@@ -878,6 +878,11 @@ export function registerWorkspaceManagementCommands(manager: PixiProjectManager)
                     command: 'pixi.checkLockfile',
                 },
                 {
+                    label: '$(file-code) Open Lockfile (pixi.lock) ...',
+                    description: 'Open pixi.lock and inspect resolved package records',
+                    command: 'pixi.openLockfile',
+                },
+                {
                     label: '$(terminal) Run in Temporary Environment (Exec) ...',
                     description: 'Run arbitrary tools inside a temporary disposable environment (pixi exec)',
                     command: 'pixi.exec',

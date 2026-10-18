@@ -1088,8 +1088,14 @@ export function registerEnvironmentCommands(manager: PixiProjectManager): Dispos
                     command: 'pixi.install',
                 },
                 {
-                    label: '$(debug-restart) Reinstall All Environments...',
-                    description: 'Reinstall all environments declared in the project (pixi reinstall --all)',
+                    label: '$(lock) Lock Dependencies',
+                    description: 'Solve dependencies and update pixi.lock without installing (pixi lock)',
+                    command: 'pixi.lock',
+                },
+                {
+                    label: '$(debug-restart) Reinstall Environments or Package...',
+                    description:
+                        'Rebuild all environments, a specific environment, or reinstall a package (pixi reinstall)',
                     command: 'pixi.reinstall',
                 },
                 {
