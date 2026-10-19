@@ -118,10 +118,7 @@ export async function activate(context: ExtensionContext): Promise<PixiExtension
         }
     })();
 
-    const [pythonDisposables] = await Promise.all([
-        pythonSupportPromise,
-        projectInitPromise,
-    ]);
+    const [pythonDisposables] = await Promise.all([pythonSupportPromise, projectInitPromise]);
 
     context.subscriptions.push(...pythonDisposables);
 

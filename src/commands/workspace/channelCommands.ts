@@ -237,7 +237,7 @@ export async function handleChannelHubCommand(
     presetFeature?: string,
 ): Promise<void> {
     interface ChannelActionItem extends QuickPickItem {
-        action: 'add' | 'remove' | 'auth';
+        action: 'add' | 'remove';
     }
 
     const actions: ChannelActionItem[] = [
@@ -250,11 +250,6 @@ export async function handleChannelHubCommand(
             label: '$(trash) Remove Channel...',
             description: 'Remove configured channel(s) from the project manifest',
             action: 'remove',
-        },
-        {
-            label: '$(key) Manage Authentication (pixi auth)...',
-            description: 'Login, logout, or manage credentials for private channels and registries',
-            action: 'auth',
         },
     ];
 
@@ -272,9 +267,6 @@ export async function handleChannelHubCommand(
             break;
         case 'remove':
             await handleRemoveChannelCommand(manager, targetItem, presetFeature);
-            break;
-        case 'auth':
-            await commands.executeCommand('pixi.auth');
             break;
     }
 }

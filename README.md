@@ -84,7 +84,8 @@ All actions are organized into intuitive, guided QuickPick hubs. Press `Ctrl+Shi
 | **Pixi: Remove Package ...**               | Remove packages with automatic feature/environment scope resolution.                 |
 | **Pixi: Run Task ...**                     | Search and run any defined project task with optional custom CLI arguments.          |
 | **Pixi: Open Terminal in Environment ...** | Open an integrated terminal pre-activated in the selected environment.               |
-| **Pixi: Configuration Management ...**     | Inspect and edit Pixi settings across workspace/user/system scopes & auth.           |
+| **Pixi: Configuration Management ...**     | Inspect and edit Pixi settings across workspace/user/system scopes.                  |
+| **Pixi: Authentication ...**               | Interactive hub to log in, log out, copy tokens, or check status (`pixi auth`).      |
 | **Pixi: Global Tools ...**                 | Manage user-level CLI packages, aliases, and dependency trees.                       |
 
 ---
