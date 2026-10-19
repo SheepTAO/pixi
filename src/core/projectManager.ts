@@ -113,10 +113,17 @@ export class PixiProjectManager implements Disposable {
     }
 
     private promptedAutoInstallProjects = new Set<string>();
+    private initPromise?: Promise<void>;
 
-    public async initialize(): Promise<void> {
-        await this.refreshAll();
-        await this.checkAutoInstall();
+    public initialize(): Promise<void> {
+        return (this.initPromise ??= (async () => {
+            await this.refreshAll();
+            await this.checkAutoInstall();
+        })());
+    }
+
+    public whenReady(): Promise<void> {
+        return this.initialize();
     }
 
     public getProjectPaths(): string[] {
@@ -558,6 +565,7 @@ export class PixiProjectManager implements Disposable {
         this._onDidChangeEnvironments.dispose();
         this.packagesCache.clear();
         this.projectToEnvs.clear();
+        this.initPromise = undefined;
         Disposable.from(...this.disposables).dispose();
     }
 }

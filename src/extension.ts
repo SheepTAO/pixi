@@ -100,22 +100,30 @@ export async function activate(context: ExtensionContext): Promise<PixiExtension
 
     traceInfo(`Pixi extension v${extensionVersion} activated.`);
 
-    // 4. Initial project discovery & validation
-    await projectManager.initialize();
-    const projects = projectManager.getProjects();
-    if (projects.length > 0) {
-        await validatePixiCli();
-        for (const p of projects) {
-            const envs = projectManager.getEnvironmentsForProject(p.projectPath);
-            const envNames = envs.map((e) => e.pixiEnvName).join(', ');
-            traceInfo(`Discovered Pixi project: ${p.name} [${envs.length} envs: ${envNames || 'none'}]`);
-        }
-    } else {
-        traceInfo('No Pixi projects discovered in current workspace.');
-    }
+    // 4. Concurrently initialize Python support and project discovery
+    const pythonSupportPromise = activatePythonSupport(projectManager, pixiApi);
 
-    // 5. Conditionally activate Python support (if ms-python.vscode-python-envs is available)
-    context.subscriptions.push(...(await activatePythonSupport(projectManager, pixiApi)));
+    const projectInitPromise = (async () => {
+        await projectManager.initialize();
+        const projects = projectManager.getProjects();
+        if (projects.length > 0) {
+            await validatePixiCli();
+            for (const p of projects) {
+                const envs = projectManager.getEnvironmentsForProject(p.projectPath);
+                const envNames = envs.map((e) => e.pixiEnvName).join(', ');
+                traceInfo(`Discovered Pixi project: ${p.name} [${envs.length} envs: ${envNames || 'none'}]`);
+            }
+        } else {
+            traceInfo('No Pixi projects discovered in current workspace.');
+        }
+    })();
+
+    const [pythonDisposables] = await Promise.all([
+        pythonSupportPromise,
+        projectInitPromise,
+    ]);
+
+    context.subscriptions.push(...pythonDisposables);
 
     // 6. React to configuration changes
     context.subscriptions.push(

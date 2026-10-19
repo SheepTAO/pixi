@@ -173,7 +173,10 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
     }
 
     public initialize(): Promise<void> {
-        return (this.initPromise ??= this.refreshFromCore());
+        return (this.initPromise ??= (async () => {
+            await this.projectManager.whenReady();
+            await this.refreshFromCore();
+        })());
     }
 
     public dispose(): void {
@@ -185,6 +188,7 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
         this.activeEnv.clear();
         this.resourceEnv.clear();
         this.projectToEnvs.clear();
+        this.initPromise = undefined;
     }
 
     public getPixiEnvironment(envId: string): PixiPythonEnvironment | undefined {
