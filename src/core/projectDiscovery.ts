@@ -47,14 +47,7 @@ export function isPixiManifestSection(section?: string | null, isPyprojectDoc?: 
     return !isPyprojectDoc || section === 'tool.pixi' || section.startsWith('tool.pixi.');
 }
 
-export {
-    getProjectKey,
-    isPathInside,
-    isSamePath,
-    PathMap,
-    PathSet,
-    toCanonicalPathKey,
-} from '../common/collections';
+export { getProjectKey, isPathInside, isSamePath, PathMap, PathSet, toCanonicalPathKey } from '../common/collections';
 
 export interface WorkspaceChannelEntry {
     channel: string;

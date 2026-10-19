@@ -155,14 +155,7 @@ export function normalizeFolderPath(target?: unknown): string | undefined {
     return p;
 }
 
-export {
-    getProjectKey,
-    isPathInside,
-    isSamePath,
-    PathMap,
-    PathSet,
-    toCanonicalPathKey,
-} from './collections';
+export { getProjectKey, isPathInside, isSamePath, PathMap, PathSet, toCanonicalPathKey } from './collections';
 
 /**
  * Escapes characters with special meaning in regular expressions.

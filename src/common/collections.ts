@@ -204,4 +204,3 @@ export class PathSet implements Set<string> {
         return 'PathSet';
     }
 }
-
