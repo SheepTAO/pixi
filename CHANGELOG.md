@@ -5,6 +5,23 @@ All notable changes to the "pixi" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.1] - 2026-10-19
+
+- **Python Environment Manager & Global Resolution**:
+    - Deduplicate global environment change events via `syncEffectiveGlobalEnv` with diff tracking.
+    - Accurately prioritize per-resource environment mappings and workspace folders before falling back to global defaults.
+    - Clean up internal state on dispose to eliminate potential memory retention.
+- **Extension Activation Concurrency & Startup Race Prevention**:
+    - Concurrently launch `activatePythonSupport` and `projectManager.initialize` via `Promise.all` to accelerate extension startup.
+    - Register Python environment manager early on tick 0, resolving startup race warnings with `vscode-python-envs`.
+    - Coordinate project initialization with `initPromise` and `whenReady` in `PixiProjectManager`.
+    - Guard `validatePixiCli` behind project count checks to eliminate false-positive CLI warnings in non-Pixi or empty workspaces.
+- **Authentication Hub & Channel Decoupling**:
+    - Expose unified `Pixi: Authentication ...` command in the Command Palette while keeping granular sub-commands hidden to prevent palette clutter.
+    - Decouple global authentication credentials from project-scoped Conda channel management.
+- **Code Quality & CI Compliance**:
+    - Enforce Prettier formatting across manifests, documentation, and TypeScript sources to ensure green release pipelines.
+
 ## [2.2.0] - 2026-10-19
 
 - **Dynamic View Actions & Grouping**:
