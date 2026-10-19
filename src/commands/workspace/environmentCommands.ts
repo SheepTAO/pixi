@@ -7,7 +7,6 @@ import { runPixiWithProgress } from '../../cli/workspaceCli';
 import { revealDefinitionInManifest } from '../../common/execUtils';
 import { isPyproject, isSamePath } from '../../core/projectDiscovery';
 import { PixiProjectManager } from '../../core/projectManager';
-import { promptAddPackageSpec, resolvePackageInstallArgs } from './packageSearchPicker';
 import {
     extractCommandContext,
     extractEnvironmentName,
@@ -31,6 +30,7 @@ import {
     updateConfigurationValue,
     validatePixiIdentifier,
 } from './common';
+import { promptAddPackageSpec, resolvePackageInstallArgs } from './packageSearchPicker';
 
 async function pickInstallableEnvironment(
     manager: PixiProjectManager,

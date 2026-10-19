@@ -47,7 +47,7 @@ export function matchEnvironmentForUri<T extends { pixiEnvName: string }>(
     projectPath: string,
     envs: T[],
 ): T | undefined {
-    if (uri.scheme === 'file') {
+    if (uri.scheme === 'file' || uri.scheme === 'vscode-notebook-cell') {
         const relPath = path.relative(projectPath, uri.fsPath).replace(/\\/g, '/');
         if (!relPath.startsWith('..')) {
             const rules = workspace

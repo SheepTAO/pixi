@@ -13,6 +13,7 @@ import {
     ResolveEnvironmentContext,
     SetEnvironmentScope,
 } from '@vscode/python-environments';
+import * as fs from 'fs';
 import { Disposable, EventEmitter, ThemeIcon, Uri, window, workspace } from 'vscode';
 
 import { PixiExtensionApi } from '../../api';
@@ -40,6 +41,7 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
 
     private globalEnv: PixiPythonEnvironment | undefined;
     private readonly activeEnv = new PathMap<PixiPythonEnvironment>();
+    private readonly resourceEnv = new PathMap<PixiPythonEnvironment>();
     private projectToEnvs = new PathMap<PixiPythonEnvironment[]>();
     private readonly disposables: Disposable[] = [];
 
@@ -64,21 +66,38 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
                 await this.refreshFromCore();
             }),
             this.pixiApi.onDidChangeActiveEnvironment((e) => {
+                const scope = e.scope;
+                const scopePath = scope?.fsPath;
                 if (e.environment) {
-                    const project = e.scope ? this.api.getPythonProject(e.scope) : undefined;
+                    const project = scope ? this.api.getPythonProject(scope) : undefined;
                     const projectPath = project?.uri.fsPath || e.environment.projectPath;
                     const envs = this.projectToEnvs.get(projectPath) || [];
                     const pyEnv = envs.find((p) => p.pixiEnvName === e.environment?.pixiEnvName);
                     if (pyEnv) {
-                        this.updateProjectActiveEnv(projectPath, pyEnv);
-                        if (e.scope === undefined) {
-                            this.updateGlobalActiveEnv(pyEnv);
+                        const isProject =
+                            !scopePath ||
+                            isSamePath(scopePath, projectPath) ||
+                            this.projectManager.getProjectPaths().some((p) => isSamePath(p, scopePath));
+                        if (isProject) {
+                            this.updateProjectActiveEnv(projectPath, pyEnv, false, scope);
+                            if (scope === undefined) {
+                                this.updateGlobalActiveEnv(pyEnv);
+                            }
+                        } else if (scope) {
+                            this.updateResourceActiveEnv(scope, pyEnv);
                         }
                     }
-                } else if (e.scope) {
-                    const project = this.api.getPythonProject(e.scope);
-                    const projectPath = project?.uri.fsPath || e.scope.fsPath;
-                    this.updateProjectActiveEnv(projectPath, undefined);
+                } else if (scope && scopePath) {
+                    const project = this.api.getPythonProject(scope);
+                    const projectPath = project?.uri.fsPath || scopePath;
+                    const isProject =
+                        isSamePath(scopePath, projectPath) ||
+                        this.projectManager.getProjectPaths().some((p) => isSamePath(p, scopePath));
+                    if (isProject) {
+                        this.updateProjectActiveEnv(projectPath, undefined, false, scope);
+                    } else {
+                        this.updateResourceActiveEnv(scope, undefined);
+                    }
                 } else {
                     this.updateGlobalActiveEnv(undefined);
                 }
@@ -98,6 +117,50 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
                             }
                         }
                     }
+                    for (const nbEditor of window.visibleNotebookEditors ?? []) {
+                        const env = await this.get(nbEditor.notebook.uri);
+                        if (env) {
+                            await this.set(nbEditor.notebook.uri, env);
+                        }
+                    }
+                }
+            }),
+            workspace.onDidChangeNotebookDocument((e) => {
+                if (e.metadata !== undefined) {
+                    const projectPath = this.resolveProjectPath(e.notebook.uri);
+                    if (!projectPath) {
+                        return;
+                    }
+                    const envs = this.projectToEnvs.get(projectPath) || [];
+                    const matched = this.findEnvFromNotebookMetadata(e.notebook.uri, envs);
+                    if (matched) {
+                        this.updateResourceActiveEnv(e.notebook.uri, matched);
+                    }
+                }
+            }),
+            workspace.onDidOpenNotebookDocument((nb) => {
+                const projectPath = this.resolveProjectPath(nb.uri);
+                if (!projectPath) {
+                    return;
+                }
+                const envs = this.projectToEnvs.get(projectPath) || [];
+                const matched = this.findEnvFromNotebookMetadata(nb.uri, envs);
+                if (matched) {
+                    this.updateResourceActiveEnv(nb.uri, matched);
+                }
+            }),
+            window.onDidChangeActiveNotebookEditor((editor) => {
+                if (editor) {
+                    const projectPath = this.resolveProjectPath(editor.notebook.uri);
+                    if (projectPath) {
+                        const envs = this.projectToEnvs.get(projectPath) || [];
+                        const matched =
+                            this.resourceEnv.get(editor.notebook.uri.fsPath) ||
+                            this.findEnvFromNotebookMetadata(editor.notebook.uri, envs);
+                        if (matched) {
+                            this.updateResourceActiveEnv(editor.notebook.uri, matched);
+                        }
+                    }
                 }
             }),
         );
@@ -113,6 +176,7 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
         Disposable.from(...this.disposables).dispose();
         this.globalEnv = undefined;
         this.activeEnv.clear();
+        this.resourceEnv.clear();
         this.projectToEnvs.clear();
     }
 
@@ -236,11 +300,50 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
             }
         }
 
+        // Re-link per-resource active environments to updated environment instances
+        for (const [resPath, oldEnv] of this.resourceEnv) {
+            const projectPath = this.resolveProjectPath(Uri.file(resPath));
+            if (projectPath) {
+                const envs = nextProjectToEnvs.get(projectPath) || [];
+                const found = envs.find((e) => e.pixiEnvName === oldEnv.pixiEnvName);
+                if (found) {
+                    this.resourceEnv.set(resPath, found);
+                } else {
+                    this.resourceEnv.delete(resPath);
+                }
+            } else {
+                this.resourceEnv.delete(resPath);
+            }
+        }
+
         // Atomic swap: replace previous environment map in a single step
         this.projectToEnvs = nextProjectToEnvs;
 
         if (changes.length > 0) {
             this._onDidChangeEnvironments.fire(changes);
+        }
+
+        // Proactively notify VS Code python-envs of active environments for projects and open notebooks
+        for (const projectPath of projectPaths) {
+            const projectEnvs = nextProjectToEnvs.get(projectPath) || [];
+            const active = this.activeEnv.get(projectPath) || getDefaultEnvironment(projectEnvs);
+            if (active) {
+                this._onDidChangeEnvironment.fire({ uri: Uri.file(projectPath), old: undefined, new: active });
+            }
+        }
+
+        for (const nb of workspace.notebookDocuments) {
+            const projectPath = this.resolveProjectPath(nb.uri);
+            if (!projectPath) {
+                continue;
+            }
+            const projectEnvs = nextProjectToEnvs.get(projectPath) || [];
+            const matched =
+                this.resourceEnv.get(nb.uri.fsPath) || this.findEnvFromNotebookMetadata(nb.uri, projectEnvs);
+            if (matched) {
+                this.resourceEnv.set(nb.uri.fsPath, matched);
+                this._onDidChangeEnvironment.fire({ uri: nb.uri, old: undefined, new: matched });
+            }
         }
     }
 
@@ -303,6 +406,101 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
         return [];
     }
 
+    private findEnvFromNotebookMetadata(uri: Uri, envs: PixiPythonEnvironment[]): PixiPythonEnvironment | undefined {
+        const isNotebook = uri.fsPath.endsWith('.ipynb') || uri.scheme === 'vscode-notebook-cell';
+        if (!isNotebook) {
+            return undefined;
+        }
+
+        const nbDoc = workspace.notebookDocuments.find((nb) => isSamePath(nb.uri.fsPath, uri.fsPath));
+        const metadata = nbDoc?.metadata;
+        let kernelspec = (metadata?.kernelspec || metadata?.custom?.metadata?.kernelspec) as
+            | { display_name?: string; name?: string }
+            | undefined;
+
+        if (!kernelspec && uri.scheme === 'file' && fs.existsSync(uri.fsPath)) {
+            try {
+                let content: string | undefined;
+                const stat = fs.statSync(uri.fsPath);
+                // For files <= 2MB, read directly; for larger files, read first 64KB and last 64KB where metadata resides
+                if (stat.size <= 2 * 1024 * 1024) {
+                    content = fs.readFileSync(uri.fsPath, 'utf8');
+                } else {
+                    const fd = fs.openSync(uri.fsPath, 'r');
+                    try {
+                        const chunkSize = 64 * 1024;
+                        const headBuf = Buffer.alloc(chunkSize);
+                        const headBytes = fs.readSync(fd, headBuf, 0, chunkSize, 0);
+                        const headStr = headBuf.subarray(0, headBytes).toString('utf8');
+
+                        const tailOffset = Math.max(0, stat.size - chunkSize);
+                        const tailBuf = Buffer.alloc(chunkSize);
+                        const tailBytes = fs.readSync(fd, tailBuf, 0, chunkSize, tailOffset);
+                        const tailStr = tailBuf.subarray(0, tailBytes).toString('utf8');
+
+                        content = headStr + '\n' + tailStr;
+                    } finally {
+                        fs.closeSync(fd);
+                    }
+                }
+                const match = content.match(/"kernelspec"\s*:\s*\{([^}]+)\}/);
+                if (match) {
+                    const dnMatch = match[1].match(/"display_name"\s*:\s*"([^"]+)"/);
+                    const nameMatch = match[1].match(/"name"\s*:\s*"([^"]+)"/);
+                    if (dnMatch || nameMatch) {
+                        kernelspec = {
+                            display_name: dnMatch ? dnMatch[1] : undefined,
+                            name: nameMatch ? nameMatch[1] : undefined,
+                        };
+                    }
+                }
+            } catch {
+                // ignore
+            }
+        }
+
+        const displayName = kernelspec?.display_name;
+        const kernelName = kernelspec?.name;
+        if (!displayName && !kernelName) {
+            return undefined;
+        }
+
+        // 1. Exact match against displayName or pixiEnvName
+        if (displayName) {
+            const exact = envs.find((e) => e.displayName === displayName || e.pixiEnvName === displayName);
+            if (exact) {
+                return exact;
+            }
+        }
+
+        // 2. Sort envs by length descending to prioritize more specific names (e.g. 'dev-extra' before 'dev')
+        const sortedEnvs = [...envs].sort((a, b) => b.pixiEnvName.length - a.pixiEnvName.length);
+
+        if (displayName) {
+            for (const env of sortedEnvs) {
+                const escapedEnv = env.pixiEnvName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const escapedProj = env.projectName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const pattern = new RegExp(`(?:^|[:(\\[/\\s]|${escapedProj}:)${escapedEnv}(?:$|[ )\\]/\\s])`, 'i');
+                if (pattern.test(displayName)) {
+                    return env;
+                }
+            }
+        }
+
+        if (kernelName && kernelName !== 'python3') {
+            for (const env of sortedEnvs) {
+                const escapedEnv = env.pixiEnvName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const escapedProj = env.projectName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const pattern = new RegExp(`(?:^|[-_\\s]|${escapedProj}[-_])${escapedEnv}(?:$|[-_\\s])`, 'i');
+                if (pattern.test(kernelName)) {
+                    return env;
+                }
+            }
+        }
+
+        return undefined;
+    }
+
     async get(scope: GetEnvironmentScope): Promise<PythonEnvironment | undefined> {
         await this.initialize();
 
@@ -316,16 +514,35 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
         }
 
         const projectEnvs = this.projectToEnvs.get(projectPath) || [];
+
+        // 1. Explicit per-resource (notebook or document) environment selection
+        if (scope instanceof Uri) {
+            const resourceMatch = this.resourceEnv.get(scope.fsPath);
+            if (resourceMatch) {
+                return resourceMatch;
+            }
+
+            // 2. Check open notebook document metadata (kernelspec)
+            const nbMatch = this.findEnvFromNotebookMetadata(scope, projectEnvs);
+            if (nbMatch) {
+                this.resourceEnv.set(scope.fsPath, nbMatch);
+                return nbMatch;
+            }
+        }
+
+        // 3. Matching by configured environment rules
         const matched = matchEnvironmentForUri(scope, projectPath, projectEnvs);
         if (matched) {
             return matched;
         }
 
+        // 4. Project-level active environment
         const active = this.activeEnv.get(projectPath);
         if (active) {
             return active;
         }
 
+        // 5. Default project environment, or global fallback
         return getDefaultEnvironment(projectEnvs) || this.globalEnv;
     }
 
@@ -345,8 +562,10 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
 
             // Check if user is selecting an environment for a Jupyter Notebook
             const isNotebook =
-                (scope instanceof Uri && scope.fsPath.endsWith('.ipynb')) ||
-                (Array.isArray(scope) && scope.some((u) => u.fsPath.endsWith('.ipynb'))) ||
+                (scope instanceof Uri &&
+                    (scope.fsPath.endsWith('.ipynb') || scope.scheme === 'vscode-notebook-cell')) ||
+                (Array.isArray(scope) &&
+                    scope.some((u) => u.fsPath.endsWith('.ipynb') || u.scheme === 'vscode-notebook-cell')) ||
                 (!scope && (window.activeNotebookEditor?.notebook.uri.fsPath.endsWith('.ipynb') ?? false));
 
             if (isNotebook && !pyEnv.hasIpykernel) {
@@ -375,8 +594,16 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
                 continue;
             }
 
-            this.updateProjectActiveEnv(projectPath, pyEnv, true);
-            await this.pixiApi.setActiveEnvironment(Uri.file(projectPath), pyEnv?.pixiEnvName);
+            const isProjectFolder =
+                isSamePath(uri.fsPath, projectPath) ||
+                this.projectManager.getProjectPaths().some((p) => isSamePath(p, uri.fsPath));
+
+            if (isProjectFolder) {
+                this.updateProjectActiveEnv(projectPath, pyEnv, true, uri);
+                await this.pixiApi.setActiveEnvironment(Uri.file(projectPath), pyEnv?.pixiEnvName);
+            } else {
+                this.updateResourceActiveEnv(uri, pyEnv, true);
+            }
         }
     }
 
@@ -395,7 +622,14 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
 
         // 2. If context is a Uri, string, or has an fsPath, match by sysPrefix, environmentPath, or python executable
         const targetPath =
-            typeof context === 'string' ? context : context instanceof Uri ? context.fsPath : (context as any)?.fsPath;
+            typeof context === 'string'
+                ? context
+                : context instanceof Uri
+                  ? context.fsPath
+                  : (context as any)?.fsPath ||
+                    (context as any)?.environmentPath?.fsPath ||
+                    (context as any)?.execInfo?.run?.executable ||
+                    (context as any)?.path;
         if (typeof targetPath === 'string') {
             for (const envs of this.projectToEnvs.values()) {
                 for (const env of envs) {
@@ -410,11 +644,6 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
             }
         }
 
-        // 3. Fallback to get() for document/scope queries
-        if (context instanceof Uri) {
-            return this.get(context);
-        }
-
         return undefined;
     }
 
@@ -422,6 +651,7 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
         projectPath: string,
         pyEnv: PixiPythonEnvironment | undefined,
         forceFire = false,
+        sourceUri?: Uri,
     ): void {
         const oldEnv = this.activeEnv.get(projectPath);
         const isSame = oldEnv?.envId.id === pyEnv?.envId.id;
@@ -433,7 +663,25 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
         } else {
             this.activeEnv.delete(projectPath);
         }
-        this._onDidChangeEnvironment.fire({ uri: Uri.file(projectPath), old: oldEnv, new: pyEnv });
+        this._onDidChangeEnvironment.fire({ uri: sourceUri ?? Uri.file(projectPath), old: oldEnv, new: pyEnv });
+    }
+
+    private updateResourceActiveEnv(uri: Uri, pyEnv: PixiPythonEnvironment | undefined, forceFire = false): void {
+        const key = uri.fsPath;
+        const oldEnv = this.resourceEnv.get(key);
+        const isSame = oldEnv?.envId.id === pyEnv?.envId.id;
+        if (isSame && !forceFire) {
+            return;
+        }
+        if (pyEnv) {
+            this.resourceEnv.set(key, pyEnv);
+        } else {
+            this.resourceEnv.delete(key);
+        }
+        this._onDidChangeEnvironment.fire({ uri, old: oldEnv, new: pyEnv });
+        if (uri.scheme === 'vscode-notebook-cell') {
+            this._onDidChangeEnvironment.fire({ uri: Uri.file(uri.fsPath), old: oldEnv, new: pyEnv });
+        }
     }
 
     private updateGlobalActiveEnv(pyEnv: PixiPythonEnvironment | undefined, forceFire = false): void {
