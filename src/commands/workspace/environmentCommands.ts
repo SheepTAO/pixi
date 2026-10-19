@@ -5,7 +5,9 @@ import { commands, Disposable, FileType, ProgressLocation, QuickPickItem, Uri, w
 import { runPixi } from '../../cli/pixiCli';
 import { runPixiWithProgress } from '../../cli/workspaceCli';
 import { revealDefinitionInManifest } from '../../common/execUtils';
+import { isPyproject, isSamePath } from '../../core/projectDiscovery';
 import { PixiProjectManager } from '../../core/projectManager';
+import { promptAddPackageSpec, resolvePackageInstallArgs } from './packageSearchPicker';
 import {
     extractCommandContext,
     extractEnvironmentName,
@@ -284,6 +286,49 @@ async function handleImportCommand(manager: PixiProjectManager, targetItem?: unk
     );
 }
 
+export async function declareEmptyFeatureInManifest(
+    projectPath: string,
+    featureName: string,
+    manager: PixiProjectManager,
+): Promise<boolean> {
+    const manifestPath =
+        manager.getManifestPath(projectPath) ||
+        (fs.existsSync(path.join(projectPath, 'pyproject.toml'))
+            ? path.join(projectPath, 'pyproject.toml')
+            : path.join(projectPath, 'pixi.toml'));
+
+    if (!fs.existsSync(manifestPath)) {
+        window.showErrorMessage(`Pixi: Manifest file not found at ${manifestPath}`);
+        return false;
+    }
+
+    const openDoc = workspace.textDocuments.find((doc) => isSamePath(doc.uri.fsPath, manifestPath));
+    if (openDoc && openDoc.isDirty) {
+        await openDoc.save();
+    }
+
+    const isPyprojectDoc = isPyproject(manifestPath);
+    const sectionHeader = isPyprojectDoc ? `[tool.pixi.feature.${featureName}]` : `[feature.${featureName}]`;
+
+    try {
+        let content = await fs.promises.readFile(manifestPath, 'utf-8');
+        const escaped = featureName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const pattern = new RegExp(`^\\[(?:tool\\.pixi\\.)?feature\\.${escaped}(?:\\.[^\\]]+)?\\]`, 'm');
+        if (!pattern.test(content)) {
+            const endsWithNewline = content.endsWith('\n');
+            const prefix = endsWithNewline ? (content.endsWith('\n\n') ? '' : '\n') : '\n\n';
+            content += `${prefix}${sectionHeader}\n`;
+
+            await fs.promises.writeFile(manifestPath, content, 'utf-8');
+        }
+        await manager.refresh(Uri.file(projectPath));
+        return true;
+    } catch (error) {
+        window.showErrorMessage(`Pixi: Failed to update manifest: ${error}`);
+        return false;
+    }
+}
+
 async function handleCreateFeatureCommand(manager: PixiProjectManager, targetItem?: unknown): Promise<void> {
     const projectPath = await pickPixiProject(manager, 'Select Pixi project to create feature in', targetItem);
     if (!projectPath) {
@@ -293,6 +338,48 @@ async function handleCreateFeatureCommand(manager: PixiProjectManager, targetIte
     const existingFeatures = await getWorkspaceFeatures(projectPath);
     const trimmedName = await promptNewFeatureName(existingFeatures);
     if (!trimmedName) {
+        return;
+    }
+
+    interface FeatureInitOptionQuickPickItem extends QuickPickItem {
+        action: 'add-package' | 'empty';
+    }
+
+    const featureInitChoice = await window.showQuickPick<FeatureInitOptionQuickPickItem>(
+        [
+            {
+                label: '$(search) Search & Add Initial Package (Recommended)',
+                description: `Search Conda/PyPI or enter package to initialize feature '${trimmedName}'`,
+                action: 'add-package',
+            },
+            {
+                label: '$(file-code) Create Empty Feature',
+                description: `Declare empty feature in manifest without packages (add tasks or dependencies later)`,
+                action: 'empty',
+            },
+        ],
+        {
+            title: `Pixi: Initialize Feature '${trimmedName}'`,
+            placeHolder: `Choose how to initialize feature '${trimmedName}'`,
+        },
+    );
+    if (!featureInitChoice) {
+        return;
+    }
+
+    if (featureInitChoice.action === 'empty') {
+        const created = await declareEmptyFeatureInManifest(projectPath, trimmedName, manager);
+        if (created) {
+            const manifestPath = manager.getManifestPath(projectPath);
+            if (manifestPath) {
+                await revealDefinitionInManifest({
+                    manifestPath,
+                    targetName: trimmedName,
+                    kind: 'feature',
+                });
+            }
+            window.showInformationMessage(`Pixi: Successfully created empty feature '${trimmedName}'.`);
+        }
         return;
     }
 
@@ -346,7 +433,7 @@ async function handleCreateEnvironmentCommand(manager: PixiProjectManager, targe
     } else {
         modeItems.push({
             label: `$(symbol-namespace) Create with companion feature '${trimmedName}' (Recommended)`,
-            description: `Add initial package to create feature '${trimmedName}' and bind to environment`,
+            description: `Create companion feature '${trimmedName}' (with or without initial packages) and bind to environment`,
             action: 'companion',
         });
     }
@@ -436,38 +523,74 @@ async function handleCreateEnvironmentCommand(manager: PixiProjectManager, targe
                 `Pixi: Environment '${trimmedName}' created and ready.`,
             );
         } else {
-            const initialPkg = await window.showInputBox({
-                title: `Pixi: Companion Feature '${trimmedName}'`,
-                prompt: `Enter initial package(s) to create feature '${trimmedName}' (or press Enter to create without package)`,
-                placeHolder: 'e.g. pytest, python=3.11, ruff',
-            });
-            if (initialPkg === undefined) {
+            interface CompanionFeatureOptionItem extends QuickPickItem {
+                action: 'search' | 'empty';
+            }
+            const pkgChoice = await window.showQuickPick<CompanionFeatureOptionItem>(
+                [
+                    {
+                        label: '$(search) Search & Add Initial Package (Recommended)',
+                        description: `Search Conda/PyPI or enter package to install into companion feature '${trimmedName}'`,
+                        action: 'search',
+                    },
+                    {
+                        label: '$(file-code) Create Companion Feature Without Initial Package',
+                        description: `Declare empty feature '${trimmedName}' and bind to environment '${trimmedName}'`,
+                        action: 'empty',
+                    },
+                ],
+                {
+                    title: `Pixi: Initial Package for Companion Feature '${trimmedName}'`,
+                    placeHolder: `Choose whether to install initial package(s) for feature '${trimmedName}'`,
+                },
+            );
+            if (!pkgChoice) {
                 return;
             }
-            const pkgSpec = initialPkg.trim();
-            const commandsToRun: string[][] = [];
-            const pkgs = pkgSpec.split(/[\s,]+/).filter(Boolean);
-            if (pkgs.length > 0) {
-                commandsToRun.push(['add', '-f', trimmedName, ...pkgs]);
+
+            if (pkgChoice.action === 'empty') {
+                const created = await declareEmptyFeatureInManifest(projectPath, trimmedName, manager);
+                if (!created) {
+                    return;
+                }
+                await runPixiWithProgress(
+                    `Pixi: Creating environment '${trimmedName}' with companion feature '${trimmedName}'...`,
+                    [
+                        ['workspace', 'environment', 'add', trimmedName, '--feature', trimmedName, ...solveGroupArgs],
+                        ['install', '-e', trimmedName],
+                    ],
+                    projectPath,
+                    manager,
+                    `Pixi: Environment '${trimmedName}' created and ready with companion feature '${trimmedName}'.`,
+                );
+            } else {
+                const promptResult = await promptAddPackageSpec(projectPath, trimmedName, undefined, manager, {
+                    title: `Pixi: Initial Package for Companion Feature '${trimmedName}'`,
+                    placeholder: 'Search Conda package or press Enter to add directly (PyPI / Conda / Git / Path)',
+                });
+                if (!promptResult) {
+                    return;
+                }
+
+                const resolvedPkg = await resolvePackageInstallArgs(projectPath, promptResult, manager);
+                if (!resolvedPkg) {
+                    return;
+                }
+
+                const commandsToRun: string[][] = [
+                    ['add', '-f', trimmedName, ...resolvedPkg.args],
+                    ['workspace', 'environment', 'add', trimmedName, '--feature', trimmedName, ...solveGroupArgs],
+                    ['install', '-e', trimmedName],
+                ];
+
+                await runPixiWithProgress(
+                    `Pixi: Creating environment '${trimmedName}' with feature '${trimmedName}' (${resolvedPkg.displaySpec})...`,
+                    commandsToRun,
+                    projectPath,
+                    manager,
+                    `Pixi: Environment '${trimmedName}' created and ready with '${resolvedPkg.displaySpec}'.`,
+                );
             }
-            commandsToRun.push(
-                [
-                    'workspace',
-                    'environment',
-                    'add',
-                    trimmedName,
-                    ...(pkgs.length > 0 ? ['--feature', trimmedName] : []),
-                    ...solveGroupArgs,
-                ],
-                ['install', '-e', trimmedName],
-            );
-            await runPixiWithProgress(
-                `Pixi: Creating environment '${trimmedName}'${pkgs.length > 0 ? ` with companion feature '${trimmedName}'` : ''}...`,
-                commandsToRun,
-                projectPath,
-                manager,
-                `Pixi: Environment '${trimmedName}' created and ready.`,
-            );
         }
         return;
     }
@@ -993,7 +1116,7 @@ async function handleFeatureHubCommand(targetItem?: unknown): Promise<void> {
     const actions = [
         {
             label: '$(plus) Create New Feature...',
-            description: 'Define a new reusable feature and add initial package(s)',
+            description: 'Define a new reusable feature (empty or with initial dependencies)',
             command: 'pixi.createFeature',
         },
         {

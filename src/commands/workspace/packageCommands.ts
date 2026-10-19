@@ -26,9 +26,9 @@ import {
 } from './common';
 import {
     AddPackagePromptResult,
-    promptAddPackageSource,
     promptAddPackageSpec,
     promptPackageVersionConstraint,
+    resolvePackageInstallArgs,
     showPackageSearchPicker,
 } from './packageSearchPicker';
 import { disposeTreeOutputChannel, showDependencyTreeCommand, whyPackageCommand } from './packageTreeViewer';
@@ -435,13 +435,11 @@ export async function handleAddPackageCommand(
     const scopeArgs = getScopeArgs(targetScope);
     const scopeLabel = formatScope(targetScope);
 
-    if (promptResult.kind === 'selected') {
-        const pkg = promptResult.pkg;
-        const spec = promptResult.spec;
-        const isPypi = pkg.sourceType === 'pypi';
-
-        if (targetScope.kind === 'workspace-dependency') {
-            if (isPypi) {
+    if (targetScope.kind === 'workspace-dependency') {
+        if (promptResult.kind === 'selected') {
+            const pkg = promptResult.pkg;
+            const spec = promptResult.spec;
+            if (pkg.sourceType === 'pypi') {
                 window.showWarningMessage(
                     'Pixi shared workspace dependencies ([workspace.dependencies]) only support Conda packages.',
                 );
@@ -453,31 +451,19 @@ export async function handleAddPackageCommand(
             return;
         }
 
-        const args = ['add'];
-        if (isPypi) {
-            args.push('--pypi');
-        }
-        args.push(...scopeArgs, spec);
-
-        const sourceLabel = isPypi ? 'PyPI' : `Conda (${pkg.channel || DEFAULT_CONDA_CHANNEL})`;
-        await executeAddPackage(manager, projectPath, args, spec, sourceLabel, scopeLabel);
-        return;
-    }
-
-    const specs = promptResult.specs;
-    if (targetScope.kind === 'workspace-dependency') {
+        const specs = promptResult.specs;
         const args = ['workspace', 'dependencies', 'add', ...specs];
         await executeAddPackage(manager, projectPath, args, specs.join(', '), 'Conda', scopeLabel);
         return;
     }
 
-    const sourceConfig = await promptAddPackageSource(projectPath, specs, manager);
-    if (!sourceConfig) {
+    const resolvedPkg = await resolvePackageInstallArgs(projectPath, promptResult, manager);
+    if (!resolvedPkg) {
         return;
     }
 
-    const args = ['add', ...scopeArgs, ...sourceConfig.args];
-    await executeAddPackage(manager, projectPath, args, specs.join(', '), sourceConfig.sourceLabel, scopeLabel);
+    const args = ['add', ...scopeArgs, ...resolvedPkg.args];
+    await executeAddPackage(manager, projectPath, args, resolvedPkg.displaySpec, resolvedPkg.sourceLabel, scopeLabel);
 }
 
 export async function handleRemovePackageCommand(manager: PixiProjectManager, targetItem?: unknown): Promise<void> {

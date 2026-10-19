@@ -407,18 +407,27 @@ export async function handlePackageSearchSelection(
     }
 }
 
+export interface PromptAddPackageSpecOptions {
+    title?: string;
+    placeholder?: string;
+}
+
 export async function promptAddPackageSpec(
     projectPath: string,
     targetEnvName?: string,
     initialQuery?: string,
     manager?: PixiProjectManager,
+    options?: PromptAddPackageSpecOptions,
 ): Promise<AddPackagePromptResult | undefined> {
     return new Promise((resolve) => {
         const quickPick = window.createQuickPick<SearchResultQuickPickItem>();
-        quickPick.title = targetEnvName
-            ? `Pixi: Add Package to '${targetEnvName}' (Conda Search & Direct Add)`
-            : 'Pixi: Add Package (Conda Search & Direct Add)';
-        quickPick.placeholder = 'Type package to search Conda or press Enter to add directly (PyPI / Conda)';
+        quickPick.title =
+            options?.title ??
+            (targetEnvName
+                ? `Pixi: Add Package to '${targetEnvName}' (Conda Search & Direct Add)`
+                : 'Pixi: Add Package (Conda Search & Direct Add)');
+        quickPick.placeholder =
+            options?.placeholder ?? 'Type package to search Conda or press Enter to add directly (PyPI / Conda)';
         quickPick.matchOnDescription = true;
         quickPick.matchOnDetail = true;
 
@@ -641,4 +650,39 @@ export async function promptAddPackageSource(
     }
 
     return { args, sourceLabel };
+}
+
+export interface ResolvedPackageArgs {
+    args: string[];
+    sourceLabel: string;
+    displaySpec: string;
+}
+
+export async function resolvePackageInstallArgs(
+    projectPath: string,
+    promptResult: AddPackagePromptResult,
+    manager?: PixiProjectManager,
+): Promise<ResolvedPackageArgs | undefined> {
+    if (promptResult.kind === 'selected') {
+        const pkg = promptResult.pkg;
+        const spec = promptResult.spec;
+        const isPypi = pkg.sourceType === 'pypi';
+        const args: string[] = [];
+        if (isPypi) {
+            args.push('--pypi');
+        }
+        args.push(spec);
+        const sourceLabel = isPypi ? 'PyPI' : `Conda (${pkg.channel || DEFAULT_CONDA_CHANNEL})`;
+        return { args, sourceLabel, displaySpec: spec };
+    }
+
+    const sourceConfig = await promptAddPackageSource(projectPath, promptResult.specs, manager);
+    if (!sourceConfig) {
+        return undefined;
+    }
+    return {
+        args: sourceConfig.args,
+        sourceLabel: sourceConfig.sourceLabel,
+        displaySpec: promptResult.specs.join(', '),
+    };
 }
