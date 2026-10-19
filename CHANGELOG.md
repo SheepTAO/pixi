@@ -5,6 +5,19 @@ All notable changes to the "pixi" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2026-10-19
+
+- **Windows Path Sensitivity & Environment Management**:
+    - Introduce canonical `PathMap` and `PathSet` collection types for case-insensitive lookup and case-preserving keys on Windows.
+    - Fix an issue where refreshing or switching environments on Windows purged all environments from the tree view and active environment state due to path casing discrepancies (`folder.uri.fsPath`).
+    - Resolve project path mapping in Python environment manager for Jupyter Notebooks (`.ipynb`) and document scopes.
+    - Reinforce Jupyter notebook `ipykernel` detection and installation prompt flow.
+- **Automatic Package Update Inspection**:
+    - Add native background package update checking with inline manifest hints (`pixi.toml` / `pyproject.toml`) and visual upgrade indicators in the Environments view.
+    - Support configurable check intervals and opt-in settings (`pixi.packageUpdates.enabled`, `pixi.packageUpdates.showInlineHints`).
+- **Terminal & Configuration Customization**:
+    - Add customizable terminal naming formats and flexible shell execution activation options.
+
 ## [2.0.0] - 2026-10-18
 
 - **Modern Pixi Workspace Architecture & Baseline Compatibility**:
