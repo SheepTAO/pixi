@@ -17,7 +17,7 @@ import { Disposable, EventEmitter, ThemeIcon, Uri, window, workspace } from 'vsc
 
 import { PixiExtensionApi } from '../../api';
 import { getPixi } from '../../cli/pixiCli';
-import { traceVerbose } from '../../common/logging';
+import { traceError, traceVerbose } from '../../common/logging';
 import { getProjectEnvStorageKey, getWorkspacePersistentState, GLOBAL_ENV_KEY } from '../../common/persistentState';
 import {
     ensureEnvironmentReady,
@@ -40,7 +40,7 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
 
     private globalEnv: PixiPythonEnvironment | undefined;
     private readonly activeEnv = new PathMap<PixiPythonEnvironment>();
-    private readonly projectToEnvs = new PathMap<PixiPythonEnvironment[]>();
+    private projectToEnvs = new PathMap<PixiPythonEnvironment[]>();
     private readonly disposables: Disposable[] = [];
 
     private readonly _onDidChangeEnvironment = new EventEmitter<DidChangeEnvironmentEventArgs>();
@@ -50,6 +50,8 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
     readonly onDidChangeEnvironments = this._onDidChangeEnvironments.event;
 
     private initPromise?: Promise<void>;
+    private activeRefreshPromise?: Promise<void>;
+    private queuedRefreshPromise?: Promise<void>;
 
     constructor(
         private readonly api: PythonEnvironmentApi,
@@ -128,9 +130,33 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
         await this.projectManager.refresh(scope instanceof Uri ? scope : undefined);
     }
 
-    private async refreshFromCore(): Promise<void> {
+    private refreshFromCore(): Promise<void> {
+        if (this.activeRefreshPromise) {
+            if (!this.queuedRefreshPromise) {
+                this.queuedRefreshPromise = this.activeRefreshPromise.then(() => {
+                    this.queuedRefreshPromise = undefined;
+                    return this.refreshFromCore();
+                });
+            }
+            return this.queuedRefreshPromise;
+        }
+
+        const run = async () => {
+            try {
+                await this.doRefreshFromCore();
+            } catch (error) {
+                traceError('Failed to refresh Python environments from Pixi core:', error);
+            } finally {
+                this.activeRefreshPromise = undefined;
+            }
+        };
+
+        return (this.activeRefreshPromise = run());
+    }
+
+    private async doRefreshFromCore(): Promise<void> {
         const oldProjectToEnvs = new PathMap(this.projectToEnvs);
-        this.projectToEnvs.clear();
+        const nextProjectToEnvs = new PathMap<PixiPythonEnvironment[]>();
 
         const projectPaths = this.projectManager.getProjectPaths();
         const projects = this.api.getPythonProjects();
@@ -169,7 +195,7 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
             const pyEnvs = coreEnvs.map((core) => createPythonEnvironment(core, pixiBin, template));
 
             const sorted = sortPixiEnvironments(pyEnvs);
-            this.projectToEnvs.set(projectPath, sorted);
+            nextProjectToEnvs.set(projectPath, sorted);
 
             const oldEnvs = oldProjectToEnvs.get(projectPath) || [];
             changes.push(...this.diffEnvironments(oldEnvs, sorted));
@@ -177,7 +203,7 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
 
         // Handle deleted projects
         for (const [oldKey, oldEnvs] of oldProjectToEnvs) {
-            if (!this.projectToEnvs.has(oldKey)) {
+            if (!nextProjectToEnvs.has(oldKey)) {
                 this.activeEnv.delete(oldKey);
                 if (oldEnvs.length > 0) {
                     changes.push(...this.diffEnvironments(oldEnvs, []));
@@ -187,7 +213,7 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
 
         // Restore active environments from persistent state or re-link existing instances
         const storage = getWorkspacePersistentState();
-        for (const [projectPath, envs] of this.projectToEnvs) {
+        for (const [projectPath, envs] of nextProjectToEnvs) {
             const targetName =
                 this.activeEnv.get(projectPath)?.pixiEnvName ||
                 storage.get<string>(getProjectEnvStorageKey(projectPath));
@@ -201,7 +227,7 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
 
         const globalTargetName = this.globalEnv?.pixiEnvName || storage.get<string>(GLOBAL_ENV_KEY);
         if (globalTargetName) {
-            const allEnvs = Array.from(this.projectToEnvs.values()).flat();
+            const allEnvs = Array.from(nextProjectToEnvs.values()).flat();
             const foundGlobal = allEnvs.find((e) => e.pixiEnvName === globalTargetName);
             if (foundGlobal) {
                 this.globalEnv = foundGlobal;
@@ -209,6 +235,9 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
                 this.globalEnv = undefined;
             }
         }
+
+        // Atomic swap: replace previous environment map in a single step
+        this.projectToEnvs = nextProjectToEnvs;
 
         if (changes.length > 0) {
             this._onDidChangeEnvironments.fire(changes);
@@ -219,8 +248,8 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
         oldEnvs: PixiPythonEnvironment[],
         newEnvs: PixiPythonEnvironment[],
     ): DidChangeEnvironmentsEventArgs {
-        const oldMap = new Map(oldEnvs.map((e) => [e.envId.id, e]));
-        const newMap = new Map(newEnvs.map((e) => [e.envId.id, e]));
+        const oldMap = new PathMap(oldEnvs.map((e) => [e.envId.id, e]));
+        const newMap = new PathMap(newEnvs.map((e) => [e.envId.id, e]));
 
         const changes: DidChangeEnvironmentsEventArgs = [];
 
@@ -330,7 +359,7 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
         }
 
         if (scope === undefined) {
-            this.updateGlobalActiveEnv(pyEnv);
+            this.updateGlobalActiveEnv(pyEnv, true);
             await this.pixiApi.setActiveEnvironment(undefined, pyEnv?.pixiEnvName);
             return;
         }
@@ -338,23 +367,65 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
         const uris = scope instanceof Uri ? [scope] : scope;
 
         for (const uri of uris) {
-            const projectPath = this.resolveProjectPath(uri);
+            let projectPath = this.resolveProjectPath(uri);
+            if (!projectPath && pyEnv) {
+                projectPath = pyEnv.projectPath;
+            }
             if (!projectPath) {
                 continue;
             }
 
-            this.updateProjectActiveEnv(projectPath, pyEnv);
+            this.updateProjectActiveEnv(projectPath, pyEnv, true);
             await this.pixiApi.setActiveEnvironment(Uri.file(projectPath), pyEnv?.pixiEnvName);
         }
     }
 
     async resolve(context: ResolveEnvironmentContext): Promise<PythonEnvironment | undefined> {
-        return this.get(context);
+        await this.initialize();
+
+        // 1. If context is a PythonEnvironment object with an envId or id
+        const rawEnvId = (context as any)?.envId;
+        const envId = typeof rawEnvId === 'string' ? rawEnvId : (rawEnvId?.id ?? (context as any)?.id);
+        if (typeof envId === 'string') {
+            const byId = this.getPixiEnvironment(envId);
+            if (byId) {
+                return byId;
+            }
+        }
+
+        // 2. If context is a Uri, string, or has an fsPath, match by sysPrefix, environmentPath, or python executable
+        const targetPath =
+            typeof context === 'string' ? context : context instanceof Uri ? context.fsPath : (context as any)?.fsPath;
+        if (typeof targetPath === 'string') {
+            for (const envs of this.projectToEnvs.values()) {
+                for (const env of envs) {
+                    if (
+                        isSamePath(env.sysPrefix, targetPath) ||
+                        isSamePath(env.environmentPath?.fsPath, targetPath) ||
+                        isSamePath(env.execInfo?.run?.executable, targetPath)
+                    ) {
+                        return env;
+                    }
+                }
+            }
+        }
+
+        // 3. Fallback to get() for document/scope queries
+        if (context instanceof Uri) {
+            return this.get(context);
+        }
+
+        return undefined;
     }
 
-    private updateProjectActiveEnv(projectPath: string, pyEnv: PixiPythonEnvironment | undefined): void {
+    private updateProjectActiveEnv(
+        projectPath: string,
+        pyEnv: PixiPythonEnvironment | undefined,
+        forceFire = false,
+    ): void {
         const oldEnv = this.activeEnv.get(projectPath);
-        if (oldEnv?.envId.id === pyEnv?.envId.id) {
+        const isSame = oldEnv?.envId.id === pyEnv?.envId.id;
+        if (isSame && !forceFire) {
             return;
         }
         if (pyEnv) {
@@ -365,9 +436,10 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
         this._onDidChangeEnvironment.fire({ uri: Uri.file(projectPath), old: oldEnv, new: pyEnv });
     }
 
-    private updateGlobalActiveEnv(pyEnv: PixiPythonEnvironment | undefined): void {
+    private updateGlobalActiveEnv(pyEnv: PixiPythonEnvironment | undefined, forceFire = false): void {
         const oldGlobal = this.globalEnv;
-        if (oldGlobal?.envId.id === pyEnv?.envId.id) {
+        const isSame = oldGlobal?.envId.id === pyEnv?.envId.id;
+        if (isSame && !forceFire) {
             return;
         }
         this.globalEnv = pyEnv;
