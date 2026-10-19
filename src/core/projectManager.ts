@@ -19,9 +19,12 @@ import { getDefaultEnvironment, matchEnvironmentForUri, sortPixiEnvironments } f
 import { listPixiPackages } from './packageManager';
 import {
     DEFAULT_CONDA_CHANNEL,
-    getProjectKey,
+    isPathInside,
     isPyproject,
+    isSamePath,
     LOCKFILE_NAME,
+    PathMap,
+    PathSet,
     PIXI_MANIFEST_NAME,
     SUPPORTED_MANIFEST_NAMES,
     WorkspaceChannelEntry,
@@ -32,11 +35,11 @@ import { PixiEnvironmentInfo, PixiEnvironmentStatus, PixiInfo, PixiPackage, Pixi
 
 export class PixiProjectManager implements Disposable {
     private projectPaths: string[] = [];
-    private projectToEnvs = new Map<string, PixiEnvironmentInfo[]>();
-    private projectToManifest = new Map<string, string>();
-    private projectToName = new Map<string, string>();
-    private projectToPlatforms = new Map<string, WorkspacePlatformEntry[]>();
-    private readonly packagesCache = new Map<string, Map<string, Promise<PixiPackage[]>>>();
+    private readonly projectToEnvs = new PathMap<PixiEnvironmentInfo[]>();
+    private readonly projectToManifest = new PathMap<string>();
+    private readonly projectToName = new PathMap<string>();
+    private readonly projectToPlatforms = new PathMap<WorkspacePlatformEntry[]>();
+    private readonly packagesCache = new PathMap<Map<string, Promise<PixiPackage[]>>>();
     private readonly disposables: Disposable[] = [];
 
     private readonly _onDidProjectsChanged = new EventEmitter<string[]>();
@@ -121,19 +124,17 @@ export class PixiProjectManager implements Disposable {
     }
 
     public getManifestPath(projectPath: string): string | undefined {
-        const key = getProjectKey(projectPath);
-        const envs = this.projectToEnvs.get(key);
+        const envs = this.projectToEnvs.get(projectPath);
         if (envs && envs.length > 0 && envs[0].manifestPath) {
             return envs[0].manifestPath;
         }
-        return this.projectToManifest.get(key);
+        return this.projectToManifest.get(projectPath);
     }
 
     public getProjectName(projectPath: string): string {
-        const key = getProjectKey(projectPath);
         return (
-            this.projectToName.get(key) ||
-            this.projectToEnvs.get(key)?.[0]?.projectName ||
+            this.projectToName.get(projectPath) ||
+            this.projectToEnvs.get(projectPath)?.[0]?.projectName ||
             path.basename(path.normalize(projectPath))
         );
     }
@@ -174,11 +175,11 @@ export class PixiProjectManager implements Disposable {
     }
 
     public getEnvironmentsForProject(projectPath: string): PixiEnvironmentInfo[] {
-        return this.projectToEnvs.get(getProjectKey(projectPath)) || [];
+        return this.projectToEnvs.get(projectPath) || [];
     }
 
     public getPlatformsForProject(projectPath: string): WorkspacePlatformEntry[] {
-        return this.projectToPlatforms.get(getProjectKey(projectPath)) || [];
+        return this.projectToPlatforms.get(projectPath) || [];
     }
 
     public getAllEnvironments(): PixiEnvironmentInfo[] {
@@ -187,18 +188,17 @@ export class PixiProjectManager implements Disposable {
 
     public clearPackagesCache(projectPath?: string): void {
         if (projectPath) {
-            this.packagesCache.delete(getProjectKey(projectPath));
+            this.packagesCache.delete(projectPath);
         } else {
             this.packagesCache.clear();
         }
     }
 
     public async getPackagesForEnvironment(envName: string, projectPath: string): Promise<PixiPackage[]> {
-        const projectKey = getProjectKey(projectPath);
-        let projectMap = this.packagesCache.get(projectKey);
+        let projectMap = this.packagesCache.get(projectPath);
         if (!projectMap) {
             projectMap = new Map<string, Promise<PixiPackage[]>>();
-            this.packagesCache.set(projectKey, projectMap);
+            this.packagesCache.set(projectPath, projectMap);
         }
 
         const cached = projectMap.get(envName);
@@ -222,14 +222,10 @@ export class PixiProjectManager implements Disposable {
     }
 
     public findProjectForUri(uri: Uri): string | undefined {
-        const filePath = path.normalize(uri.fsPath);
-        const isWindows = process.platform === 'win32';
-        const normFilePath = isWindows ? filePath.toLowerCase() : filePath;
+        const filePath = uri.fsPath;
         const sortedPaths = [...this.projectPaths].sort((a, b) => b.length - a.length);
         for (const projectPath of sortedPaths) {
-            const normProjectPath = isWindows ? projectPath.toLowerCase() : projectPath;
-            const sep = path.sep;
-            if (normFilePath === normProjectPath || normFilePath.startsWith(normProjectPath + sep)) {
+            if (isPathInside(filePath, projectPath)) {
                 return projectPath;
             }
         }
@@ -305,24 +301,15 @@ export class PixiProjectManager implements Disposable {
 
                     // Check for registered sub-workspaces within open workspace folders
                     try {
-                        const isWindows = process.platform === 'win32';
                         const regOutput = await runPixi(['workspace', 'register', 'list', '--json']);
                         const regWorkspaces = safeJsonParse<Record<string, string>>(regOutput, {});
                         for (const regPath of Object.values(regWorkspaces)) {
                             if (typeof regPath === 'string' && fs.existsSync(regPath)) {
                                 const normReg = path.normalize(regPath);
-                                const isInsideWorkspace = workspaceFolders.some((wf) => {
-                                    const normWf = path.normalize(wf.uri.fsPath);
-                                    if (isWindows) {
-                                        const lowerReg = normReg.toLowerCase();
-                                        const lowerWf = normWf.toLowerCase();
-                                        return lowerReg === lowerWf || lowerReg.startsWith(lowerWf + path.sep);
-                                    }
-                                    return normReg === normWf || normReg.startsWith(normWf + path.sep);
-                                });
-                                const alreadyDetected = detectedPaths.some((dp) =>
-                                    isWindows ? dp.toLowerCase() === normReg.toLowerCase() : dp === normReg,
+                                const isInsideWorkspace = workspaceFolders.some((wf) =>
+                                    isPathInside(normReg, wf.uri.fsPath),
                                 );
+                                const alreadyDetected = detectedPaths.some((dp) => isSamePath(dp, normReg));
                                 if (isInsideWorkspace && !alreadyDetected) {
                                     const isProject = await this.refreshProject(normReg);
                                     if (isProject) {
@@ -338,13 +325,13 @@ export class PixiProjectManager implements Disposable {
             );
         }
 
-        const oldPaths = new Set(this.projectPaths);
-        this.projectPaths = [...new Set(detectedPaths)].sort((a, b) =>
+        const oldPaths = new PathSet(this.projectPaths);
+        this.projectPaths = [...new PathSet(detectedPaths)].sort((a, b) =>
             a.localeCompare(b, undefined, { sensitivity: 'base' }),
         );
         await this.updateHasPixiProjectContext();
 
-        const currentPaths = new Set(this.projectPaths);
+        const currentPaths = new PathSet(this.projectPaths);
         const pathsChanged = oldPaths.size !== currentPaths.size || [...oldPaths].some((p) => !currentPaths.has(p));
 
         // Clean up deleted projects
@@ -366,7 +353,6 @@ export class PixiProjectManager implements Disposable {
 
     private async refreshProject(projectPath: string): Promise<boolean> {
         const normalized = path.normalize(projectPath);
-        const projectKey = getProjectKey(normalized);
         this.clearPackagesCache(normalized);
         try {
             const stdout = await runPixi(['info', '--json'], { cwd: normalized });
@@ -374,10 +360,10 @@ export class PixiProjectManager implements Disposable {
 
             if (!pixiInfo.project_info) {
                 traceVerbose(`No project_info returned from pixi info for ${normalized}`);
-                this.projectToEnvs.delete(projectKey);
-                this.projectToManifest.delete(projectKey);
-                this.projectToName.delete(projectKey);
-                this.projectToPlatforms.delete(projectKey);
+                this.projectToEnvs.delete(normalized);
+                this.projectToManifest.delete(normalized);
+                this.projectToName.delete(normalized);
+                this.projectToPlatforms.delete(normalized);
                 return false;
             }
 
@@ -388,8 +374,8 @@ export class PixiProjectManager implements Disposable {
                 setCachedHostPlatform(currentPlatform);
             }
 
-            this.projectToManifest.set(projectKey, manifestPath);
-            this.projectToName.set(projectKey, projectName);
+            this.projectToManifest.set(normalized, manifestPath);
+            this.projectToName.set(normalized, projectName);
 
             interface PlatformAggregate {
                 name: string;
@@ -428,7 +414,7 @@ export class PixiProjectManager implements Disposable {
                 }
             }
             this.projectToPlatforms.set(
-                projectKey,
+                normalized,
                 Array.from(platformsMap.values()).map((e) => ({
                     name: e.name,
                     subdir: e.subdir,
@@ -501,14 +487,14 @@ export class PixiProjectManager implements Disposable {
                 }),
             );
 
-            this.projectToEnvs.set(projectKey, sortPixiEnvironments(envs));
+            this.projectToEnvs.set(normalized, sortPixiEnvironments(envs));
             return true;
         } catch (error) {
             traceVerbose(`Failed to refresh Pixi project at ${normalized}: ${error}`);
-            this.projectToEnvs.delete(projectKey);
-            this.projectToManifest.delete(projectKey);
-            this.projectToName.delete(projectKey);
-            this.projectToPlatforms.delete(projectKey);
+            this.projectToEnvs.delete(normalized);
+            this.projectToManifest.delete(normalized);
+            this.projectToName.delete(normalized);
+            this.projectToPlatforms.delete(normalized);
             return false;
         }
     }

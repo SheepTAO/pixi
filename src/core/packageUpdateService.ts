@@ -4,7 +4,7 @@ import { runPixi } from '../cli/pixiCli';
 import { escapeRegex, safeJsonParse } from '../common/execUtils';
 import { traceVerbose } from '../common/logging';
 import { normalizePkgName } from './packageManager';
-import { getProjectKey } from './projectDiscovery';
+import { PathMap } from './projectDiscovery';
 import { PixiProjectManager } from './projectManager';
 
 export interface DryRunPackageChange {
@@ -138,8 +138,8 @@ export class PixiPackageUpdateService implements Disposable {
     private readonly _onDidChangeOutdatedPackages = new EventEmitter<string>();
     public readonly onDidChangeOutdatedPackages: Event<string> = this._onDidChangeOutdatedPackages.event;
 
-    private readonly cache = new Map<string, OutdatedCacheEntry>();
-    private readonly inFlight = new Map<string, Promise<void>>();
+    private readonly cache = new PathMap<OutdatedCacheEntry>();
+    private readonly inFlight = new PathMap<Promise<void>>();
     private readonly disposables: Disposable[] = [];
 
     constructor(private readonly projectManager: PixiProjectManager) {
@@ -164,8 +164,7 @@ export class PixiPackageUpdateService implements Disposable {
     }
 
     public getOutdatedPackage(projectPath: string, envName: string, pkgName: string): DryRunPackageChange | undefined {
-        const projectKey = getProjectKey(projectPath);
-        const entry = this.cache.get(projectKey);
+        const entry = this.cache.get(projectPath);
         if (!entry) {
             return undefined;
         }
@@ -177,8 +176,7 @@ export class PixiPackageUpdateService implements Disposable {
     }
 
     public getOutdatedPackages(projectPath: string, envName: string): Map<string, DryRunPackageChange> {
-        const projectKey = getProjectKey(projectPath);
-        const entry = this.cache.get(projectKey);
+        const entry = this.cache.get(projectPath);
         if (!entry) {
             return new Map();
         }
@@ -186,8 +184,7 @@ export class PixiPackageUpdateService implements Disposable {
     }
 
     public getAllOutdatedForProject(projectPath: string): Map<string, Map<string, DryRunPackageChange>> {
-        const projectKey = getProjectKey(projectPath);
-        const entry = this.cache.get(projectKey);
+        const entry = this.cache.get(projectPath);
         if (!entry) {
             return new Map();
         }
@@ -195,8 +192,7 @@ export class PixiPackageUpdateService implements Disposable {
     }
 
     public populateCache(projectPath: string, changes: DryRunPackageChange[], options?: { targetEnv?: string }): void {
-        const projectKey = getProjectKey(projectPath);
-        const existing = this.cache.get(projectKey);
+        const existing = this.cache.get(projectPath);
 
         let byEnv: Map<string, Map<string, DryRunPackageChange>>;
         if (options?.targetEnv && existing) {
@@ -221,7 +217,7 @@ export class PixiPackageUpdateService implements Disposable {
             envMap.set(normalizePkgName(change.name), change);
         }
 
-        this.cache.set(projectKey, {
+        this.cache.set(projectPath, {
             timestamp: Date.now(),
             byEnv,
         });
@@ -234,14 +230,13 @@ export class PixiPackageUpdateService implements Disposable {
             return;
         }
 
-        const projectKey = getProjectKey(projectPath);
-        const cached = this.cache.get(projectKey);
+        const cached = this.cache.get(projectPath);
         const now = Date.now();
         if (!options?.force && cached && now - cached.timestamp < OUTDATED_CACHE_TTL_MS) {
             return;
         }
 
-        let pending = this.inFlight.get(projectKey);
+        let pending = this.inFlight.get(projectPath);
         if (pending) {
             return pending;
         }
@@ -254,25 +249,24 @@ export class PixiPackageUpdateService implements Disposable {
                 this.populateCache(projectPath, changes);
             } catch (error) {
                 traceVerbose(`Failed to check for package updates in ${projectPath}: ${error}`);
-                const existing = this.cache.get(projectKey);
-                this.cache.set(projectKey, {
+                const existing = this.cache.get(projectPath);
+                this.cache.set(projectPath, {
                     timestamp: Date.now() - (OUTDATED_CACHE_TTL_MS - FAILURE_BACKOFF_MS),
                     byEnv: existing?.byEnv ?? new Map(),
                 });
             } finally {
-                this.inFlight.delete(projectKey);
+                this.inFlight.delete(projectPath);
             }
         })();
 
-        this.inFlight.set(projectKey, pending);
+        this.inFlight.set(projectPath, pending);
         return pending;
     }
 
     public clearCache(projectPath?: string): void {
         if (projectPath) {
-            const projectKey = getProjectKey(projectPath);
-            if (this.cache.has(projectKey)) {
-                this.cache.delete(projectKey);
+            if (this.cache.has(projectPath)) {
+                this.cache.delete(projectPath);
                 this._onDidChangeOutdatedPackages.fire(projectPath);
             }
         } else if (this.cache.size > 0) {

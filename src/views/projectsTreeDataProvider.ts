@@ -16,7 +16,7 @@ import {
 import { getReferencingEnvs, getWorkspaceFeatures, WorkspaceListEntry } from '../commands/workspace/common';
 import { enrichLocalPackages, normalizePkgName, sortPixiPackages, splitPackageSpec } from '../core/packageManager';
 import { PixiPackageUpdateService } from '../core/packageUpdateService';
-import { getProjectKey } from '../core/projectDiscovery';
+import { PathMap } from '../core/projectDiscovery';
 import { PixiProjectManager } from '../core/projectManager';
 import {
     formatSystemRequirementsSummary,
@@ -324,7 +324,7 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
 
     private treeView?: TreeView<PixiProjectsTreeItem>;
     private currentViewMode: ProjectsViewMode = 'environment';
-    private readonly featuresCache = new Map<string, Promise<WorkspaceListEntry[]>>();
+    private readonly featuresCache = new PathMap<Promise<WorkspaceListEntry[]>>();
 
     constructor(
         private readonly projectManager: PixiProjectManager,
@@ -390,11 +390,10 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
     }
 
     private getProjectFeatures(projectPath: string): Promise<WorkspaceListEntry[]> {
-        const key = getProjectKey(projectPath);
-        let promise = this.featuresCache.get(key);
+        let promise = this.featuresCache.get(projectPath);
         if (!promise) {
             promise = getWorkspaceFeatures(projectPath);
-            this.featuresCache.set(key, promise);
+            this.featuresCache.set(projectPath, promise);
         }
         return promise;
     }

@@ -13,7 +13,6 @@ import {
     ResolveEnvironmentContext,
     SetEnvironmentScope,
 } from '@vscode/python-environments';
-import * as path from 'path';
 import { Disposable, EventEmitter, ThemeIcon, Uri, window, workspace } from 'vscode';
 
 import { PixiExtensionApi } from '../../api';
@@ -26,7 +25,7 @@ import {
     matchEnvironmentForUri,
     sortPixiEnvironments,
 } from '../../core/environmentRules';
-import { getProjectKey } from '../../core/projectDiscovery';
+import { isSamePath, PathMap } from '../../core/projectDiscovery';
 import { PixiProjectManager } from '../../core/projectManager';
 import { PIXI_MANAGER_ID } from './constants';
 import { createPythonEnvironment, promptToInstallIpykernel } from './pythonDiscovery';
@@ -40,8 +39,8 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
     public readonly iconPath: IconPath = new ThemeIcon('prefix-dev');
 
     private globalEnv: PixiPythonEnvironment | undefined;
-    private activeEnv = new Map<string, PixiPythonEnvironment>();
-    private projectToEnvs = new Map<string, PixiPythonEnvironment[]>();
+    private readonly activeEnv = new PathMap<PixiPythonEnvironment>();
+    private readonly projectToEnvs = new PathMap<PixiPythonEnvironment[]>();
     private readonly disposables: Disposable[] = [];
 
     private readonly _onDidChangeEnvironment = new EventEmitter<DidChangeEnvironmentEventArgs>();
@@ -66,7 +65,7 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
                 if (e.environment) {
                     const project = e.scope ? this.api.getPythonProject(e.scope) : undefined;
                     const projectPath = project?.uri.fsPath || e.environment.projectPath;
-                    const envs = this.projectToEnvs.get(getProjectKey(projectPath)) || [];
+                    const envs = this.projectToEnvs.get(projectPath) || [];
                     const pyEnv = envs.find((p) => p.pixiEnvName === e.environment?.pixiEnvName);
                     if (pyEnv) {
                         this.updateProjectActiveEnv(projectPath, pyEnv);
@@ -116,9 +115,8 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
     }
 
     public getPixiEnvironment(envId: string): PixiPythonEnvironment | undefined {
-        const normalized = path.normalize(envId);
         for (const envs of this.projectToEnvs.values()) {
-            const found = envs.find((e) => path.normalize(e.envId.id) === normalized);
+            const found = envs.find((e) => isSamePath(e.envId.id, envId));
             if (found) {
                 return found;
             }
@@ -131,12 +129,12 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
     }
 
     private async refreshFromCore(): Promise<void> {
-        const oldProjectToEnvs = new Map(this.projectToEnvs);
+        const oldProjectToEnvs = new PathMap(this.projectToEnvs);
         this.projectToEnvs.clear();
 
         const projectPaths = this.projectManager.getProjectPaths();
         const projects = this.api.getPythonProjects();
-        const projectMap = new Map(projects.map((p) => [p.uri.fsPath, p]));
+        const projectMap = new PathMap(projects.map((p) => [p.uri.fsPath, p]));
 
         const newProjects: PythonProject[] = [];
         for (const projectPath of projectPaths) {
@@ -171,10 +169,9 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
             const pyEnvs = coreEnvs.map((core) => createPythonEnvironment(core, pixiBin, template));
 
             const sorted = sortPixiEnvironments(pyEnvs);
-            const key = getProjectKey(projectPath);
-            this.projectToEnvs.set(key, sorted);
+            this.projectToEnvs.set(projectPath, sorted);
 
-            const oldEnvs = oldProjectToEnvs.get(key) || [];
+            const oldEnvs = oldProjectToEnvs.get(projectPath) || [];
             changes.push(...this.diffEnvironments(oldEnvs, sorted));
         }
 
@@ -190,16 +187,15 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
 
         // Restore active environments from persistent state or re-link existing instances
         const storage = getWorkspacePersistentState();
-        for (const [key, envs] of this.projectToEnvs) {
-            const projectPath = envs[0]?.projectPath;
+        for (const [projectPath, envs] of this.projectToEnvs) {
             const targetName =
-                this.activeEnv.get(key)?.pixiEnvName ||
-                (projectPath ? storage.get<string>(getProjectEnvStorageKey(projectPath)) : undefined);
+                this.activeEnv.get(projectPath)?.pixiEnvName ||
+                storage.get<string>(getProjectEnvStorageKey(projectPath));
             const found = targetName ? envs.find((e) => e.pixiEnvName === targetName) : undefined;
             if (found) {
-                this.activeEnv.set(key, found);
+                this.activeEnv.set(projectPath, found);
             } else {
-                this.activeEnv.delete(key);
+                this.activeEnv.delete(projectPath);
             }
         }
 
@@ -271,7 +267,7 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
 
         if (scope instanceof Uri) {
             const projectPath = this.resolveProjectPath(scope);
-            const envs = projectPath ? this.projectToEnvs.get(getProjectKey(projectPath)) || [] : [];
+            const envs = projectPath ? this.projectToEnvs.get(projectPath) || [] : [];
             return [...envs];
         }
 
@@ -290,14 +286,13 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
             return this.globalEnv;
         }
 
-        const key = getProjectKey(projectPath);
-        const projectEnvs = this.projectToEnvs.get(key) || [];
+        const projectEnvs = this.projectToEnvs.get(projectPath) || [];
         const matched = matchEnvironmentForUri(scope, projectPath, projectEnvs);
         if (matched) {
             return matched;
         }
 
-        const active = this.activeEnv.get(key);
+        const active = this.activeEnv.get(projectPath);
         if (active) {
             return active;
         }
@@ -327,7 +322,7 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
 
             if (isNotebook && !pyEnv.hasIpykernel) {
                 const projectPath = pyEnv.projectPath;
-                const altEnvs = this.projectToEnvs.get(getProjectKey(projectPath)) || [];
+                const altEnvs = this.projectToEnvs.get(projectPath) || [];
                 void promptToInstallIpykernel(pyEnv, this.projectManager, altEnvs, async (target) => {
                     await this.set(scope, target);
                 });
@@ -343,13 +338,13 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
         const uris = scope instanceof Uri ? [scope] : scope;
 
         for (const uri of uris) {
-            const project = this.api.getPythonProject(uri);
-            if (!project) {
+            const projectPath = this.resolveProjectPath(uri);
+            if (!projectPath) {
                 continue;
             }
 
-            this.updateProjectActiveEnv(project.uri.fsPath, pyEnv);
-            await this.pixiApi.setActiveEnvironment(project.uri, pyEnv?.pixiEnvName);
+            this.updateProjectActiveEnv(projectPath, pyEnv);
+            await this.pixiApi.setActiveEnvironment(Uri.file(projectPath), pyEnv?.pixiEnvName);
         }
     }
 
@@ -358,15 +353,14 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
     }
 
     private updateProjectActiveEnv(projectPath: string, pyEnv: PixiPythonEnvironment | undefined): void {
-        const key = getProjectKey(projectPath);
-        const oldEnv = this.activeEnv.get(key);
+        const oldEnv = this.activeEnv.get(projectPath);
         if (oldEnv?.envId.id === pyEnv?.envId.id) {
             return;
         }
         if (pyEnv) {
-            this.activeEnv.set(key, pyEnv);
+            this.activeEnv.set(projectPath, pyEnv);
         } else {
-            this.activeEnv.delete(key);
+            this.activeEnv.delete(projectPath);
         }
         this._onDidChangeEnvironment.fire({ uri: Uri.file(projectPath), old: oldEnv, new: pyEnv });
     }

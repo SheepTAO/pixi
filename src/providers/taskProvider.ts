@@ -21,7 +21,7 @@ import { ensureHasPixiProjects, resolveReadyEnvironment } from '../commands/work
 import { quoteStringIfNecessary, safeJsonParse } from '../common/execUtils';
 import { traceError, traceVerbose } from '../common/logging';
 import { ensureEnvironmentReady } from '../core/environmentRules';
-import { getProjectKey } from '../core/projectDiscovery';
+import { isSamePath, PathMap } from '../core/projectDiscovery';
 import { PixiProjectManager } from '../core/projectManager';
 
 export const DEFAULT_TASK_PREFIX_SEPARATORS = ['-', '_', ':', '::'];
@@ -86,7 +86,7 @@ interface RawPixiTaskEnvironment {
 
 export class PixiTaskProvider implements TaskProvider, Disposable {
     private readonly disposables: Disposable[] = [];
-    private readonly taskCache = new Map<string, Promise<PixiTask[]>>();
+    private readonly taskCache = new PathMap<Promise<PixiTask[]>>();
     private readonly _onDidChangeTasks = new EventEmitter<void>();
     readonly onDidChangeTasks: Event<void> = this._onDidChangeTasks.event;
 
@@ -99,7 +99,7 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
 
     public refresh(projectPath?: string): void {
         if (projectPath) {
-            this.taskCache.delete(getProjectKey(projectPath));
+            this.taskCache.delete(projectPath);
         } else {
             this.taskCache.clear();
         }
@@ -154,18 +154,17 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
     }
 
     async getTasksForProject(projectPath: string): Promise<PixiTask[]> {
-        const projectKey = getProjectKey(projectPath);
-        let promise = this.taskCache.get(projectKey);
+        let promise = this.taskCache.get(projectPath);
         if (!promise) {
             const normalized = path.normalize(projectPath);
             promise = runPixi(['task', 'list', '--json'], { cwd: normalized })
                 .then((stdout) => this.parsePixiTasksJson(stdout, normalized))
                 .catch((err) => {
-                    this.taskCache.delete(projectKey);
+                    this.taskCache.delete(projectPath);
                     traceVerbose(`Could not load tasks for ${normalized}:`, err);
                     return [];
                 });
-            this.taskCache.set(projectKey, promise);
+            this.taskCache.set(projectPath, promise);
         }
         return promise;
     }
@@ -285,8 +284,8 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
 
         let projectPaths = this.projectManager.getProjectPaths();
         if (options.targetProjectPath) {
-            const targetKey = getProjectKey(options.targetProjectPath);
-            projectPaths = projectPaths.filter((p) => getProjectKey(p) === targetKey);
+            const target = options.targetProjectPath;
+            projectPaths = projectPaths.filter((p) => isSamePath(p, target));
         }
         if (projectPaths.length === 0) {
             return undefined;

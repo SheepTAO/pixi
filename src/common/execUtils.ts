@@ -155,13 +155,14 @@ export function normalizeFolderPath(target?: unknown): string | undefined {
     return p;
 }
 
-/**
- * Generates a normalized project key for map caching, taking into account OS path casing.
- */
-export function getProjectKey(projectPath: string): string {
-    const normalized = path.normalize(projectPath).replace(/[/\\]+$/, '');
-    return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
-}
+export {
+    getProjectKey,
+    isPathInside,
+    isSamePath,
+    PathMap,
+    PathSet,
+    toCanonicalPathKey,
+} from './collections';
 
 /**
  * Escapes characters with special meaning in regular expressions.
