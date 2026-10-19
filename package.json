@@ -978,7 +978,12 @@
             "view/title": [
                 {
                     "command": "pixi.createEnvironment",
-                    "when": "view == pixi.views.projects && pixi.hasPixiProject",
+                    "when": "view == pixi.views.projects && pixi.hasPixiProject && (config.pixi.environments.viewMode != 'feature' && pixi.environmentsViewMode != 'feature')",
+                    "group": "navigation@0"
+                },
+                {
+                    "command": "pixi.createFeature",
+                    "when": "view == pixi.views.projects && pixi.hasPixiProject && (config.pixi.environments.viewMode == 'feature' || pixi.environmentsViewMode == 'feature')",
                     "group": "navigation@0"
                 },
                 {

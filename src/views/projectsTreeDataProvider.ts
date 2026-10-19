@@ -1,5 +1,6 @@
 import * as path from 'path';
 import {
+    commands,
     Disposable,
     Event,
     EventEmitter,
@@ -332,6 +333,7 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
     ) {
         const config = workspace.getConfiguration('pixi.environments');
         this.currentViewMode = config.get<ProjectsViewMode>('viewMode', 'environment');
+        void commands.executeCommand('setContext', 'pixi.environmentsViewMode', this.currentViewMode);
 
         this.disposables.push(
             this.projectManager.onDidChangeEnvironments(() => this.refresh()),
@@ -377,6 +379,7 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
         if (this.treeView) {
             this.treeView.description = this.currentViewMode === 'feature' ? 'features' : undefined;
         }
+        void commands.executeCommand('setContext', 'pixi.environmentsViewMode', this.currentViewMode);
     }
 
     public dispose(): void {
