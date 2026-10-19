@@ -5,6 +5,26 @@ All notable changes to the "pixi" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-10-19
+
+- **Dynamic View Actions & Grouping**:
+    - Dynamically switch the primary action on the Environments view title bar (`+` button) between `Create Environment ...` and `Create Feature ...` according to the active grouping mode (`environment` vs `feature`).
+    - Synchronize `pixi.environmentsViewMode` context key to provide instant menu state transitions when changing view groupings.
+- **Terminal Environment Selection & Race Condition Protection**:
+    - Add native Jupyter Notebook editor context awareness (`window.activeNotebookEditor`) for accurate terminal environment and project path resolution.
+    - Implement a structured environment selection hierarchy prioritizing `pixi.terminal.defaultEnvironment` and active project environments over arbitrary installed environments.
+    - Guard against asynchronous race conditions in terminal environment variable synchronization via sequential request tracking (`syncSeq`).
+    - Listen for active notebook switching, configuration adjustments (`pixi.terminal.*`, `pixi.environmentRules`), and public active environment change events.
+    - Highlight active project environments and refine multi-project labeling in quick picks.
+- **Unified Feature & Environment Creation Workflows**:
+    - Unify interactive package search and empty declaration options across both feature and environment creation commands.
+    - Enhance initial package specification resolution with conda/pypi search and prompt options.
+- **Jupyter Notebook & Python Kernel Synchronization**:
+    - Implement atomic environment refresh and per-resource environment resolution.
+    - Automatically synchronize Jupyter notebook active kernels when switching Pixi environments.
+- **Release & Quality Assurance Automation**:
+    - Enforce automated formatting, linting, and type checking in CI release pipelines prior to marketplace publication.
+
 ## [2.0.1] - 2026-10-19
 
 - **Windows Path Sensitivity & Environment Management**:
