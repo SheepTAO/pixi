@@ -26,7 +26,7 @@ import {
     matchEnvironmentForUri,
     sortPixiEnvironments,
 } from '../../core/environmentRules';
-import { isSamePath, PathMap } from '../../core/projectDiscovery';
+import { isPathInside, isSamePath, PathMap } from '../../core/projectDiscovery';
 import { PixiProjectManager } from '../../core/projectManager';
 import { PIXI_MANAGER_ID } from './constants';
 import { createPythonEnvironment, promptToInstallIpykernel } from './pythonDiscovery';
@@ -40,6 +40,7 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
     public readonly iconPath: IconPath = new ThemeIcon('prefix-dev');
 
     private globalEnv: PixiPythonEnvironment | undefined;
+    private lastEffectiveGlobalEnv: PixiPythonEnvironment | undefined;
     private readonly activeEnv = new PathMap<PixiPythonEnvironment>();
     private readonly resourceEnv = new PathMap<PixiPythonEnvironment>();
     private projectToEnvs = new PathMap<PixiPythonEnvironment[]>();
@@ -82,6 +83,8 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
                             this.updateProjectActiveEnv(projectPath, pyEnv, false, scope);
                             if (scope === undefined) {
                                 this.updateGlobalActiveEnv(pyEnv);
+                            } else if (!this.globalEnv) {
+                                this.syncEffectiveGlobalEnv();
                             }
                         } else if (scope) {
                             this.updateResourceActiveEnv(scope, pyEnv);
@@ -95,6 +98,9 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
                         this.projectManager.getProjectPaths().some((p) => isSamePath(p, scopePath));
                     if (isProject) {
                         this.updateProjectActiveEnv(projectPath, undefined, false, scope);
+                        if (!this.globalEnv) {
+                            this.syncEffectiveGlobalEnv();
+                        }
                     } else {
                         this.updateResourceActiveEnv(scope, undefined);
                     }
@@ -175,6 +181,7 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
         this._onDidChangeEnvironments.dispose();
         Disposable.from(...this.disposables).dispose();
         this.globalEnv = undefined;
+        this.lastEffectiveGlobalEnv = undefined;
         this.activeEnv.clear();
         this.resourceEnv.clear();
         this.projectToEnvs.clear();
@@ -331,6 +338,8 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
                 this._onDidChangeEnvironment.fire({ uri: Uri.file(projectPath), old: undefined, new: active });
             }
         }
+
+        this.syncEffectiveGlobalEnv(true);
 
         for (const nb of workspace.notebookDocuments) {
             const projectPath = this.resolveProjectPath(nb.uri);
@@ -501,16 +510,81 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
         return undefined;
     }
 
+    private getEffectiveGlobalEnv(): PixiPythonEnvironment | undefined {
+        if (this.globalEnv) {
+            return this.globalEnv;
+        }
+
+        // 1. Active editor or notebook document's resource or project environment
+        const activeUri = window.activeTextEditor?.document.uri || window.activeNotebookEditor?.notebook.uri;
+        if (activeUri) {
+            const resEnv = this.resourceEnv.get(activeUri.fsPath);
+            if (resEnv) {
+                return resEnv;
+            }
+            const projectPath = this.resolveProjectPath(activeUri);
+            if (projectPath) {
+                const active = this.activeEnv.get(projectPath);
+                if (active) {
+                    return active;
+                }
+                const envs = this.projectToEnvs.get(projectPath) || [];
+                const def = getDefaultEnvironment(envs);
+                if (def) {
+                    return def;
+                }
+            }
+        }
+
+        const projectPaths = this.projectManager.getProjectPaths();
+        const primaryFolder = workspace.workspaceFolders?.[0]?.uri.fsPath;
+        const sortedProjectPaths = [...projectPaths];
+        if (primaryFolder) {
+            sortedProjectPaths.sort((a, b) => {
+                const aIsPrimary = isPathInside(a, primaryFolder);
+                const bIsPrimary = isPathInside(b, primaryFolder);
+                if (aIsPrimary && !bIsPrimary) {
+                    return -1;
+                }
+                if (!aIsPrimary && bIsPrimary) {
+                    return 1;
+                }
+                return 0;
+            });
+        }
+
+        // 2. Workspace projects' active environment
+        for (const p of sortedProjectPaths) {
+            const active = this.activeEnv.get(p);
+            if (active) {
+                return active;
+            }
+        }
+
+        // 3. Workspace projects' default environment
+        for (const p of sortedProjectPaths) {
+            const envs = this.projectToEnvs.get(p) || [];
+            const def = getDefaultEnvironment(envs);
+            if (def) {
+                return def;
+            }
+        }
+
+        // 4. Default environment across all discovered environments
+        const allEnvs = Array.from(this.projectToEnvs.values()).flat();
+        return getDefaultEnvironment(allEnvs);
+    }
+
     async get(scope: GetEnvironmentScope): Promise<PythonEnvironment | undefined> {
         await this.initialize();
 
         if (!scope) {
-            return this.globalEnv;
+            return this.getEffectiveGlobalEnv();
         }
 
         const projectPath = this.resolveProjectPath(scope);
         if (!projectPath) {
-            return this.globalEnv;
+            return this.getEffectiveGlobalEnv();
         }
 
         const projectEnvs = this.projectToEnvs.get(projectPath) || [];
@@ -543,7 +617,7 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
         }
 
         // 5. Default project environment, or global fallback
-        return getDefaultEnvironment(projectEnvs) || this.globalEnv;
+        return getDefaultEnvironment(projectEnvs) || this.getEffectiveGlobalEnv();
     }
 
     async set(scope: SetEnvironmentScope, environment?: PythonEnvironment): Promise<void> {
@@ -684,6 +758,24 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
         }
     }
 
+    private syncEffectiveGlobalEnv(forceFire = false): void {
+        const effectiveGlobal = this.getEffectiveGlobalEnv();
+        const isSame = this.lastEffectiveGlobalEnv?.envId.id === effectiveGlobal?.envId.id;
+        if (isSame && !forceFire) {
+            return;
+        }
+        const oldEnv = this.lastEffectiveGlobalEnv;
+        if (!oldEnv && !effectiveGlobal) {
+            return;
+        }
+        this.lastEffectiveGlobalEnv = effectiveGlobal;
+        this._onDidChangeEnvironment.fire({
+            uri: undefined,
+            old: oldEnv,
+            new: effectiveGlobal,
+        });
+    }
+
     private updateGlobalActiveEnv(pyEnv: PixiPythonEnvironment | undefined, forceFire = false): void {
         const oldGlobal = this.globalEnv;
         const isSame = oldGlobal?.envId.id === pyEnv?.envId.id;
@@ -691,6 +783,6 @@ export class PixiPythonEnvManager implements EnvironmentManager, Disposable {
             return;
         }
         this.globalEnv = pyEnv;
-        this._onDidChangeEnvironment.fire({ uri: undefined, old: oldGlobal, new: pyEnv });
+        this.syncEffectiveGlobalEnv(forceFire);
     }
 }
