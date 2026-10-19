@@ -13,6 +13,7 @@ import {
     workspace,
 } from 'vscode';
 
+import { PixiExtensionApi } from '../api/types';
 import { getPixi, runPixi } from '../cli/pixiCli';
 import { resolveReadyEnvironment } from '../commands/workspace/common';
 import { safeJsonParse } from '../common/execUtils';
@@ -23,10 +24,12 @@ import { PixiEnvironmentInfo } from '../core/types';
 export class PixiTerminalProvider implements TerminalProfileProvider, Disposable {
     private readonly disposables: Disposable[] = [];
     private lastSyncedEnvKey?: string;
+    private syncSeq = 0;
 
     constructor(
         private readonly projectManager: PixiProjectManager,
         private readonly context?: ExtensionContext,
+        private readonly pixiApi?: PixiExtensionApi,
     ) {
         this.disposables.push(
             window.registerTerminalProfileProvider('pixi.terminal', this),
@@ -36,13 +39,27 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
                 void this.syncEnvironmentVariableCollection();
             }),
             window.onDidChangeActiveTextEditor(() => this.syncEnvironmentVariableCollection()),
+            window.onDidChangeActiveNotebookEditor(() => this.syncEnvironmentVariableCollection()),
             workspace.onDidChangeConfiguration((e) => {
-                if (e.affectsConfiguration('pixi.terminal.autoActivateOnCreate')) {
+                if (
+                    e.affectsConfiguration('pixi.terminal.autoActivateOnCreate') ||
+                    e.affectsConfiguration('pixi.terminal.defaultEnvironment') ||
+                    e.affectsConfiguration('pixi.terminal.activationMode') ||
+                    e.affectsConfiguration('pixi.environmentRules')
+                ) {
                     this.lastSyncedEnvKey = undefined;
                     void this.syncEnvironmentVariableCollection();
                 }
             }),
         );
+        if (this.pixiApi) {
+            this.disposables.push(
+                this.pixiApi.onDidChangeActiveEnvironment(() => {
+                    this.lastSyncedEnvKey = undefined;
+                    void this.syncEnvironmentVariableCollection();
+                }),
+            );
+        }
         void this.syncEnvironmentVariableCollection();
     }
 
@@ -72,11 +89,36 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
             return;
         }
 
-        const activeUri = window.activeTextEditor?.document?.uri;
+        const activeUri = window.activeTextEditor?.document?.uri ?? window.activeNotebookEditor?.notebook?.uri;
         const matchedPath = activeUri ? this.projectManager.findProjectForUri(activeUri) : undefined;
         const targetPath = matchedPath || projects[0].projectPath;
         const envs = this.projectManager.getEnvironmentsForProject(targetPath);
-        const targetEnv = envs.find((e) => e.pixiStatus === 'installed');
+        if (envs.length === 0) {
+            this.lastSyncedEnvKey = undefined;
+            this.context.environmentVariableCollection.clear();
+            this.context.environmentVariableCollection.description = undefined;
+            return;
+        }
+
+        const config = workspace.getConfiguration('pixi.terminal', Uri.file(targetPath));
+        const defaultEnvSetting = config.get<string>('defaultEnvironment')?.trim();
+        let targetEnv: PixiEnvironmentInfo | undefined;
+
+        if (defaultEnvSetting) {
+            targetEnv = envs.find((e) => e.pixiEnvName === defaultEnvSetting);
+        }
+
+        if (!targetEnv) {
+            targetEnv =
+                activeUri && matchedPath
+                    ? this.projectManager.getEnvironmentForUri(activeUri)
+                    : this.projectManager.resolveProjectActiveOrDefault(targetPath, envs);
+        }
+
+        if (!targetEnv || targetEnv.pixiStatus !== 'installed') {
+            targetEnv = envs.find((e) => e.pixiStatus === 'installed');
+        }
+
         if (!targetEnv) {
             this.lastSyncedEnvKey = undefined;
             this.context.environmentVariableCollection.clear();
@@ -89,6 +131,8 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
             return;
         }
 
+        const currentSeq = ++this.syncSeq;
+
         try {
             const hookArgs = ['shell-hook', '--json'];
             if (targetEnv.manifestPath) {
@@ -96,6 +140,9 @@ export class PixiTerminalProvider implements TerminalProfileProvider, Disposable
             }
             hookArgs.push('-e', targetEnv.pixiEnvName);
             const stdout = await runPixi(hookArgs, { cwd: targetEnv.projectPath });
+            if (this.syncSeq !== currentSeq) {
+                return;
+            }
             const data = safeJsonParse<{ environment_variables?: Record<string, string> }>(stdout, {});
             if (data?.environment_variables && Object.keys(data.environment_variables).length > 0) {
                 this.context.environmentVariableCollection.clear();

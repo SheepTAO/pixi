@@ -898,15 +898,16 @@ export async function pickPixiEnvironment(
         return envs[0];
     }
 
-    const activeUri = window.activeTextEditor?.document?.uri;
+    const activeUri = window.activeTextEditor?.document?.uri ?? window.activeNotebookEditor?.notebook?.uri;
     const configScope = targetProjectPath ? Uri.file(targetProjectPath) : activeUri;
     const config = workspace.getConfiguration('pixi', configScope);
     const defaultEnvSetting = options?.defaultEnvConfigKey
         ? config.get<string>(options.defaultEnvConfigKey)?.trim()
         : undefined;
 
+    const activeProjectPath = !targetProjectPath && activeUri ? manager.findProjectForUri(activeUri) : undefined;
+
     if (defaultEnvSetting) {
-        const activeProjectPath = !targetProjectPath && activeUri ? manager.findProjectForUri(activeUri) : undefined;
         const matching = envs.filter((e) => e.pixiEnvName === defaultEnvSetting);
         const matchedEnv =
             (activeProjectPath ? matching.find((e) => e.projectPath === activeProjectPath) : undefined) ??
@@ -916,14 +917,23 @@ export async function pickPixiEnvironment(
         }
     }
 
+    if (activeProjectPath) {
+        envs.sort((a, b) => {
+            const aIsActive = a.projectPath === activeProjectPath ? 0 : 1;
+            const bIsActive = b.projectPath === activeProjectPath ? 0 : 1;
+            return aIsActive - bIsActive;
+        });
+    }
+
     interface FullEnvQuickPickItem extends QuickPickItem {
         env: PixiEnvironmentInfo;
     }
 
+    const isMultiProject = !targetProjectPath && manager.getProjects().length > 1;
     const items: FullEnvQuickPickItem[] = envs.map((env) => {
         const { icon, text } = getEnvironmentStatusBadge(env.pixiStatus);
         return {
-            label: `${icon} ${env.pixiEnvName}`,
+            label: isMultiProject ? `${icon} ${env.pixiEnvName} (${env.projectName})` : `${icon} ${env.pixiEnvName}`,
             description: text,
             detail: env.statusReason || env.prefix,
             env,
