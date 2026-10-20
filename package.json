@@ -1128,103 +1128,118 @@
             ],
             "view/item/context": [
                 {
+                    "command": "pixi.openManifest",
+                    "when": "view == pixi.views.projects && viewItem == pixiWorkspaceHeader",
+                    "group": "inline@1"
+                },
+                {
+                    "command": "pixi.bumpVersion",
+                    "when": "view == pixi.views.projects && viewItem == pixiWorkspaceHeader",
+                    "group": "inline@2"
+                },
+                {
                     "command": "pixi.addPackage",
                     "when": "view == pixi.views.projects && viewItem == pixiProject",
                     "group": "inline@1"
                 },
                 {
                     "command": "pixi.openManifest",
-                    "when": "view == pixi.views.projects && viewItem == pixiProject",
+                    "when": "view == pixi.views.projects && (viewItem == pixiProject || viewItem == pixiWorkspaceHeader)",
                     "group": "1_manage@0"
                 },
                 {
+                    "command": "pixi.workspace",
+                    "when": "view == pixi.views.projects && (viewItem == pixiProject || viewItem == pixiWorkspaceHeader)",
+                    "group": "1_manage@0.5"
+                },
+                {
                     "command": "pixi.createEnvironment",
-                    "when": "view == pixi.views.projects && viewItem == pixiProject",
+                    "when": "view == pixi.views.projects && (viewItem == pixiProject || viewItem == pixiWorkspaceHeader)",
                     "group": "1_manage@1"
                 },
                 {
                     "command": "pixi.createFeature",
-                    "when": "view == pixi.views.projects && viewItem == pixiProject",
+                    "when": "view == pixi.views.projects && (viewItem == pixiProject || viewItem == pixiWorkspaceHeader)",
                     "group": "1_manage@2"
                 },
                 {
                     "command": "pixi.setProjectName",
-                    "when": "view == pixi.views.projects && viewItem == pixiProject",
+                    "when": "view == pixi.views.projects && (viewItem == pixiProject || viewItem == pixiWorkspaceHeader)",
                     "group": "1_manage@2.4"
                 },
                 {
                     "command": "pixi.bumpVersion",
-                    "when": "view == pixi.views.projects && viewItem == pixiProject",
+                    "when": "view == pixi.views.projects && (viewItem == pixiProject || viewItem == pixiWorkspaceHeader)",
                     "group": "1_manage@2.5"
                 },
                 {
                     "command": "pixi.setDescription",
-                    "when": "view == pixi.views.projects && viewItem == pixiProject",
+                    "when": "view == pixi.views.projects && (viewItem == pixiProject || viewItem == pixiWorkspaceHeader)",
                     "group": "1_manage@2.6"
                 },
                 {
                     "command": "pixi.setRequiresPixi",
-                    "when": "view == pixi.views.projects && viewItem == pixiProject",
+                    "when": "view == pixi.views.projects && (viewItem == pixiProject || viewItem == pixiWorkspaceHeader)",
                     "group": "1_manage@2.7"
                 },
                 {
                     "command": "pixi.managePreviewFlags",
-                    "when": "view == pixi.views.projects && viewItem == pixiProject",
+                    "when": "view == pixi.views.projects && (viewItem == pixiProject || viewItem == pixiWorkspaceHeader)",
                     "group": "1_manage@2.8"
                 },
                 {
                     "command": "pixi.manageActivation",
-                    "when": "view == pixi.views.projects && viewItem == pixiProject",
+                    "when": "view == pixi.views.projects && (viewItem == pixiProject || viewItem == pixiWorkspaceHeader)",
                     "group": "1_manage@2.9"
                 },
                 {
                     "command": "pixi.workspace.register",
-                    "when": "view == pixi.views.projects && viewItem == pixiProject",
+                    "when": "view == pixi.views.projects && (viewItem == pixiProject || viewItem == pixiWorkspaceHeader)",
                     "group": "1_manage@2.95"
                 },
                 {
                     "command": "pixi.config",
-                    "when": "view == pixi.views.projects && viewItem == pixiProject",
+                    "when": "view == pixi.views.projects && (viewItem == pixiProject || viewItem == pixiWorkspaceHeader)",
                     "group": "1_manage@2.96"
                 },
                 {
                     "command": "pixi.lock",
-                    "when": "view == pixi.views.projects && viewItem == pixiProject",
+                    "when": "view == pixi.views.projects && (viewItem == pixiProject || viewItem == pixiWorkspaceHeader)",
                     "group": "1_manage@3"
                 },
                 {
                     "command": "pixi.checkLockfile",
-                    "when": "view == pixi.views.projects && viewItem == pixiProject",
+                    "when": "view == pixi.views.projects && (viewItem == pixiProject || viewItem == pixiWorkspaceHeader)",
                     "group": "1_manage@3.05"
                 },
                 {
                     "command": "pixi.exec",
-                    "when": "view == pixi.views.projects && viewItem == pixiProject",
+                    "when": "view == pixi.views.projects && (viewItem == pixiProject || viewItem == pixiWorkspaceHeader)",
                     "group": "1_manage@3.1"
                 },
                 {
                     "command": "pixi.addChannel",
-                    "when": "view == pixi.views.projects && viewItem == pixiProject",
+                    "when": "view == pixi.views.projects && (viewItem == pixiProject || viewItem == pixiWorkspaceHeader)",
                     "group": "2_channel@1"
                 },
                 {
                     "command": "pixi.removeChannel",
-                    "when": "view == pixi.views.projects && viewItem == pixiProject",
+                    "when": "view == pixi.views.projects && (viewItem == pixiProject || viewItem == pixiWorkspaceHeader)",
                     "group": "2_channel@2"
                 },
                 {
                     "command": "pixi.platform",
-                    "when": "view == pixi.views.projects && viewItem == pixiProject",
+                    "when": "view == pixi.views.projects && (viewItem == pixiProject || viewItem == pixiWorkspaceHeader)",
                     "group": "2_channel@3"
                 },
                 {
                     "command": "pixi.platform.autoDetect",
-                    "when": "view == pixi.views.projects && viewItem == pixiProject",
+                    "when": "view == pixi.views.projects && (viewItem == pixiProject || viewItem == pixiWorkspaceHeader)",
                     "group": "2_channel@3.1"
                 },
                 {
                     "command": "pixi.systemRequirements",
-                    "when": "view == pixi.views.projects && viewItem == pixiProject",
+                    "when": "view == pixi.views.projects && (viewItem == pixiProject || viewItem == pixiWorkspaceHeader)",
                     "group": "2_channel@4"
                 },
                 {
@@ -1840,6 +1855,12 @@
                     "type": "boolean",
                     "default": true,
                     "description": "Display detected toolchain summary (e.g. Python, C++, Rust, R) next to environment names in the Environments tree view.",
+                    "scope": "resource"
+                },
+                "pixi.environments.showWorkspaceHeader": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Display a pinned workspace overview item with project name, version, and manifest details at the top of the Environments tree view in single-project workspaces.",
                     "scope": "resource"
                 },
                 "pixi.toolchains.scanLanguages": {

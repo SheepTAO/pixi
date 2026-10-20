@@ -39,6 +39,10 @@ export class PixiProjectManager implements Disposable {
     private readonly projectToManifest = new PathMap<string>();
     private readonly projectToName = new PathMap<string>();
     private readonly projectToPlatforms = new PathMap<WorkspacePlatformEntry[]>();
+    private readonly projectToVersion = new PathMap<string | undefined>();
+    private readonly projectToFolderSize = new PathMap<string | undefined>();
+    private readonly projectToDescription = new PathMap<string | undefined>();
+    private readonly projectToRequiresPixi = new PathMap<string | undefined>();
     private readonly packagesCache = new PathMap<Map<string, Promise<PixiPackage[]>>>();
     private readonly disposables: Disposable[] = [];
 
@@ -176,9 +180,29 @@ export class PixiProjectManager implements Disposable {
                 name: this.getProjectName(p),
                 projectPath: p,
                 manifestPath: this.getManifestPath(p) || path.join(p, PIXI_MANIFEST_NAME),
+                version: this.projectToVersion.get(p),
+                pixiFolderSize: this.projectToFolderSize.get(p),
+                description: this.projectToDescription.get(p),
+                requiresPixi: this.projectToRequiresPixi.get(p),
             };
         });
         return projects.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+    }
+
+    public getProjectVersion(projectPath: string): string | undefined {
+        return this.projectToVersion.get(projectPath);
+    }
+
+    public getProjectFolderSize(projectPath: string): string | undefined {
+        return this.projectToFolderSize.get(projectPath);
+    }
+
+    public getProjectDescription(projectPath: string): string | undefined {
+        return this.projectToDescription.get(projectPath);
+    }
+
+    public getProjectRequiresPixi(projectPath: string): string | undefined {
+        return this.projectToRequiresPixi.get(projectPath);
     }
 
     public getEnvironmentsForProject(projectPath: string): PixiEnvironmentInfo[] {
@@ -348,6 +372,10 @@ export class PixiProjectManager implements Disposable {
                 this.projectToManifest.delete(knownPath);
                 this.projectToName.delete(knownPath);
                 this.projectToPlatforms.delete(knownPath);
+                this.projectToVersion.delete(knownPath);
+                this.projectToFolderSize.delete(knownPath);
+                this.projectToDescription.delete(knownPath);
+                this.projectToRequiresPixi.delete(knownPath);
                 this.clearPackagesCache(knownPath);
             }
         }
@@ -371,6 +399,10 @@ export class PixiProjectManager implements Disposable {
                 this.projectToManifest.delete(normalized);
                 this.projectToName.delete(normalized);
                 this.projectToPlatforms.delete(normalized);
+                this.projectToVersion.delete(normalized);
+                this.projectToFolderSize.delete(normalized);
+                this.projectToDescription.delete(normalized);
+                this.projectToRequiresPixi.delete(normalized);
                 return false;
             }
 
@@ -383,6 +415,28 @@ export class PixiProjectManager implements Disposable {
 
             this.projectToManifest.set(normalized, manifestPath);
             this.projectToName.set(normalized, projectName);
+            this.projectToVersion.set(normalized, pixiInfo.project_info.version || undefined);
+            this.projectToFolderSize.set(normalized, pixiInfo.project_info.pixi_folder_size || undefined);
+
+            try {
+                if (fs.existsSync(manifestPath)) {
+                    const content = fs.readFileSync(manifestPath, 'utf8');
+                    const descMatch = content.match(/description\s*=\s*["']([^"']+)["']/);
+                    if (descMatch) {
+                        this.projectToDescription.set(normalized, descMatch[1]);
+                    } else {
+                        this.projectToDescription.delete(normalized);
+                    }
+                    const reqMatch = content.match(/requires-pixi\s*=\s*["']([^"']+)["']/);
+                    if (reqMatch) {
+                        this.projectToRequiresPixi.set(normalized, reqMatch[1]);
+                    } else {
+                        this.projectToRequiresPixi.delete(normalized);
+                    }
+                }
+            } catch {
+                // Ignore read errors
+            }
 
             interface PlatformAggregate {
                 name: string;

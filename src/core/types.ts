@@ -80,4 +80,8 @@ export interface PixiProject {
     name: string;
     projectPath: string;
     manifestPath: string;
+    version?: string | null;
+    pixiFolderSize?: string | null;
+    description?: string | null;
+    requiresPixi?: string | null;
 }

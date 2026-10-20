@@ -4,6 +4,7 @@ import {
     Disposable,
     Event,
     EventEmitter,
+    MarkdownString,
     ThemeColor,
     ThemeIcon,
     TreeDataProvider,
@@ -28,13 +29,129 @@ import {
 import { formatToolchainDetails, formatToolchainSummary } from '../core/toolchains';
 import { PixiEnvironmentInfo, PixiPackage, PixiProject } from '../core/types';
 
+function buildWorkspaceTooltip(
+    project: PixiProject,
+    manifestName: string,
+    versionStr?: string,
+    descriptionText?: string,
+    platforms: string[] = [],
+    channels: string[] = [],
+    requiresPixi?: string,
+    envCount: number = 0,
+    featureCount: number = 0,
+): MarkdownString {
+    const md = new MarkdownString('', true);
+    md.isTrusted = true;
+    md.supportHtml = true;
+
+    const header = versionStr ? `### 📦 ${project.name} \`${versionStr}\`` : `### 📦 ${project.name}`;
+    md.appendMarkdown(`${header}\n\n`);
+
+    if (descriptionText) {
+        md.appendMarkdown(`*${descriptionText}*\n\n`);
+    }
+
+    md.appendMarkdown('---\n\n');
+    md.appendMarkdown(`- **Manifest**: \`${manifestName}\`\n`);
+    md.appendMarkdown(`- **Path**: \`${project.projectPath}\`\n`);
+
+    if (project.pixiFolderSize) {
+        md.appendMarkdown(`- **Prefix Size**: \`${project.pixiFolderSize}\`\n`);
+    }
+
+    if (platforms.length > 0) {
+        md.appendMarkdown(`- **Platforms (${platforms.length})**: ${platforms.map((p) => `\`${p}\``).join(', ')}\n`);
+    }
+
+    if (channels.length > 0) {
+        md.appendMarkdown(`- **Channels**: ${channels.map((c) => `\`${c}\``).join(', ')}\n`);
+    }
+
+    if (requiresPixi) {
+        md.appendMarkdown(`- **Requires Pixi**: \`${requiresPixi}\`\n`);
+    }
+
+    const counts: string[] = [];
+    if (envCount > 0) {
+        counts.push(`${envCount} environment${envCount > 1 ? 's' : ''}`);
+    }
+    if (featureCount > 0) {
+        counts.push(`${featureCount} feature${featureCount > 1 ? 's' : ''}`);
+    }
+    if (counts.length > 0) {
+        md.appendMarkdown(`- **Workspace Scope**: ${counts.join(', ')}\n`);
+    }
+
+    md.appendMarkdown('\n---\n\n');
+    md.appendMarkdown('*Click to open manifest • Right-click for workspace actions*');
+    return md;
+}
+
+export class PixiWorkspaceHeaderTreeItem extends TreeItem {
+    constructor(
+        public readonly project: PixiProject,
+        platforms: string[] = [],
+        channels: string[] = [],
+        envCount: number = 0,
+        featureCount: number = 0,
+        descriptionText?: string,
+        requiresPixi?: string,
+    ) {
+        super(project.name, TreeItemCollapsibleState.None);
+        const manifestName = path.basename(project.manifestPath);
+        const versionStr = project.version ? `v${project.version}` : undefined;
+        this.description = versionStr ? `${versionStr} (${manifestName})` : `(${manifestName})`;
+        this.iconPath = new ThemeIcon('root-folder', new ThemeColor('symbolIcon.folderForeground'));
+        this.contextValue = 'pixiWorkspaceHeader';
+
+        this.command = {
+            command: 'pixi.openManifest',
+            title: 'Open Manifest',
+            arguments: [this],
+        };
+
+        this.tooltip = buildWorkspaceTooltip(
+            project,
+            manifestName,
+            versionStr,
+            descriptionText,
+            platforms,
+            channels,
+            requiresPixi,
+            envCount,
+            featureCount,
+        );
+    }
+}
+
 export class PixiProjectTreeItem extends TreeItem {
-    constructor(public readonly project: PixiProject) {
+    constructor(
+        public readonly project: PixiProject,
+        platforms: string[] = [],
+        channels: string[] = [],
+        envCount: number = 0,
+        featureCount: number = 0,
+        descriptionText?: string,
+        requiresPixi?: string,
+    ) {
         super(project.name, TreeItemCollapsibleState.Expanded);
-        this.description = path.basename(project.manifestPath);
-        this.tooltip = `Project: ${project.name}\nPath: ${project.projectPath}\nManifest: ${project.manifestPath}`;
+        const manifestName = path.basename(project.manifestPath);
+        const versionStr = project.version ? `v${project.version}` : undefined;
+        this.description = versionStr ? `${versionStr} (${manifestName})` : `(${manifestName})`;
         this.iconPath = new ThemeIcon('root-folder');
         this.contextValue = 'pixiProject';
+
+        this.tooltip = buildWorkspaceTooltip(
+            project,
+            manifestName,
+            versionStr,
+            descriptionText,
+            platforms,
+            channels,
+            requiresPixi,
+            envCount,
+            featureCount,
+        );
     }
 }
 
@@ -308,6 +425,7 @@ export class PixiSystemRequirementPropertyTreeItem extends TreeItem {
 export type ProjectsViewMode = 'environment' | 'feature';
 
 export type PixiProjectsTreeItem =
+    | PixiWorkspaceHeaderTreeItem
     | PixiProjectTreeItem
     | PixiEnvironmentTreeItem
     | PixiFeatureTreeItem
@@ -350,7 +468,8 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
                 if (
                     e.affectsConfiguration('pixi.environments.viewMode') ||
                     e.affectsConfiguration('pixi.environments.systemRequirementsPosition') ||
-                    e.affectsConfiguration('pixi.environments.showToolchains')
+                    e.affectsConfiguration('pixi.environments.showToolchains') ||
+                    e.affectsConfiguration('pixi.environments.showWorkspaceHeader')
                 ) {
                     const newMode = workspace
                         .getConfiguration('pixi.environments')
@@ -468,7 +587,65 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
         return envs.map((e) => new PixiEnvironmentTreeItem(e, project, e.features));
     }
 
-    private async getProjectChildren(project: PixiProject): Promise<PixiProjectsTreeItem[]> {
+    private async resolveProjectSummary(project: PixiProject): Promise<{
+        platforms: string[];
+        channels: string[];
+        envCount: number;
+        featureCount: number;
+        descriptionText?: string;
+        requiresPixi?: string;
+    }> {
+        const platforms = this.projectManager.getPlatformsForProject(project.projectPath).map((p) => p.name);
+        const channels = this.projectManager.getProjectConfiguredChannels(project.projectPath);
+        const envs = this.projectManager.getEnvironmentsForProject(project.projectPath);
+        let featureCount = 0;
+        try {
+            const features = await this.getProjectFeatures(project.projectPath);
+            featureCount = features.length;
+        } catch {
+            // ignore
+        }
+
+        return {
+            platforms,
+            channels,
+            envCount: envs.length,
+            featureCount,
+            descriptionText: project.description || undefined,
+            requiresPixi: project.requiresPixi || undefined,
+        };
+    }
+
+    private async createWorkspaceHeaderTreeItem(project: PixiProject): Promise<PixiWorkspaceHeaderTreeItem> {
+        const summary = await this.resolveProjectSummary(project);
+        return new PixiWorkspaceHeaderTreeItem(
+            project,
+            summary.platforms,
+            summary.channels,
+            summary.envCount,
+            summary.featureCount,
+            summary.descriptionText,
+            summary.requiresPixi,
+        );
+    }
+
+    private async createProjectTreeItem(project: PixiProject): Promise<PixiProjectTreeItem> {
+        const summary = await this.resolveProjectSummary(project);
+        return new PixiProjectTreeItem(
+            project,
+            summary.platforms,
+            summary.channels,
+            summary.envCount,
+            summary.featureCount,
+            summary.descriptionText,
+            summary.requiresPixi,
+        );
+    }
+
+    private async getProjectChildren(
+        project: PixiProject,
+        isSingleProjectRoot = false,
+    ): Promise<PixiProjectsTreeItem[]> {
         const items =
             this.currentViewMode === 'feature'
                 ? await this.getFeatureItemsForProject(project)
@@ -486,6 +663,14 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
                 } else {
                     items.push(reqItem);
                 }
+            }
+        }
+
+        if (isSingleProjectRoot) {
+            const showWorkspaceHeader = config.get<boolean>('showWorkspaceHeader', true);
+            if (showWorkspaceHeader) {
+                const headerItem = await this.createWorkspaceHeaderTreeItem(project);
+                items.unshift(headerItem);
             }
         }
 
@@ -507,13 +692,17 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
                 return [];
             }
             if (projects.length === 1) {
-                return this.getProjectChildren(projects[0]);
+                return this.getProjectChildren(projects[0], true);
             }
-            return projects.map((p) => new PixiProjectTreeItem(p));
+            return Promise.all(projects.map((p) => this.createProjectTreeItem(p)));
+        }
+
+        if (element instanceof PixiWorkspaceHeaderTreeItem) {
+            return [];
         }
 
         if (element instanceof PixiProjectTreeItem) {
-            return this.getProjectChildren(element.project);
+            return this.getProjectChildren(element.project, false);
         }
 
         if (element instanceof PixiFeatureTreeItem) {
