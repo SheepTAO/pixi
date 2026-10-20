@@ -1503,21 +1503,6 @@
                     "group": "inline@2"
                 },
                 {
-                    "command": "pixi.runTaskInEnvironment",
-                    "when": "view == pixi.views.tasks && viewItem == pixiTaskItem",
-                    "group": "inline@3"
-                },
-                {
-                    "command": "pixi.tasks.revealInManifest",
-                    "when": "view == pixi.views.tasks && viewItem == pixiTaskItem",
-                    "group": "inline@4"
-                },
-                {
-                    "command": "pixi.tasks.removeTask",
-                    "when": "view == pixi.views.tasks && viewItem == pixiTaskItem",
-                    "group": "inline@5"
-                },
-                {
                     "command": "pixi.runTask",
                     "when": "view == pixi.views.tasks && viewItem == pixiTaskItem",
                     "group": "1_run@1"

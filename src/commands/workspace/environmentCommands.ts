@@ -1,6 +1,16 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { commands, Disposable, FileType, ProgressLocation, QuickPickItem, Uri, window, workspace } from 'vscode';
+import {
+    commands,
+    Disposable,
+    FileType,
+    ProgressLocation,
+    QuickPickItem,
+    QuickPickItemKind,
+    Uri,
+    window,
+    workspace,
+} from 'vscode';
 
 import { runPixi } from '../../cli/pixiCli';
 import { runPixiWithProgress } from '../../cli/workspaceCli';
@@ -1040,16 +1050,19 @@ async function handleOpenManifestCommand(manager: PixiProjectManager, targetItem
 }
 
 async function handleEnvironmentHubCommand(targetItem?: unknown): Promise<void> {
-    const actions = [
+    interface HubActionItem extends QuickPickItem {
+        command?: string;
+    }
+
+    const actions: HubActionItem[] = [
+        {
+            label: 'Environment Lifecycle',
+            kind: QuickPickItemKind.Separator,
+        },
         {
             label: '$(plus) Create New Environment...',
             description: 'Create an environment composed of one or more features',
             command: 'pixi.createEnvironment',
-        },
-        {
-            label: '$(sparkle) Create New Feature...',
-            description: 'Create a new feature set in the project manifest',
-            command: 'pixi.createFeature',
         },
         {
             label: '$(symbol-namespace) Configure Environment Features...',
@@ -1057,24 +1070,9 @@ async function handleEnvironmentHubCommand(targetItem?: unknown): Promise<void> 
             command: 'pixi.configureEnvironmentFeatures',
         },
         {
-            label: '$(trash) Remove Feature from Manifest...',
-            description: 'Remove a feature from the project manifest (pixi workspace feature remove)',
-            command: 'pixi.removeFeature',
-        },
-        {
             label: '$(cloud-download) Install / Sync Environments',
             description: 'Install or synchronize dependencies for a specific environment or entire project',
             command: 'pixi.install',
-        },
-        {
-            label: '$(terminal) Open Terminal in Environment...',
-            description: 'Open a dedicated terminal with the environment activated',
-            command: 'pixi.openTerminal',
-        },
-        {
-            label: '$(lock) Lock Dependencies',
-            description: 'Solve dependencies and update pixi.lock without installing (pixi lock)',
-            command: 'pixi.lock',
         },
         {
             label: '$(debug-restart) Reinstall Environments or Package...',
@@ -1087,19 +1085,37 @@ async function handleEnvironmentHubCommand(targetItem?: unknown): Promise<void> 
             command: 'pixi.exportEnvironment',
         },
         {
-            label: '$(cloud-download) Import Dependencies from File...',
-            description: 'Import Conda environment.yml or PyPI requirements.txt into environment or feature',
-            command: 'pixi.import',
-        },
-        {
-            label: '$(terminal) Run in Temporary Environment (Exec)...',
-            description: 'Execute ad-hoc commands in a temporary environment (pixi exec)',
-            command: 'pixi.exec',
-        },
-        {
             label: '$(trash) Delete Environment...',
             description: 'Clean an installed environment prefix on disk',
             command: 'pixi.deleteEnvironment',
+        },
+        {
+            label: 'Features',
+            kind: QuickPickItemKind.Separator,
+        },
+        {
+            label: '$(sparkle) Create New Feature...',
+            description: 'Create a new feature set in the project manifest',
+            command: 'pixi.createFeature',
+        },
+        {
+            label: '$(trash) Remove Feature from Manifest...',
+            description: 'Remove a feature from the project manifest (pixi workspace feature remove)',
+            command: 'pixi.removeFeature',
+        },
+        {
+            label: 'Terminal & Execution',
+            kind: QuickPickItemKind.Separator,
+        },
+        {
+            label: '$(terminal) Open Terminal in Environment...',
+            description: 'Open a dedicated terminal with the environment activated',
+            command: 'pixi.openTerminal',
+        },
+        {
+            label: '$(run) Run in Temporary Environment (Exec)...',
+            description: 'Execute ad-hoc commands in a temporary environment (pixi exec)',
+            command: 'pixi.exec',
         },
     ];
 
@@ -1107,7 +1123,7 @@ async function handleEnvironmentHubCommand(targetItem?: unknown): Promise<void> 
         title: 'Pixi: Environment Management',
         placeHolder: 'Select environment operation',
     });
-    if (pick) {
+    if (pick?.command) {
         await commands.executeCommand(pick.command, targetItem);
     }
 }

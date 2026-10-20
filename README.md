@@ -78,7 +78,7 @@ All actions are organized into intuitive, guided QuickPick hubs. Press `Ctrl+Shi
 | Command Hub                                | Description                                                                          |
 | :----------------------------------------- | :----------------------------------------------------------------------------------- |
 | **Pixi: Workspace ...**                    | Manage workspace properties, shared dependencies, channels, platforms, and lockfile. |
-| **Pixi: Environment ...**                  | Create, delete, lock, reinstall, import, or export environments and features.        |
+| **Pixi: Environment ...**                  | Create, delete, reinstall, configure, export, and manage environments and features.  |
 | **Pixi: Search Packages ...**              | Real-time search across Conda and PyPI with platform, license, and doc previews.     |
 | **Pixi: Add Package ...**                  | Add dependencies to specific environments, features, or workspace-wide scope.        |
 | **Pixi: Remove Package ...**               | Remove packages with automatic feature/environment scope resolution.                 |

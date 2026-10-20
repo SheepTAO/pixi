@@ -1,7 +1,16 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { commands, Disposable, OutputChannel, QuickPickItem, ThemeIcon, window, workspace } from 'vscode';
+import {
+    commands,
+    Disposable,
+    OutputChannel,
+    QuickPickItem,
+    QuickPickItemKind,
+    ThemeIcon,
+    window,
+    workspace,
+} from 'vscode';
 
 import { getPixi, runPixi } from '../../cli/pixiCli';
 import { runPixiWithProgress } from '../../cli/workspaceCli';
@@ -778,14 +787,37 @@ async function handleWorkspaceHubCommand(manager: PixiProjectManager, targetItem
     const projectName = manager.getProjectName(projectPath);
 
     interface WorkspaceActionItem extends QuickPickItem {
-        command: string;
+        command?: string;
     }
 
     const items: WorkspaceActionItem[] = [
         {
+            label: 'Project Manifest',
+            kind: QuickPickItemKind.Separator,
+        },
+        {
             label: '$(tag) Bump / Set Version ...',
             description: 'Bump patch, minor, major, or set custom version in [workspace.version]',
             command: 'pixi.bumpVersion',
+        },
+        {
+            label: '$(edit) Rename Workspace ...',
+            description: 'Get or update workspace name via pixi workspace name',
+            command: 'pixi.setProjectName',
+        },
+        {
+            label: '$(note) Set Workspace Description ...',
+            description: 'Get or update workspace description via pixi workspace description',
+            command: 'pixi.setDescription',
+        },
+        {
+            label: '$(verified) Set Minimum Pixi Requirement ...',
+            description: 'Configure requires-pixi constraint via pixi workspace requires-pixi',
+            command: 'pixi.setRequiresPixi',
+        },
+        {
+            label: 'Dependencies & Platforms',
+            kind: QuickPickItemKind.Separator,
         },
         {
             label: '$(layers) Manage Workspace Dependencies ...',
@@ -808,17 +840,11 @@ async function handleWorkspaceHubCommand(manager: PixiProjectManager, targetItem
             command: 'pixi.systemRequirements',
         },
         {
-            label: '$(export) Export Environment ...',
-            description: 'Export environment as Conda environment.yml or explicit specification',
-            command: 'pixi.exportEnvironment',
+            label: 'Lockfile & Synchronization',
+            kind: QuickPickItemKind.Separator,
         },
         {
-            label: '$(cloud-download) Import Dependencies from File ...',
-            description: 'Import Conda environment.yml or PyPI requirements.txt into workspace',
-            command: 'pixi.import',
-        },
-        {
-            label: '$(lock) Lock Dependencies ...',
+            label: '$(lock) Lock Dependencies (pixi lock) ...',
             description: 'Solve and update lockfile (pixi.lock) for project',
             command: 'pixi.lock',
         },
@@ -833,24 +859,13 @@ async function handleWorkspaceHubCommand(manager: PixiProjectManager, targetItem
             command: 'pixi.openLockfile',
         },
         {
-            label: '$(terminal) Run in Temporary Environment (Exec) ...',
-            description: 'Run arbitrary tools inside a temporary disposable environment (pixi exec)',
-            command: 'pixi.exec',
+            label: '$(cloud-download) Import Dependencies from File ...',
+            description: 'Import Conda environment.yml or PyPI requirements.txt into workspace',
+            command: 'pixi.import',
         },
         {
-            label: '$(edit) Rename Workspace ...',
-            description: 'Get or update workspace name via pixi workspace name',
-            command: 'pixi.setProjectName',
-        },
-        {
-            label: '$(note) Set Workspace Description ...',
-            description: 'Get or update workspace description via pixi workspace description',
-            command: 'pixi.setDescription',
-        },
-        {
-            label: '$(verified) Set Minimum Pixi Requirement ...',
-            description: 'Configure requires-pixi constraint via pixi workspace requires-pixi',
-            command: 'pixi.setRequiresPixi',
+            label: 'Advanced & Machine Settings',
+            kind: QuickPickItemKind.Separator,
         },
         {
             label: '$(beaker) Manage Workspace Preview Flags ...',
@@ -878,7 +893,7 @@ async function handleWorkspaceHubCommand(manager: PixiProjectManager, targetItem
         title: `Pixi: Workspace Management [${projectName}]`,
         placeHolder: 'Select a workspace configuration operation',
     });
-    if (!picked) {
+    if (!picked?.command) {
         return;
     }
 
