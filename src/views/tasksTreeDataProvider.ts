@@ -45,14 +45,17 @@ const TASK_ICON_RULES: readonly TaskIconRule[] = [
     { keywords: ['sync', 'setup'], icon: 'sync', color: 'charts.green' },
 ];
 
-function resolveTaskIcon(taskName: string): ThemeIcon {
+function resolveTaskIconInfo(taskName: string): { icon: string; themeIcon: ThemeIcon } {
     const lower = taskName.toLowerCase();
     for (const rule of TASK_ICON_RULES) {
         if (rule.keywords.some((kw) => lower.includes(kw))) {
-            return rule.color ? new ThemeIcon(rule.icon, new ThemeColor(rule.color)) : new ThemeIcon(rule.icon);
+            const themeIcon = rule.color
+                ? new ThemeIcon(rule.icon, new ThemeColor(rule.color))
+                : new ThemeIcon(rule.icon);
+            return { icon: rule.icon, themeIcon };
         }
     }
-    return new ThemeIcon('terminal-view-icon');
+    return { icon: 'terminal', themeIcon: new ThemeIcon('terminal-view-icon') };
 }
 
 export class PixiTaskTreeItem extends TreeItem {
@@ -67,14 +70,15 @@ export class PixiTaskTreeItem extends TreeItem {
         this.description = [envTag, descText].filter(Boolean).join(' ');
 
         // Intelligent Codicon matching based on task name semantics
-        this.iconPath = resolveTaskIcon(task.name);
+        const { icon: iconName, themeIcon } = resolveTaskIconInfo(task.name);
+        this.iconPath = themeIcon;
 
         const md = new MarkdownString('', true);
         md.isTrusted = true;
         md.supportHtml = true;
 
         const envHeading = task.default_environment ? ` \`[${task.default_environment}]\`` : '';
-        md.appendMarkdown(`### $(terminal) ${task.name}${envHeading}\n\n`);
+        md.appendMarkdown(`### $(${iconName}) ${task.name}${envHeading}\n\n`);
 
         if (task.description) {
             md.appendMarkdown(`*${task.description}*\n\n`);

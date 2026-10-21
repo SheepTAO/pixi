@@ -461,12 +461,26 @@ export class PixiSystemRequirementPropertyTreeItem extends TreeItem {
         public readonly propertyValue: string,
         public readonly project: PixiProject,
     ) {
-        super(propertyName, TreeItemCollapsibleState.None);
         const descriptor = SYSTEM_REQUIREMENT_DESCRIPTORS.find((d) => d.id === propertyName);
-        this.iconPath = new ThemeIcon(descriptor?.icon || 'symbol-property');
+        const displayLabel = descriptor?.label || propertyName;
+        super(displayLabel, TreeItemCollapsibleState.None);
+        const iconName = descriptor?.icon || 'symbol-property';
+        this.iconPath = new ThemeIcon(iconName);
         this.contextValue = 'pixiSystemRequirementProperty';
         this.description = propertyValue;
-        this.tooltip = `${propertyName} = "${propertyValue}"\nClick to edit requirement`;
+
+        const md = new MarkdownString('', true);
+        md.isTrusted = true;
+        md.supportHtml = true;
+        md.appendMarkdown(`### $(${iconName}) ${displayLabel}\n\n`);
+        if (descriptor?.description) {
+            md.appendMarkdown(`*${descriptor.description}*\n\n`);
+        }
+        md.appendMarkdown(`- **Requirement**: \`${propertyName} = "${propertyValue}"\`\n`);
+        md.appendMarkdown(`- **Project**: ${project.name}\n\n`);
+        md.appendMarkdown('---\n\n*Click to edit requirement in manifest*');
+        this.tooltip = md;
+
         this.command = {
             command: 'pixi.systemRequirements.editProperty',
             title: 'Edit Requirement',
