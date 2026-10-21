@@ -145,9 +145,14 @@ export class PixiPackageUpdateService implements Disposable {
     constructor(private readonly projectManager: PixiProjectManager) {
         this.disposables.push(
             this._onDidChangeOutdatedPackages,
-            this.projectManager.onDidChangeEnvironments(() => {
-                this.clearCache();
-                this.checkAllEnabledProjects();
+            this.projectManager.onDidChangeEnvironments((projectPath) => {
+                if (projectPath) {
+                    this.cache.delete(projectPath);
+                    void this.checkForUpdates(projectPath);
+                } else {
+                    this.clearCache();
+                    this.checkAllEnabledProjects();
+                }
             }),
             workspace.onDidChangeConfiguration((e) => {
                 if (e.affectsConfiguration('pixi.packages.checkForUpdates')) {

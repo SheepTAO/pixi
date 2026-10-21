@@ -140,12 +140,20 @@ export class PixiTaskGroupTreeItem extends TreeItem {
     ) {
         super(groupName, TreeItemCollapsibleState.Expanded);
         this.description = `(${tasks.length})`;
-        this.tooltip =
-            groupType === 'environment'
-                ? `Environment '${groupName}': ${tasks.length} task(s)`
-                : `Task Group '${groupName}': ${tasks.length} task(s)`;
+        const iconName = groupType === 'environment' ? 'layers' : 'folder';
         this.iconPath = groupType === 'environment' ? new ThemeIcon('layers') : new ThemeIcon('folder');
         this.contextValue = 'pixiTaskGroup';
+
+        const md = new MarkdownString('', true);
+        md.isTrusted = true;
+        md.supportHtml = true;
+        const typeLabel = groupType === 'environment' ? 'Environment Group' : 'Task Group';
+        md.appendMarkdown(`### $(${iconName}) ${groupName}\n\n`);
+        md.appendMarkdown(`- **Type**: ${typeLabel}\n`);
+        md.appendMarkdown(`- **Project**: ${project.name}\n`);
+        md.appendMarkdown(`- **Tasks**: ${tasks.length} task${tasks.length === 1 ? '' : 's'}\n\n`);
+        md.appendMarkdown('---\n\n*Click to expand or collapse*');
+        this.tooltip = md;
     }
 }
 

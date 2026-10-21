@@ -2,6 +2,7 @@ import {
     Disposable,
     Event,
     EventEmitter,
+    MarkdownString,
     ThemeIcon,
     TreeDataProvider,
     TreeItem,
@@ -24,21 +25,30 @@ export class PixiGlobalToolTreeItem extends TreeItem {
         this.iconPath = new ThemeIcon('tools');
         this.contextValue = 'pixiGlobalTool';
 
-        const lines = [`Tool: ${tool.name}`];
-        if (version) {
-            lines.push(`Version: ${version}`);
+        const md = new MarkdownString('', true);
+        md.isTrusted = true;
+        md.supportHtml = true;
+
+        const versionHeading = version ? ` \`${version}\`` : '';
+        md.appendMarkdown(`### $(tools) ${tool.name}${versionHeading}\n\n`);
+
+        const details: string[] = [];
+        if (tool.exposed && tool.exposed.length > 0) {
+            details.push(`- **Exposed Commands**: ${tool.exposed.map((e) => `\`${e.exposed_name}\``).join(', ')}`);
         }
         if (tool.dependencies && tool.dependencies.length > 1) {
             const extraDeps = tool.dependencies
                 .slice(1)
-                .map((d) => `${d.name} (${d.version})`)
+                .map((d) => `\`${d.name} (${d.version})\``)
                 .join(', ');
-            lines.push(`Extra dependencies: ${extraDeps}`);
+            details.push(`- **Extra Dependencies**: ${extraDeps}`);
         }
-        if (tool.exposed?.length) {
-            lines.push(`Exposed commands: ${tool.exposed.map((e) => e.exposed_name).join(', ')}`);
+        if (details.length > 0) {
+            md.appendMarkdown(details.join('\n') + '\n\n');
         }
-        this.tooltip = lines.join('\n');
+
+        md.appendMarkdown('---\n\n*Right-click for options*');
+        this.tooltip = md;
     }
 }
 

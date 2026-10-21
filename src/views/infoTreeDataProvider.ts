@@ -3,6 +3,7 @@ import {
     Disposable,
     Event,
     EventEmitter,
+    MarkdownString,
     ThemeColor,
     ThemeIcon,
     TreeDataProvider,
@@ -148,7 +149,11 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
         const versionItem = new PixiInfoItem('Version', TreeItemCollapsibleState.None);
         versionItem.description = cleanVersion ? `v${cleanVersion}` : 'unknown';
         versionItem.iconPath = new ThemeIcon('tag');
-        versionItem.tooltip = cleanVersion ? `Pixi CLI version: ${cleanVersion}` : 'Pixi CLI version unknown';
+        const vMd = new MarkdownString('', true);
+        vMd.isTrusted = true;
+        vMd.appendMarkdown(`### $(tag) Pixi CLI\n\n`);
+        vMd.appendMarkdown(`- **Version**: \`${cleanVersion ? `v${cleanVersion}` : 'unknown'}\`\n`);
+        versionItem.tooltip = vMd;
         items.push(versionItem);
 
         // 2. Platform & TLS Backend
@@ -156,7 +161,14 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
         const platformItem = new PixiInfoItem('Platform', TreeItemCollapsibleState.None);
         platformItem.description = platform;
         platformItem.iconPath = new ThemeIcon('server-process');
-        platformItem.tooltip = `Platform: ${platform}${info.tls_backend ? `\nTLS Backend: ${info.tls_backend}` : ''}`;
+        const pMd = new MarkdownString('', true);
+        pMd.isTrusted = true;
+        pMd.appendMarkdown(`### $(server-process) System Platform\n\n`);
+        pMd.appendMarkdown(`- **Platform**: \`${platform}\`\n`);
+        if (info.tls_backend) {
+            pMd.appendMarkdown(`- **TLS Backend**: \`${info.tls_backend}\`\n`);
+        }
+        platformItem.tooltip = pMd;
         items.push(platformItem);
 
         // 3. Cache Directory
@@ -174,17 +186,20 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
             cacheItem.description = sizeStr ? `${sizeStr} (${info.cache_dir})` : info.cache_dir;
             cacheItem.iconPath = new ThemeIcon('database');
             cacheItem.contextValue = 'pixiInfoCache';
-            let tooltip = `Cache Directory: ${info.cache_dir}`;
+
+            const cMd = new MarkdownString('', true);
+            cMd.isTrusted = true;
+            cMd.appendMarkdown(`### $(database) Cache Directory\n\n`);
+            cMd.appendMarkdown(`- **Path**: \`${info.cache_dir}\`\n`);
             if (this.cachedCacheSize) {
-                tooltip += `\nTotal Size: ${this.cachedCacheSize}`;
+                cMd.appendMarkdown(`- **Total Size**: \`${this.cachedCacheSize}\`\n`);
             } else if (isCalculating) {
-                tooltip += '\nCalculating cache size...';
+                cMd.appendMarkdown(`- **Total Size**: *Calculating...*\n`);
             } else if (!autoMeasure) {
-                tooltip +=
-                    '\nAuto-measure is disabled in settings (pixi.cache.autoMeasureSize). Click the dashboard icon to calculate.';
+                cMd.appendMarkdown(`- **Total Size**: *Auto-measure disabled (pixi.cache.autoMeasureSize)*\n`);
             }
-            tooltip += '\nClick to open in terminal or copy path';
-            cacheItem.tooltip = tooltip;
+            cMd.appendMarkdown('\n---\n\n*Click to open in terminal or copy path*');
+            cacheItem.tooltip = cMd;
             cacheItem.command = {
                 command: 'pixi.openLocation',
                 title: 'Open Cache Directory',
@@ -210,7 +225,17 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
                 );
                 item.description = `[${entry.method}]${userDesc}`;
                 item.iconPath = new ThemeIcon('shield', new ThemeColor('charts.green'));
-                item.tooltip = `Host: ${entry.hostPattern}\nMethod: ${entry.method}${userDesc}\nStorage: ${info.auth_dir}\nClick to copy token or manage`;
+
+                const aMd = new MarkdownString('', true);
+                aMd.isTrusted = true;
+                aMd.appendMarkdown(`### $(shield) ${entry.hostPattern}\n\n`);
+                aMd.appendMarkdown(`- **Method**: \`${entry.method}\`\n`);
+                if (entry.username) {
+                    aMd.appendMarkdown(`- **Username**: \`${entry.username}\`\n`);
+                }
+                aMd.appendMarkdown(`- **Storage**: \`${info.auth_dir}\`\n\n`);
+                aMd.appendMarkdown('---\n\n*Click to copy token or manage*');
+                item.tooltip = aMd;
                 item.contextValue = hasToken ? 'pixiInfoAuthHostWithToken' : 'pixiInfoAuthHost';
                 if (hasToken) {
                     item.command = {
@@ -229,10 +254,19 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
             );
             authGroup.iconPath = new ThemeIcon('key');
             authGroup.description = entries.length > 0 ? `${entries.length} hosts` : info.auth_dir;
-            authGroup.tooltip =
+
+            const agMd = new MarkdownString('', true);
+            agMd.isTrusted = true;
+            agMd.appendMarkdown(`### $(key) Auth Storage\n\n`);
+            agMd.appendMarkdown(`- **Credentials File**: \`${info.auth_dir}\`\n`);
+            agMd.appendMarkdown(`- **Authenticated Hosts**: ${entries.length}\n\n`);
+            agMd.appendMarkdown('---\n\n');
+            agMd.appendMarkdown(
                 entries.length > 0
-                    ? `Credentials File: ${info.auth_dir}\n${entries.length} authenticated host(s)\nClick to open credentials location`
-                    : `Credentials File: ${info.auth_dir}\nNo authenticated hosts yet\nClick to login or manage authentication`;
+                    ? '*Click to open credentials location*'
+                    : '*Click to login or manage authentication*',
+            );
+            authGroup.tooltip = agMd;
             authGroup.contextValue = 'pixiInfoAuthStorage';
             if (entries.length === 0) {
                 authGroup.command = {
@@ -276,7 +310,13 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
                     const item = new PixiInfoItem(desc.label, TreeItemCollapsibleState.None);
                     item.description = desc.targetPath;
                     item.iconPath = new ThemeIcon(desc.icon);
-                    item.tooltip = `${desc.tooltipPrefix}: ${desc.targetPath}\n${desc.actionHint}`;
+
+                    const gpMd = new MarkdownString('', true);
+                    gpMd.isTrusted = true;
+                    gpMd.appendMarkdown(`### $(${desc.icon}) ${desc.tooltipPrefix}\n\n`);
+                    gpMd.appendMarkdown(`- **Path**: \`${desc.targetPath}\`\n\n`);
+                    gpMd.appendMarkdown(`---\n\n*${desc.actionHint}*`);
+                    item.tooltip = gpMd;
                     item.command = {
                         command: 'pixi.openLocation',
                         title: `Open ${desc.label}`,
@@ -294,7 +334,14 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
                 );
                 globalGroup.iconPath = new ThemeIcon('folder');
                 globalGroup.description = `${globalChildren.length} paths`;
-                globalGroup.tooltip = 'Pixi global tools, binaries, and manifest locations';
+
+                const ggMd = new MarkdownString('', true);
+                ggMd.isTrusted = true;
+                ggMd.appendMarkdown(`### $(folder) Global Paths\n\n`);
+                ggMd.appendMarkdown(
+                    'Pixi global tools, binaries, and manifest locations.\n\n---\n\n*Click to expand or collapse*',
+                );
+                globalGroup.tooltip = ggMd;
                 items.push(globalGroup);
             }
         }
@@ -313,14 +360,29 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
                 const vpItem = new PixiInfoItem(name, TreeItemCollapsibleState.None);
                 vpItem.description = versionStr;
                 vpItem.iconPath = new ThemeIcon('symbol-property');
-                vpItem.tooltip = `Virtual Package: ${pkg}`;
+
+                const vpMd = new MarkdownString('', true);
+                vpMd.isTrusted = true;
+                vpMd.appendMarkdown(`### $(symbol-property) ${name}\n\n`);
+                vpMd.appendMarkdown(`- **Package**: \`${pkg}\`\n`);
+                if (versionStr) {
+                    vpMd.appendMarkdown(`- **Version**: \`${versionStr}\`\n`);
+                }
+                vpItem.tooltip = vpMd;
                 return vpItem;
             });
 
             const vpGroup = new PixiInfoItem('Virtual Packages', TreeItemCollapsibleState.Collapsed, vpChildren);
             vpGroup.iconPath = new ThemeIcon('layers');
             vpGroup.description = `(${vpChildren.length})`;
-            vpGroup.tooltip = 'System virtual packages detected by Pixi';
+
+            const vpgMd = new MarkdownString('', true);
+            vpgMd.isTrusted = true;
+            vpgMd.appendMarkdown(`### $(layers) Virtual Packages\n\n`);
+            vpgMd.appendMarkdown(
+                `Detected ${vpChildren.length} system virtual package(s).\n\n---\n\n*Click to expand or collapse*`,
+            );
+            vpGroup.tooltip = vpgMd;
             items.push(vpGroup);
         }
 
@@ -330,7 +392,13 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
                 const cfgItem = new PixiInfoItem(path.basename(cfg), TreeItemCollapsibleState.None);
                 cfgItem.description = cfg;
                 cfgItem.iconPath = new ThemeIcon('file-code');
-                cfgItem.tooltip = `Configuration File: ${cfg}\nClick to open in editor`;
+
+                const cfgMd = new MarkdownString('', true);
+                cfgMd.isTrusted = true;
+                cfgMd.appendMarkdown(`### $(file-code) ${path.basename(cfg)}\n\n`);
+                cfgMd.appendMarkdown(`- **Path**: \`${cfg}\`\n\n`);
+                cfgMd.appendMarkdown('---\n\n*Click to open in editor*');
+                cfgItem.tooltip = cfgMd;
                 cfgItem.command = {
                     command: 'pixi.openLocation',
                     title: 'Open Configuration File',
@@ -342,13 +410,25 @@ export class PixiInfoTreeDataProvider implements TreeDataProvider<PixiInfoItem>,
             const configGroup = new PixiInfoItem('Configuration', TreeItemCollapsibleState.Collapsed, configChildren);
             configGroup.iconPath = new ThemeIcon('gear');
             configGroup.description = `(${configChildren.length} file${configChildren.length > 1 ? 's' : ''})`;
-            configGroup.tooltip = 'Active Pixi configuration files';
+
+            const cgMd = new MarkdownString('', true);
+            cgMd.isTrusted = true;
+            cgMd.appendMarkdown(`### $(gear) Configuration\n\n`);
+            cgMd.appendMarkdown(
+                `Found ${configChildren.length} active configuration file(s).\n\n---\n\n*Click to expand or collapse*`,
+            );
+            configGroup.tooltip = cgMd;
             items.push(configGroup);
         } else {
             const configItem = new PixiInfoItem('Configuration', TreeItemCollapsibleState.None);
             configItem.description = 'Default';
             configItem.iconPath = new ThemeIcon('gear');
-            configItem.tooltip = 'No custom configuration files detected (using defaults)';
+
+            const dcMd = new MarkdownString('', true);
+            dcMd.isTrusted = true;
+            dcMd.appendMarkdown(`### $(gear) Configuration\n\n`);
+            dcMd.appendMarkdown('No custom configuration files detected (using defaults).');
+            configItem.tooltip = dcMd;
             items.push(configItem);
         }
 

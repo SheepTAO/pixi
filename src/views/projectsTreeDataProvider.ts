@@ -157,11 +157,20 @@ export class PixiTransitiveGroupTreeItem extends TreeItem {
     ) {
         super('Transitive Dependencies', TreeItemCollapsibleState.Collapsed);
         this.description = `(${packages.length})`;
-        const countText =
-            packages.length === 1 ? '1 transitive dependency' : `${packages.length} transitive dependencies`;
-        this.tooltip = `${countText} installed for '${env.pixiEnvName}'.\nClick to expand or collapse.`;
         this.iconPath = new ThemeIcon('references', new ThemeColor('descriptionForeground'));
         this.contextValue = 'pixiTransitiveGroup';
+
+        const md = new MarkdownString('', true);
+        md.isTrusted = true;
+        md.supportHtml = true;
+        md.appendMarkdown(`### $(references) Transitive Dependencies\n\n`);
+        md.appendMarkdown(`- **Environment**: \`${env.pixiEnvName}\`\n`);
+        md.appendMarkdown(`- **Project**: ${project.name}\n`);
+        md.appendMarkdown(
+            `- **Packages**: ${packages.length} transitive package${packages.length === 1 ? '' : 's'}\n\n`,
+        );
+        md.appendMarkdown('---\n\n*Click to expand or collapse*');
+        this.tooltip = md;
     }
 }
 
@@ -498,7 +507,7 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
         void commands.executeCommand('setContext', 'pixi.environmentsViewMode', this.currentViewMode);
 
         this.disposables.push(
-            this.projectManager.onDidChangeEnvironments(() => this.refresh()),
+            this.projectManager.onDidChangeEnvironments((projectPath) => this.refresh(projectPath)),
             this.packageUpdateService
                 ? this.packageUpdateService.onDidChangeOutdatedPackages(() => this._onDidChangeTreeData.fire())
                 : Disposable.from(),

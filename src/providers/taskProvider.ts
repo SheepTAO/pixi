@@ -92,7 +92,7 @@ export class PixiTaskProvider implements TaskProvider, Disposable {
 
     constructor(private readonly projectManager: PixiProjectManager) {
         this.disposables.push(
-            this.projectManager.onDidChangeEnvironments(() => this.refresh()),
+            this.projectManager.onDidChangeEnvironments((projectPath) => this.refresh(projectPath)),
             tasks.registerTaskProvider('pixi', this),
         );
     }

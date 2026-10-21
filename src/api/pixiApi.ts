@@ -147,7 +147,8 @@ export class PixiExtensionApiImpl implements PixiExtensionApi, Disposable {
     }
 
     public get onDidChangeEnvironments(): Event<void> {
-        return this.projectManager.onDidChangeEnvironments;
+        return (listener, thisArgs, disposables) =>
+            this.projectManager.onDidChangeEnvironments(() => listener.call(thisArgs), undefined, disposables);
     }
 
     public dispose(): void {

@@ -50,7 +50,7 @@ export class PixiProjectManager implements Disposable {
     private readonly _onDidProjectsChanged = new EventEmitter<string[]>();
     readonly onDidProjectsChanged = this._onDidProjectsChanged.event;
 
-    private readonly _onDidChangeEnvironments = new EventEmitter<void>();
+    private readonly _onDidChangeEnvironments = new EventEmitter<string | undefined>();
     readonly onDidChangeEnvironments = this._onDidChangeEnvironments.event;
     private refreshTimer: NodeJS.Timeout | undefined;
 
@@ -310,7 +310,7 @@ export class PixiProjectManager implements Disposable {
             if (projectPath && this.projectPaths.includes(projectPath)) {
                 const stillValid = await this.refreshProject(projectPath);
                 if (stillValid) {
-                    this._onDidChangeEnvironments.fire();
+                    this._onDidChangeEnvironments.fire(projectPath);
                     return;
                 }
             }
@@ -393,7 +393,7 @@ export class PixiProjectManager implements Disposable {
         if (pathsChanged) {
             this._onDidProjectsChanged.fire(this.projectPaths);
         }
-        this._onDidChangeEnvironments.fire();
+        this._onDidChangeEnvironments.fire(undefined);
     }
 
     private async refreshProject(projectPath: string): Promise<boolean> {
