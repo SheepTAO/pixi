@@ -5,6 +5,21 @@ All notable changes to the "pixi" extension will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0] - 2026-10-21
+
+- **Workspace Overview & Monorepo Manifest Discovery**:
+    - Add pinned Workspace Overview root card displaying rich project metadata, channels, environments, and platforms with click-to-open manifest navigation.
+    - Implement recursive manifest watching (`**/{pixi.toml,pyproject.toml}`) with ignore-filtering (`.pixi`, `node_modules`, `.git`) to seamlessly track nested monorepo packages.
+- **Targeted Cache Invalidation & Performance**:
+    - Introduce granular cache invalidation for features, tasks, and outdated package inspections triggered selectively on manifest file edits, eliminating redundant CLI process overhead.
+- **Semantic Task & Tooling Integration**:
+    - Dynamically infer Codicon icons and markdown tooltips for tasks based on command semantics (`test`, `build`, `bench`, `lint`, `docs`, `clean`, `serve`, etc.).
+    - Display global tool executable command aliases (e.g. `ripgrep (rg)`) and multi-binary counters in global tools view.
+    - Streamline task inline execution actions and display task count badges in project tree headers.
+- **System Requirements & UI Polish**:
+    - Add human-readable labels, formatting, and rich documentation tooltips for system requirement properties (`linux-version`, `cuda`, `glibc`, `archspec`, `macos-version`).
+    - Unify Codicon Markdown tooltips, badge typography, and muted styling across all 4 tree views and empty states.
+
 ## [2.2.1] - 2026-10-19
 
 - **Python Environment Manager & Global Resolution**:

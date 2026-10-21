@@ -16,7 +16,7 @@
 
 ---
 
-**Pixi for Visual Studio Code** turns VS Code into a first-class IDE for [Pixi](https://pixi.sh) projects. It provides a visual Activity Bar sidebar, real-time package search across Conda and PyPI, one-click task execution, pre-activated integrated terminals, and native Python / Jupyter environment integration.
+**Pixi for Visual Studio Code** provides workspace integration for [Pixi](https://pixi.sh) projects, including visual environment management, Conda and PyPI package search, task execution, integrated terminals, and Python / Jupyter environment support.
 
 ---
 
@@ -43,37 +43,37 @@ _Note: You can upgrade Pixi at any time by running `pixi self-update` in your te
 
 ---
 
-## Core Highlights
+## Features
 
-### 🌲 Visual Environments & Workspaces
+### Visual Environments & Workspaces
 
 - **Project Auto-Discovery**: Instantly recognizes `pixi.toml` and `pyproject.toml` across single-root and multi-root workspaces.
 - **Dual Perspective Tree**: Toggle between **Environment View** (runtime status, installed packages, toolchains) and **Feature View** (declared features, dependencies).
 - **One-Click Actions**: Install, synchronize, update, lock, or export environments (Conda YAML / Explicit specs) directly from the Activity Bar.
 
-### 🔍 Unified Package Search & Dependencies
+### Unified Package Search & Dependencies
 
-- **Dual-Source Search**: High-performance real-time search across Conda (`conda-forge`) and PyPI with live autocompletion.
+- **Dual-Source Search**: Search Conda (`conda-forge`) and PyPI packages with autocompletion.
 - **Dependency Diagnostics**: Inspect full resolved dependency trees and reverse search (_"Why is this package installed?"_).
 - **Locked Inlay Hints**: View resolved package versions inline in manifests (`: 1.26.4`) with rich hover cards and lockfile navigation.
 
-### ⚡ Tasks & Pre-Activated Terminals
+### Tasks & Pre-Activated Terminals
 
-- **Instant Task Running**: Run tasks via 1-click buttons, Command Palette, or manifest CodeLens & hover previews.
+- **Run Tasks**: Run tasks from the Activity Bar, Command Palette, or manifest CodeLens and hover previews.
 - **Smart Grouping**: Group tasks by prefix (`test-*`, `build-*`) or environment to keep large projects organized.
 - **Integrated Terminals**: Launch terminals pre-activated in any Pixi environment with one click.
 - **Global Tools**: Inspect, install, update, and manage standalone CLI tools in `~/.pixi/bin`.
 
-### 🐍 First-Class Python & Multi-Language Support
+### Python & Multi-Language Support
 
-- **Python & Jupyter**: Seamless integration with `@vscode/python-environments` for automatic interpreter selection and clean Jupyter Notebook kernel grouping.
+- **Python & Jupyter**: Automatic interpreter selection and Jupyter Notebook kernel registration via `@vscode/python-environments`.
 - **Multi-Language Toolchains**: Auto-detects compilers and toolchains in active environments for C/C++ (GCC, Clang, CMake), R, and Rust.
 
 ---
 
-## Interactive Command Hubs
+## Commands
 
-All actions are organized into intuitive, guided QuickPick hubs. Press `Ctrl+Shift+P` / `Cmd+Shift+P` and type `Pixi:`:
+QuickPick menus provide access to common workflows. Press `Ctrl+Shift+P` / `Cmd+Shift+P` and type `Pixi:`:
 
 | Command Hub                                | Description                                                                          |
 | :----------------------------------------- | :----------------------------------------------------------------------------------- |
@@ -85,7 +85,7 @@ All actions are organized into intuitive, guided QuickPick hubs. Press `Ctrl+Shi
 | **Pixi: Run Task ...**                     | Search and run any defined project task with optional custom CLI arguments.          |
 | **Pixi: Open Terminal in Environment ...** | Open an integrated terminal pre-activated in the selected environment.               |
 | **Pixi: Configuration Management ...**     | Inspect and edit Pixi settings across workspace/user/system scopes.                  |
-| **Pixi: Authentication ...**               | Interactive hub to log in, log out, copy tokens, or check status (`pixi auth`).      |
+| **Pixi: Authentication ...**               | Log in, log out, copy tokens, or check status (`pixi auth`).                         |
 | **Pixi: Global Tools ...**                 | Manage user-level CLI packages, aliases, and dependency trees.                       |
 
 ---
@@ -125,5 +125,5 @@ _Tip: Search `@ext:sheeptao.pixi` in VS Code Settings (`Ctrl+,` / `Cmd+,`) to br
 ## Acknowledgements & License
 
 - Special thanks to [Renan Santos](https://github.com/renan-r-santos) and contributors of [pixi-code](https://github.com/renan-r-santos/pixi-code) for creating the original foundation.
-- Thanks to the [Prefix.dev](https://prefix.dev) team for building the incredible [Pixi](https://pixi.sh) package manager and ecosystem.
+- Thanks to the [Prefix.dev](https://prefix.dev) team for building the [Pixi](https://pixi.sh) package manager and ecosystem.
 - Licensed under the [MIT License](LICENSE).
