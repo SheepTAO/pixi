@@ -34,6 +34,7 @@ export interface ProjectSummaryMetadata {
     channels?: string[];
     envCount?: number;
     featureCount?: number;
+    taskCount?: number;
     descriptionText?: string;
     requiresPixi?: string;
 }
@@ -43,6 +44,7 @@ function buildWorkspaceTooltip(
     manifestName: string,
     versionStr?: string,
     summary: ProjectSummaryMetadata = {},
+    isHeader = false,
 ): MarkdownString {
     const md = new MarkdownString('', true);
     md.isTrusted = true;
@@ -79,6 +81,10 @@ function buildWorkspaceTooltip(
         md.appendMarkdown(`- **Requires Pixi**: \`${summary.requiresPixi}\`\n`);
     }
 
+    if (summary.taskCount !== undefined) {
+        md.appendMarkdown(`- **Tasks**: ${summary.taskCount} task${summary.taskCount === 1 ? '' : 's'} declared\n`);
+    }
+
     const counts: string[] = [];
     const envCount = summary.envCount ?? 0;
     const featureCount = summary.featureCount ?? 0;
@@ -93,7 +99,11 @@ function buildWorkspaceTooltip(
     }
 
     md.appendMarkdown('\n---\n\n');
-    md.appendMarkdown('*Click to open manifest • Right-click for workspace actions*');
+    if (isHeader) {
+        md.appendMarkdown('*Click to open manifest • Right-click for workspace actions*');
+    } else {
+        md.appendMarkdown('*Click to expand or collapse • Right-click for options*');
+    }
     return md;
 }
 
@@ -115,7 +125,7 @@ export class PixiWorkspaceHeaderTreeItem extends TreeItem {
             arguments: [this],
         };
 
-        this.tooltip = buildWorkspaceTooltip(project, manifestName, versionStr, summary);
+        this.tooltip = buildWorkspaceTooltip(project, manifestName, versionStr, summary, true);
     }
 }
 
@@ -127,11 +137,15 @@ export class PixiProjectTreeItem extends TreeItem {
         super(project.name, TreeItemCollapsibleState.Expanded);
         const manifestName = path.basename(project.manifestPath);
         const versionStr = project.version ? `v${project.version}` : undefined;
-        this.description = versionStr ? `${versionStr} (${manifestName})` : `(${manifestName})`;
+        const taskBadge =
+            summary.taskCount !== undefined
+                ? ` • ${summary.taskCount === 1 ? '1 task' : `${summary.taskCount} tasks`}`
+                : '';
+        this.description = versionStr ? `${versionStr} (${manifestName})${taskBadge}` : `(${manifestName})${taskBadge}`;
         this.iconPath = new ThemeIcon('root-folder');
         this.contextValue = 'pixiProject';
 
-        this.tooltip = buildWorkspaceTooltip(project, manifestName, versionStr, summary);
+        this.tooltip = buildWorkspaceTooltip(project, manifestName, versionStr, summary, false);
     }
 }
 
@@ -374,28 +388,36 @@ export class PixiFeatureTreeItem extends TreeItem {
 
         if (isEnvScoped) {
             this.description = `(${packages.length})`;
-            this.tooltip = isDefault
-                ? `Global Feature '${feature.name}': ${packages.length} package(s) in environment '${env.pixiEnvName}'`
-                : `Feature '${feature.name}': ${packages.length} package(s) in environment '${env.pixiEnvName}'`;
+            const md = new MarkdownString('', true);
+            md.isTrusted = true;
+            md.supportHtml = true;
+            md.appendMarkdown(`### $(symbol-namespace) ${feature.name}\n\n`);
+            md.appendMarkdown(`- **Environment**: \`${env.pixiEnvName}\`\n`);
+            md.appendMarkdown(`- **Packages**: ${packages.length} package${packages.length === 1 ? '' : 's'}\n`);
+            this.tooltip = md;
         } else {
             this.description = isDefault
                 ? '(Global)'
                 : usedByEnvs.length > 0
                   ? `Used by: ${usedByEnvs.join(', ')}`
                   : '(Unused)';
-            const tooltipLines = [
-                `Feature: ${feature.name}`,
-                `Project: ${project.name}`,
-                isDefault
-                    ? 'Scope: Global (available to all environments)'
-                    : `Used by: ${usedByEnvs.length > 0 ? usedByEnvs.join(', ') : 'None'}`,
-                `Conda Dependencies: ${feature.dependencies.length}`,
-                `PyPI Dependencies: ${feature.pypiDependencies.length}`,
-            ];
-            if (feature.tasks && feature.tasks.length > 0) {
-                tooltipLines.push(`Tasks: ${feature.tasks.join(', ')}`);
+            const md = new MarkdownString('', true);
+            md.isTrusted = true;
+            md.supportHtml = true;
+            md.appendMarkdown(`### $(symbol-namespace) ${feature.name}\n\n`);
+            md.appendMarkdown(`- **Project**: ${project.name}\n`);
+            if (isDefault) {
+                md.appendMarkdown('- **Scope**: Global (available to all environments)\n');
+            } else {
+                const usedStr = usedByEnvs.length > 0 ? usedByEnvs.map((e) => `\`${e}\``).join(', ') : 'None';
+                md.appendMarkdown(`- **Used by**: ${usedStr}\n`);
             }
-            this.tooltip = tooltipLines.join('\n');
+            md.appendMarkdown(`- **Conda Dependencies**: ${feature.dependencies.length}\n`);
+            md.appendMarkdown(`- **PyPI Dependencies**: ${feature.pypiDependencies.length}\n`);
+            if (feature.tasks && feature.tasks.length > 0) {
+                md.appendMarkdown(`- **Tasks**: ${feature.tasks.map((t) => `\`${t}\``).join(', ')}\n`);
+            }
+            this.tooltip = md;
         }
     }
 }
@@ -409,12 +431,18 @@ export class PixiSystemRequirementsTreeItem extends TreeItem {
         this.iconPath = new ThemeIcon('server-process');
         this.contextValue = 'pixiSystemRequirements';
         this.description = formatSystemRequirementsSummary(requirements);
-        const lines = [
-            `System Requirements: ${project.name}`,
-            ...Object.entries(requirements).map(([k, v]) => `  ${k}: ${v}`),
-            'Expand to view properties, or click inline actions to reveal/configure in manifest',
-        ];
-        this.tooltip = lines.join('\n');
+
+        const md = new MarkdownString('', true);
+        md.isTrusted = true;
+        md.supportHtml = true;
+        md.appendMarkdown(`### $(server-process) System Requirements\n\n`);
+        md.appendMarkdown(`- **Project**: ${project.name}\n\n`);
+        md.appendMarkdown('---\n\n');
+        for (const [k, v] of Object.entries(requirements)) {
+            md.appendMarkdown(`- **${k}**: \`${v}\`\n`);
+        }
+        md.appendMarkdown('\n---\n\n*Click to expand or configure properties in manifest*');
+        this.tooltip = md;
     }
 }
 

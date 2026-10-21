@@ -71,6 +71,13 @@ export class PixiProjectManager implements Disposable {
                 let needsFullRefresh = false;
                 for (const u of uris) {
                     const filePath = path.normalize(u.fsPath);
+                    if (
+                        filePath.includes(`${path.sep}.pixi${path.sep}`) ||
+                        filePath.includes(`${path.sep}.git${path.sep}`) ||
+                        filePath.includes(`${path.sep}node_modules${path.sep}`)
+                    ) {
+                        continue;
+                    }
                     const projectDir = this.findProjectForUri(u);
                     if (projectDir) {
                         if (isPyproject(filePath)) {
@@ -99,7 +106,9 @@ export class PixiProjectManager implements Disposable {
             }, 500);
         };
 
-        const watcher = workspace.createFileSystemWatcher(`{${SUPPORTED_MANIFEST_NAMES.join(',')},${LOCKFILE_NAME}}`);
+        const watcher = workspace.createFileSystemWatcher(
+            `**/{${SUPPORTED_MANIFEST_NAMES.join(',')},${LOCKFILE_NAME}}`,
+        );
 
         this.disposables.push(
             watcher,

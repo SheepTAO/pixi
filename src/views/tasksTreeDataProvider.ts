@@ -192,7 +192,16 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
                 const singleProject = projects[0];
                 return this.getTaskItemsForProject(singleProject, true);
             }
-            return projects.map((p) => new PixiProjectTreeItem(p));
+            return Promise.all(
+                projects.map(async (p) => {
+                    const tasks = await this.taskProvider.getTasksForProject(p.projectPath);
+                    return new PixiProjectTreeItem(p, {
+                        taskCount: tasks.length,
+                        descriptionText: p.description || undefined,
+                        requiresPixi: p.requiresPixi || undefined,
+                    });
+                }),
+            );
         }
 
         if (element instanceof PixiProjectTreeItem) {
