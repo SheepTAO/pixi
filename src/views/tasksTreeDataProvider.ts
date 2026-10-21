@@ -124,7 +124,7 @@ export class PixiTaskEmptyTreeItem extends TreeItem {
         super('No tasks found', TreeItemCollapsibleState.None);
         const manifestName = path.basename(project.manifestPath);
         this.tooltip = `No tasks defined in ${project.name}. Click to add a task in ${manifestName}.`;
-        this.iconPath = new ThemeIcon('info');
+        this.iconPath = new ThemeIcon('info', new ThemeColor('descriptionForeground'));
         this.contextValue = 'pixiTaskEmpty';
         this.command = {
             command: 'pixi.tasks.addTask',

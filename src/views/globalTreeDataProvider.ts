@@ -21,7 +21,13 @@ export class PixiGlobalToolTreeItem extends TreeItem {
         super(tool.name, TreeItemCollapsibleState.None);
 
         const version = getToolVersion(tool);
-        this.description = version;
+        let aliasBadge = '';
+        if (tool.exposed && tool.exposed.length === 1 && tool.exposed[0].exposed_name !== tool.name) {
+            aliasBadge = `(${tool.exposed[0].exposed_name})`;
+        } else if (tool.exposed && tool.exposed.length > 1) {
+            aliasBadge = `(${tool.exposed.length} binaries)`;
+        }
+        this.description = [version, aliasBadge].filter(Boolean).join(' ') || undefined;
         this.iconPath = new ThemeIcon('tools');
         this.contextValue = 'pixiGlobalTool';
 
