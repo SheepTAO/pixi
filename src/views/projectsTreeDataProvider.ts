@@ -29,26 +29,32 @@ import {
 import { formatToolchainDetails, formatToolchainSummary } from '../core/toolchains';
 import { PixiEnvironmentInfo, PixiPackage, PixiProject } from '../core/types';
 
+export interface ProjectSummaryMetadata {
+    platforms?: string[];
+    channels?: string[];
+    envCount?: number;
+    featureCount?: number;
+    descriptionText?: string;
+    requiresPixi?: string;
+}
+
 function buildWorkspaceTooltip(
     project: PixiProject,
     manifestName: string,
     versionStr?: string,
-    descriptionText?: string,
-    platforms: string[] = [],
-    channels: string[] = [],
-    requiresPixi?: string,
-    envCount: number = 0,
-    featureCount: number = 0,
+    summary: ProjectSummaryMetadata = {},
 ): MarkdownString {
     const md = new MarkdownString('', true);
     md.isTrusted = true;
     md.supportHtml = true;
 
-    const header = versionStr ? `### 📦 ${project.name} \`${versionStr}\`` : `### 📦 ${project.name}`;
+    const header = versionStr
+        ? `### $(root-folder) ${project.name} \`${versionStr}\``
+        : `### $(root-folder) ${project.name}`;
     md.appendMarkdown(`${header}\n\n`);
 
-    if (descriptionText) {
-        md.appendMarkdown(`*${descriptionText}*\n\n`);
+    if (summary.descriptionText) {
+        md.appendMarkdown(`*${summary.descriptionText}*\n\n`);
     }
 
     md.appendMarkdown('---\n\n');
@@ -59,19 +65,23 @@ function buildWorkspaceTooltip(
         md.appendMarkdown(`- **Prefix Size**: \`${project.pixiFolderSize}\`\n`);
     }
 
+    const platforms = summary.platforms ?? [];
     if (platforms.length > 0) {
         md.appendMarkdown(`- **Platforms (${platforms.length})**: ${platforms.map((p) => `\`${p}\``).join(', ')}\n`);
     }
 
+    const channels = summary.channels ?? [];
     if (channels.length > 0) {
         md.appendMarkdown(`- **Channels**: ${channels.map((c) => `\`${c}\``).join(', ')}\n`);
     }
 
-    if (requiresPixi) {
-        md.appendMarkdown(`- **Requires Pixi**: \`${requiresPixi}\`\n`);
+    if (summary.requiresPixi) {
+        md.appendMarkdown(`- **Requires Pixi**: \`${summary.requiresPixi}\`\n`);
     }
 
     const counts: string[] = [];
+    const envCount = summary.envCount ?? 0;
+    const featureCount = summary.featureCount ?? 0;
     if (envCount > 0) {
         counts.push(`${envCount} environment${envCount > 1 ? 's' : ''}`);
     }
@@ -90,12 +100,7 @@ function buildWorkspaceTooltip(
 export class PixiWorkspaceHeaderTreeItem extends TreeItem {
     constructor(
         public readonly project: PixiProject,
-        platforms: string[] = [],
-        channels: string[] = [],
-        envCount: number = 0,
-        featureCount: number = 0,
-        descriptionText?: string,
-        requiresPixi?: string,
+        summary: ProjectSummaryMetadata = {},
     ) {
         super(project.name, TreeItemCollapsibleState.None);
         const manifestName = path.basename(project.manifestPath);
@@ -110,29 +115,14 @@ export class PixiWorkspaceHeaderTreeItem extends TreeItem {
             arguments: [this],
         };
 
-        this.tooltip = buildWorkspaceTooltip(
-            project,
-            manifestName,
-            versionStr,
-            descriptionText,
-            platforms,
-            channels,
-            requiresPixi,
-            envCount,
-            featureCount,
-        );
+        this.tooltip = buildWorkspaceTooltip(project, manifestName, versionStr, summary);
     }
 }
 
 export class PixiProjectTreeItem extends TreeItem {
     constructor(
         public readonly project: PixiProject,
-        platforms: string[] = [],
-        channels: string[] = [],
-        envCount: number = 0,
-        featureCount: number = 0,
-        descriptionText?: string,
-        requiresPixi?: string,
+        summary: ProjectSummaryMetadata = {},
     ) {
         super(project.name, TreeItemCollapsibleState.Expanded);
         const manifestName = path.basename(project.manifestPath);
@@ -141,17 +131,7 @@ export class PixiProjectTreeItem extends TreeItem {
         this.iconPath = new ThemeIcon('root-folder');
         this.contextValue = 'pixiProject';
 
-        this.tooltip = buildWorkspaceTooltip(
-            project,
-            manifestName,
-            versionStr,
-            descriptionText,
-            platforms,
-            channels,
-            requiresPixi,
-            envCount,
-            featureCount,
-        );
+        this.tooltip = buildWorkspaceTooltip(project, manifestName, versionStr, summary);
     }
 }
 
@@ -180,7 +160,6 @@ export class PixiPackageTreeItem extends TreeItem {
         public readonly outdatedVer?: string,
     ) {
         super(pkg.name, TreeItemCollapsibleState.None);
-        const versionStr = pkg.version ? ` v${pkg.version}` : '';
         const updateArrow = outdatedVer && outdatedVer !== pkg.version ? ` (↑ ${outdatedVer})` : '';
 
         if (pkg.is_editable || pkg.is_local) {
@@ -200,38 +179,55 @@ export class PixiPackageTreeItem extends TreeItem {
                 : new ThemeIcon('symbol-field', new ThemeColor('descriptionForeground'));
         }
 
-        const lines = [
-            `${pkg.name}${versionStr}${updateArrow}`,
-            `Kind: ${pkg.kind ? pkg.kind.toUpperCase() : 'Conda'}${pkg.is_explicit ? ' (explicit dependency)' : ' (transitive dependency)'}`,
-        ];
-        if (this.featureName) {
-            lines.push(`Feature: ${this.featureName}`);
+        const md = new MarkdownString('', true);
+        md.isTrusted = true;
+        md.supportHtml = true;
+
+        const isLocal = Boolean(pkg.is_editable || pkg.is_local);
+        const iconName = isLocal ? 'folder-library' : 'package';
+        const versionHeading = pkg.version ? ` \`v${pkg.version}\`` : '';
+        md.appendMarkdown(`### $(${iconName}) ${pkg.name}${versionHeading}\n\n`);
+
+        if (outdatedVer && outdatedVer !== pkg.version) {
+            md.appendMarkdown(`$(arrow-up) **Update available**: \`v${outdatedVer}\`\n\n`);
         }
-        if (pkg.is_editable || pkg.is_local) {
-            lines.push(`Type: Local ${pkg.is_editable ? 'Editable ' : ''}Subpackage`);
+
+        const details: string[] = [];
+        const kindLabel = pkg.kind ? pkg.kind.toUpperCase() : 'Conda';
+        const typeLabel = pkg.is_explicit ? 'explicit' : 'transitive';
+        details.push(`- **Type**: ${kindLabel} (${typeLabel})`);
+
+        if (this.featureName) {
+            details.push(`- **Feature**: \`${this.featureName}\``);
+        }
+        if (isLocal) {
+            const editLabel = pkg.is_editable ? 'Editable ' : '';
+            details.push(`- **Subpackage**: Local ${editLabel}Subpackage`);
         }
         if (pkg.local_path) {
-            lines.push(`Path: ${pkg.local_path}`);
+            details.push(`- **Path**: \`${pkg.local_path}\``);
         }
         if (pkg.build) {
-            lines.push(`Build: ${pkg.build}`);
+            details.push(`- **Build**: \`${pkg.build}\``);
         }
         if (pkg.license) {
-            lines.push(`License: ${pkg.license}`);
+            details.push(`- **License**: ${pkg.license}`);
         }
         if (pkg.source && !pkg.is_local) {
-            lines.push(`Source: ${pkg.source}`);
+            details.push(`- **Source**: ${pkg.source}`);
         }
+
+        md.appendMarkdown(details.join('\n') + '\n\n');
+
         if (pkg.local_manifest_path) {
-            lines.push(`\nClick to open ${path.basename(pkg.local_manifest_path)}`);
+            md.appendMarkdown('---\n\n*Click to open subpackage manifest*');
             this.command = {
                 command: 'vscode.open',
                 title: 'Open Subpackage Manifest',
                 arguments: [Uri.file(pkg.local_manifest_path)],
             };
         }
-        this.tooltip = lines.join('\n');
-        const isLocal = Boolean(pkg.is_editable || pkg.is_local);
+        this.tooltip = md;
         this.contextValue = isLocal
             ? pkg.is_explicit
                 ? 'pixiPackageLocalExplicit'
@@ -303,33 +299,53 @@ export class PixiEnvironmentTreeItem extends TreeItem {
             this.contextValue = 'pixiEnvIncompatible';
         }
 
-        const lines = [
-            `Environment: ${env.pixiEnvName}`,
-            `Status: ${env.pixiStatus}`,
-            `Project: ${project.name}`,
-            `Prefix: ${env.prefix}`,
-        ];
+        const md = new MarkdownString('', true);
+        md.isTrusted = true;
+        md.supportHtml = true;
+
+        const statusIcon =
+            env.pixiStatus === 'installed'
+                ? 'pass-filled'
+                : env.pixiStatus === 'uninstalled'
+                  ? 'circle-outline'
+                  : 'error';
+        md.appendMarkdown(`### $(${statusIcon}) ${env.pixiEnvName}\n\n`);
+
+        const details: string[] = [];
+        details.push(`- **Status**: ${env.pixiStatus}`);
+        details.push(`- **Project**: ${project.name}`);
+        details.push(`- **Prefix**: \`${env.prefix}\``);
+
         if (env.solveGroup) {
-            lines.push(`Solve Group: ${env.solveGroup}`);
+            details.push(`- **Solve Group**: \`${env.solveGroup}\``);
         }
         if (env.environmentSize) {
-            lines.push(`Size on Disk: ${env.environmentSize}`);
+            details.push(`- **Size on Disk**: \`${env.environmentSize}\``);
         }
         if (envFeatures && envFeatures.length > 0) {
-            lines.push(`Features: ${envFeatures.join(', ')}`);
+            details.push(`- **Features**: ${envFeatures.map((f) => `\`${f}\``).join(', ')}`);
         }
         if (env.statusReason) {
-            lines.push(`Reason: ${env.statusReason}`);
+            details.push(`- **Reason**: ${env.statusReason}`);
         }
-        lines.push(...toolchainLines);
+        if (toolchainSummary) {
+            details.push(`- **Toolchains**: ${toolchainSummary}`);
+        }
         if (env.resolvedPlatform) {
-            lines.push(`Resolved Platform: ${env.resolvedPlatform}`);
+            details.push(`- **Platform**: \`${env.resolvedPlatform}\``);
         }
-        if (env.platforms && env.platforms.length > 0) {
-            const platformNames = env.platforms.map((p) => (typeof p === 'string' ? p : p.name));
-            lines.push(`Configured Platforms: ${platformNames.join(', ')}`);
+
+        md.appendMarkdown(details.join('\n') + '\n\n');
+        if (toolchainLines.length > 0) {
+            md.appendMarkdown('---\n\n' + toolchainLines.join('\n\n') + '\n\n');
         }
-        this.tooltip = lines.join('\n');
+
+        if (env.pixiStatus === 'uninstalled') {
+            md.appendMarkdown('---\n\n*Click to install environment*');
+        } else if (env.pixiStatus === 'installed') {
+            md.appendMarkdown('---\n\n*Right-click for environment actions*');
+        }
+        this.tooltip = md;
     }
 }
 
@@ -488,8 +504,12 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
         this.updateViewDescription();
     }
 
-    public refresh(): void {
-        this.featuresCache.clear();
+    public refresh(projectPath?: string): void {
+        if (projectPath) {
+            this.featuresCache.delete(projectPath);
+        } else {
+            this.featuresCache.clear();
+        }
         this.updateViewDescription();
         this._onDidChangeTreeData.fire();
     }
@@ -618,28 +638,12 @@ export class PixiProjectsTreeDataProvider implements TreeDataProvider<PixiProjec
 
     private async createWorkspaceHeaderTreeItem(project: PixiProject): Promise<PixiWorkspaceHeaderTreeItem> {
         const summary = await this.resolveProjectSummary(project);
-        return new PixiWorkspaceHeaderTreeItem(
-            project,
-            summary.platforms,
-            summary.channels,
-            summary.envCount,
-            summary.featureCount,
-            summary.descriptionText,
-            summary.requiresPixi,
-        );
+        return new PixiWorkspaceHeaderTreeItem(project, summary);
     }
 
     private async createProjectTreeItem(project: PixiProject): Promise<PixiProjectTreeItem> {
         const summary = await this.resolveProjectSummary(project);
-        return new PixiProjectTreeItem(
-            project,
-            summary.platforms,
-            summary.channels,
-            summary.envCount,
-            summary.featureCount,
-            summary.descriptionText,
-            summary.requiresPixi,
-        );
+        return new PixiProjectTreeItem(project, summary);
     }
 
     private async getProjectChildren(

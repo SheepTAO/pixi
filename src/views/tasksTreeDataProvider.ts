@@ -3,6 +3,7 @@ import {
     Disposable,
     Event,
     EventEmitter,
+    MarkdownString,
     ThemeColor,
     ThemeIcon,
     TreeDataProvider,
@@ -68,31 +69,41 @@ export class PixiTaskTreeItem extends TreeItem {
         // Intelligent Codicon matching based on task name semantics
         this.iconPath = resolveTaskIcon(task.name);
 
-        const lines = [`Task: ${task.name}`];
-        if (task.cmd) {
-            lines.push(`Command: ${task.cmd}`);
-        }
+        const md = new MarkdownString('', true);
+        md.isTrusted = true;
+        md.supportHtml = true;
+
+        const envHeading = task.default_environment ? ` \`[${task.default_environment}]\`` : '';
+        md.appendMarkdown(`### $(terminal) ${task.name}${envHeading}\n\n`);
+
         if (task.description) {
-            lines.push(`Description: ${task.description}`);
+            md.appendMarkdown(`*${task.description}*\n\n`);
         }
-        if (task.default_environment) {
-            lines.push(`Environment: ${task.default_environment}`);
+
+        if (task.cmd) {
+            md.appendMarkdown('```bash\n' + task.cmd + '\n```\n\n');
         }
+
+        const details: string[] = [];
         if (task.depends_on && task.depends_on.length > 0) {
-            const deps = task.depends_on.map((d) => d.task_name).join(', ');
-            lines.push(`Depends on: ${deps}`);
+            details.push(`- **Depends on**: ${task.depends_on.map((d) => `\`${d.task_name}\``).join(', ')}`);
         }
         if (task.inputs && task.inputs.length > 0) {
-            lines.push(`Inputs: ${task.inputs.join(', ')}`);
+            details.push(`- **Inputs**: ${task.inputs.map((i) => `\`${i}\``).join(', ')}`);
         }
         if (task.outputs && task.outputs.length > 0) {
-            lines.push(`Outputs: ${task.outputs.join(', ')}`);
+            details.push(`- **Outputs**: ${task.outputs.map((o) => `\`${o}\``).join(', ')}`);
         }
         if (task.clean_env) {
-            lines.push('Clean environment: yes');
+            details.push('- **Clean environment**: yes');
         }
-        lines.push('\nClick to run task');
-        this.tooltip = lines.join('\n');
+
+        if (details.length > 0) {
+            md.appendMarkdown(details.join('\n') + '\n\n');
+        }
+
+        md.appendMarkdown('---\n\n*Click to run task • Right-click for options*');
+        this.tooltip = md;
 
         this.command = {
             command: 'pixi.runTask',
@@ -108,9 +119,14 @@ export class PixiTaskEmptyTreeItem extends TreeItem {
     constructor(public readonly project: PixiProject) {
         super('No tasks found', TreeItemCollapsibleState.None);
         const manifestName = path.basename(project.manifestPath);
-        this.tooltip = `No tasks defined in ${project.name}. Define tasks under [tasks] in ${manifestName} or click '+' in the view title.`;
+        this.tooltip = `No tasks defined in ${project.name}. Click to add a task in ${manifestName}.`;
         this.iconPath = new ThemeIcon('info');
         this.contextValue = 'pixiTaskEmpty';
+        this.command = {
+            command: 'pixi.tasks.addTask',
+            title: 'Add Task',
+            arguments: [project],
+        };
     }
 }
 
@@ -174,13 +190,13 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
         if (!element) {
             if (projects.length === 1) {
                 const singleProject = projects[0];
-                return this.getTaskItemsForProject(singleProject);
+                return this.getTaskItemsForProject(singleProject, true);
             }
             return projects.map((p) => new PixiProjectTreeItem(p));
         }
 
         if (element instanceof PixiProjectTreeItem) {
-            return this.getTaskItemsForProject(element.project);
+            return this.getTaskItemsForProject(element.project, false);
         }
 
         if (element instanceof PixiTaskGroupTreeItem) {
@@ -190,9 +206,15 @@ export class PixiTasksTreeDataProvider implements TreeDataProvider<PixiTasksTree
         return [];
     }
 
-    private async getTaskItemsForProject(project: PixiProject): Promise<PixiTasksTreeItem[]> {
+    private async getTaskItemsForProject(
+        project: PixiProject,
+        isSingleProjectRoot = false,
+    ): Promise<PixiTasksTreeItem[]> {
         const tasks = await this.taskProvider.getTasksForProject(project.projectPath);
         if (tasks.length === 0) {
+            if (isSingleProjectRoot) {
+                return [];
+            }
             return [new PixiTaskEmptyTreeItem(project)];
         }
 

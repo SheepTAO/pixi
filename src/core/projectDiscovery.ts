@@ -47,6 +47,23 @@ export function isPixiManifestSection(section?: string | null, isPyprojectDoc?: 
     return !isPyprojectDoc || section === 'tool.pixi' || section.startsWith('tool.pixi.');
 }
 
+export interface ManifestMetadata {
+    description?: string;
+    requiresPixi?: string;
+}
+
+/**
+ * Extracts top-level metadata (description, requires-pixi) from manifest content.
+ */
+export function parseManifestMetadata(content: string): ManifestMetadata {
+    const descMatch = content.match(/description\s*=\s*["']([^"']+)["']/);
+    const reqMatch = content.match(/requires-pixi\s*=\s*["']([^"']+)["']/);
+    return {
+        description: descMatch ? descMatch[1] : undefined,
+        requiresPixi: reqMatch ? reqMatch[1] : undefined,
+    };
+}
+
 export { getProjectKey, isPathInside, isSamePath, PathMap, PathSet, toCanonicalPathKey } from '../common/collections';
 
 export interface WorkspaceChannelEntry {

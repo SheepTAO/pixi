@@ -1650,7 +1650,7 @@
             },
             {
                 "view": "pixi.views.tasks",
-                "contents": "No tasks found in current project.\nDefine tasks under [tasks] in pixi.toml or pyproject.toml.",
+                "contents": "No tasks found in current workspace.\n[Add Task](command:pixi.tasks.addTask)",
                 "when": "pixi.hasPixiProject"
             },
             {

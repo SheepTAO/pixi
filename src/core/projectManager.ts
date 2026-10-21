@@ -23,6 +23,7 @@ import {
     isPyproject,
     isSamePath,
     LOCKFILE_NAME,
+    parseManifestMetadata,
     PathMap,
     PathSet,
     PIXI_MANIFEST_NAME,
@@ -421,15 +422,14 @@ export class PixiProjectManager implements Disposable {
             try {
                 if (fs.existsSync(manifestPath)) {
                     const content = fs.readFileSync(manifestPath, 'utf8');
-                    const descMatch = content.match(/description\s*=\s*["']([^"']+)["']/);
-                    if (descMatch) {
-                        this.projectToDescription.set(normalized, descMatch[1]);
+                    const meta = parseManifestMetadata(content);
+                    if (meta.description) {
+                        this.projectToDescription.set(normalized, meta.description);
                     } else {
                         this.projectToDescription.delete(normalized);
                     }
-                    const reqMatch = content.match(/requires-pixi\s*=\s*["']([^"']+)["']/);
-                    if (reqMatch) {
-                        this.projectToRequiresPixi.set(normalized, reqMatch[1]);
+                    if (meta.requiresPixi) {
+                        this.projectToRequiresPixi.set(normalized, meta.requiresPixi);
                     } else {
                         this.projectToRequiresPixi.delete(normalized);
                     }
